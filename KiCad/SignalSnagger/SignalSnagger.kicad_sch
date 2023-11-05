@@ -6,8 +6,8 @@
 
   (title_block
     (title "SignalSnagger")
-    (date "2023-11-04")
-    (rev "0.5")
+    (date "2023-11-05")
+    (rev "0.6")
   )
 
   (lib_symbols
@@ -2762,6 +2762,10 @@
   (text "Primary" (at 139.7 101.6 0)
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid d5dd4794-a134-43f5-96aa-5513758ccb35)
+  )
+  (text "Ribbon Cable" (at 77.47 27.94 180)
+    (effects (font (size 1.27 1.27)) (justify right bottom))
+    (uuid f1a74a7c-9925-4035-b8e4-01a61abb41c1)
   )
   (text "Sense Adj." (at 21.59 128.27 0)
     (effects (font (size 1.27 1.27)) (justify left bottom))
