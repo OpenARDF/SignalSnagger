@@ -7,7 +7,7 @@
   (title_block
     (title "SignalSnagger")
     (date "2023-11-05")
-    (rev "0.7")
+    (rev "0.8")
   )
 
   (lib_symbols
@@ -1772,7 +1772,6 @@
     )
   )
 
-
   (junction (at 125.73 162.56) (diameter 0) (color 0 0 0 0)
     (uuid 2559bfb0-db58-4d81-9aed-6ce3593482b1)
   )
@@ -1876,7 +1875,7 @@
   (no_connect (at 76.2 58.42) (uuid c85ce056-eb95-4ab3-a8df-27f333c5dc76))
   (no_connect (at 76.2 68.58) (uuid d58aee08-764b-495e-ad45-18c000aae31b))
   (no_connect (at 111.76 63.5) (uuid e115eb2e-f619-4028-8158-c5f77a712de4))
-  (no_connect (at 111.76 76.2) (uuid e115eb2e-f619-4028-8158-c5f77a712de4))
+  (no_connect (at 111.76 76.2) (uuid e115eb2e-f619-4028-8158-c5f77a712de5))
   (no_connect (at 53.34 91.44) (uuid fcefbfac-a978-47e7-b6cc-1f627a255393))
 
   (wire (pts (xy 165.1 158.75) (xy 165.1 162.56))
@@ -2440,6 +2439,10 @@
   (text "GREEN" (at 158.75 161.29 0)
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid 6b1014af-3b18-4920-99d2-f06bf0babfc5)
+  )
+  (text "Nominal 14.2 MHz" (at 207.01 48.26 0)
+    (effects (font (size 1.27 1.27)) (justify left bottom))
+    (uuid 744a7e76-42a9-4717-b495-06a4f53adf75)
   )
   (text "On/Off" (at 78.74 142.24 0)
     (effects (font (size 1.27 1.27)) (justify left bottom))
