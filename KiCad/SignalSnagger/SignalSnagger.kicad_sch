@@ -6,8 +6,8 @@
 
   (title_block
     (title "SignalSnagger")
-    (date "2023-12-19")
-    (rev "0.21")
+    (date "2024-02-01")
+    (rev "0.22")
   )
 
   (lib_symbols
@@ -6496,6 +6496,12 @@
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/994ba703-f593-4edb-82a7-7dcbf0a27a42"
       (reference "#PWR0256") (unit 1) (value "+3V3") (footprint "")
     )
+    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/506627be-637b-4014-9c50-e157b466aea8"
+      (reference "#PWR0257") (unit 1) (value "GND") (footprint "")
+    )
+    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/02f99529-5da4-4be5-b246-d4e24a456d76"
+      (reference "#PWR0258") (unit 1) (value "+3V3") (footprint "")
+    )
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/70bc3570-00d9-418f-b6ec-c2cffe8f468f"
       (reference "#PWR0301") (unit 1) (value "GND") (footprint "")
     )
@@ -6504,6 +6510,9 @@
     )
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/bd8c5134-1f7a-4328-a64d-6ae8ead7e58c"
       (reference "#PWR0303") (unit 1) (value "GND") (footprint "")
+    )
+    (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/d3555311-f089-4336-bfb7-2413a4df2f08"
+      (reference "#PWR0304") (unit 1) (value "GND") (footprint "")
     )
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/5f1464d3-210a-4430-86bf-55129e62f884"
       (reference "#PWR0305") (unit 1) (value "GND") (footprint "")
@@ -6940,6 +6949,12 @@
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/d84ebe8f-1ee5-419c-acb9-a953a294a533"
       (reference "R213") (unit 1) (value "27k") (footprint "Resistor_SMD:R_0805_2012Metric")
     )
+    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/fa1b5a6e-f150-4519-bc47-45d93fe8d11e"
+      (reference "R214") (unit 1) (value "10k") (footprint "Resistor_SMD:R_0805_2012Metric")
+    )
+    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/ce7da26e-d8dc-46ac-ba09-478814a71674"
+      (reference "R215") (unit 1) (value "10k") (footprint "Resistor_SMD:R_0805_2012Metric")
+    )
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/46881e72-f446-4768-afd0-02aeb8090402"
       (reference "R301") (unit 1) (value "10k") (footprint "")
     )
@@ -6984,6 +6999,9 @@
     )
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/e5c8aed2-a090-4a08-9192-da4c6cbb326e"
       (reference "R315") (unit 1) (value "10k") (footprint "")
+    )
+    (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/a0d60062-2053-43e0-93e8-dc89fb17b24a"
+      (reference "R316") (unit 1) (value "470") (footprint "")
     )
     (path "/c0687338-f6ed-4456-aad9-d29c3bd35909"
       (reference "RV101") (unit 1) (value "10k 10T") (footprint "")
