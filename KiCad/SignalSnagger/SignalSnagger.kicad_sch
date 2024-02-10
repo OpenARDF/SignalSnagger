@@ -7,7 +7,7 @@
   (title_block
     (title "SignalSnagger")
     (date "2024-02-09")
-    (rev "0.26")
+    (rev "0.27")
   )
 
   (lib_symbols
@@ -6742,12 +6742,6 @@
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/d50d4fc5-5df4-4320-89cf-6361690e6376"
       (reference "#PWR0261") (unit 1) (value "GNDD") (footprint "")
     )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/e5b5dd73-b12b-40e0-af26-495764fc3b27"
-      (reference "#PWR0262") (unit 1) (value "+5V") (footprint "")
-    )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/cdc00cb0-11b4-4fb4-9ee9-bbad04e0f9a2"
-      (reference "#PWR0263") (unit 1) (value "+5V") (footprint "")
-    )
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/70bc3570-00d9-418f-b6ec-c2cffe8f468f"
       (reference "#PWR0301") (unit 1) (value "GND") (footprint "")
     )
@@ -7147,12 +7141,6 @@
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/d6b92832-117f-4f59-aaf6-0717883ff45d"
       (reference "J215") (unit 1) (value "Conn_01x01_Female") (footprint "")
     )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/94ead492-5964-42a8-bec7-e830110bd8b1"
-      (reference "J216") (unit 1) (value "Conn_01x01_Female") (footprint "")
-    )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/7604ee4c-e3b1-4008-8029-c254af90966b"
-      (reference "J217") (unit 1) (value "Conn_01x01_Female") (footprint "")
-    )
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/b655b61e-e422-44ae-96f0-14ea7413fab6"
       (reference "J301") (unit 1) (value "Headphones") (footprint "")
     )
@@ -7311,12 +7299,6 @@
     )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/ce7da26e-d8dc-46ac-ba09-478814a71674"
       (reference "R215") (unit 1) (value "10k") (footprint "Resistor_SMD:R_0805_2012Metric")
-    )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/8a5d5b6f-aa2d-43e6-a52c-5e310f1c62f2"
-      (reference "R216") (unit 1) (value "10k") (footprint "Resistor_SMD:R_0805_2012Metric")
-    )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/fc49b511-c388-4540-826a-ea5b6d6e23a3"
-      (reference "R217") (unit 1) (value "10k") (footprint "Resistor_SMD:R_0805_2012Metric")
     )
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/46881e72-f446-4768-afd0-02aeb8090402"
       (reference "R301") (unit 1) (value "10k") (footprint "")
