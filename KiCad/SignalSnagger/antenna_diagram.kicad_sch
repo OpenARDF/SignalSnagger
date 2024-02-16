@@ -5901,4 +5901,10 @@
       3AAAAABJRU5ErkJggg==
     )
   )
+
+  (text "Note for reference only and use\nthe pins #'s in the root page of\nthe schematic. Reason pin  7 and 8\nwere swapped: to get proper \nphasing of this sense loop."
+    (at 81.28 152.4 0)
+    (effects (font (size 1.27 1.27)) (justify left bottom))
+    (uuid ac66b195-7eea-46a9-9d02-005080e953a0)
+  )
 )
