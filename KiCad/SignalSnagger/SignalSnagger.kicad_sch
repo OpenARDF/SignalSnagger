@@ -4130,36 +4130,6 @@
     (pin "2" (uuid c54809c2-ca57-4955-8654-5b58ac0cf147))
   )
 
-  (symbol (lib_id "Device:C_Small") (at 146.05 130.81 0) (mirror x) (unit 1)
-    (in_bom yes) (on_board yes)
-    (uuid 16cc8a9f-1003-407d-b999-29609c049c67)
-    (property "Reference" "C126" (id 0) (at 148.59 130.81 90))
-    (property "Value" "10uF" (id 1) (at 143.51 133.35 0))
-    (property "Footprint" "Capacitor_SMD:C_0603_1608Metric" (id 2) (at 146.05 130.81 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "Datasheet" "~" (id 3) (at 146.05 130.81 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "Digi-Key Part No." "1276-1006-1-ND" (id 4) (at 146.05 130.81 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "Link" "https://www.digikey.com/en/products/detail/samsung-electro-mechanics/CL10B104KA8NNNC/3886664" (id 5) (at 146.05 130.81 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "Manufacturer" "Samsung Electro-Mechanics" (id 6) (at 146.05 130.81 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "Manufacturer PN" "CL10B104KA8NNNC" (id 7) (at 146.05 130.81 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "Description" "CAP CER 0.1UF 25V X7R 0603" (id 8) (at 146.05 130.81 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (pin "1" (uuid 93e19792-df4f-4888-be38-c817e631b9a0))
-    (pin "2" (uuid 9c351a93-eca6-48ee-a027-846e69c7b1b6))
-  )
-
   (symbol (lib_id "Connector_Generic:Conn_01x01") (at 93.98 121.92 0) (mirror y) (unit 1)
     (in_bom yes) (on_board yes)
     (uuid 1827fd48-a0ad-4504-ad60-021c20fdb5f0)
@@ -4760,32 +4730,32 @@
 
   (symbol (lib_id "Device:C_Small") (at 134.62 130.81 0) (mirror x) (unit 1)
     (in_bom yes) (on_board yes)
-    (uuid 5e46f9b8-27ca-428e-9b24-8aaad6d75d0e)
+    (uuid 5ab35832-744c-4db2-888b-e9ca106db8b3)
     (property "Reference" "C125" (id 0) (at 137.16 130.81 90))
-    (property "Value" "10uF" (id 1) (at 132.08 133.35 0))
-    (property "Footprint" "Capacitor_SMD:C_0603_1608Metric" (id 2) (at 134.62 130.81 0)
+    (property "Value" "" (id 1) (at 132.08 130.81 90))
+    (property "Footprint" "" (id 2) (at 134.62 130.81 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 134.62 130.81 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Digi-Key Part No." "1276-1006-1-ND" (id 4) (at 134.62 130.81 0)
+    (property "Digi-Key Part No." "490-7198-1-ND" (id 4) (at 134.62 130.81 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Link" "https://www.digikey.com/en/products/detail/samsung-electro-mechanics/CL10B104KA8NNNC/3886664" (id 5) (at 134.62 130.81 0)
+    (property "Link" "https://www.digikey.com/en/products/detail/murata-electronics/GRM188C81C106MA73D/3900463" (id 5) (at 134.62 130.81 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Manufacturer" "Samsung Electro-Mechanics" (id 6) (at 134.62 130.81 0)
+    (property "Manufacturer" "Murata Electronics" (id 6) (at 134.62 130.81 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Manufacturer PN" "CL10B104KA8NNNC" (id 7) (at 134.62 130.81 0)
+    (property "Manufacturer PN" "GRM188C81C106MA73D" (id 7) (at 134.62 130.81 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Description" "CAP CER 0.1UF 25V X7R 0603" (id 8) (at 134.62 130.81 0)
+    (property "Description" "CAP CER 10UF 16V X6S 0603" (id 8) (at 134.62 130.81 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (pin "1" (uuid 1ee58771-ef0c-4ca3-8335-39fdac7bc5ce))
-    (pin "2" (uuid 78297bb0-3e1c-4569-882c-85524aa105bd))
+    (pin "1" (uuid 6af8a0e1-8afc-4e45-b164-14578ea76525))
+    (pin "2" (uuid 369a0b24-b9d1-4a6f-b0a0-66563381417d))
   )
 
   (symbol (lib_id "Connector_Generic:Conn_01x01") (at 120.65 96.52 180) (unit 1)
@@ -4996,6 +4966,36 @@
     (pin "2" (uuid 616c9a34-552a-407f-a94b-3f85cd1471bd))
   )
 
+  (symbol (lib_id "Device:C_Small") (at 146.05 130.81 0) (mirror x) (unit 1)
+    (in_bom yes) (on_board yes)
+    (uuid 6a94604c-3e18-4468-a890-eb9dcd8a9629)
+    (property "Reference" "C126" (id 0) (at 148.59 130.81 90))
+    (property "Value" "10uF" (id 1) (at 143.51 130.81 90))
+    (property "Footprint" "Capacitor_SMD:C_0603_1608Metric" (id 2) (at 146.05 130.81 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Datasheet" "~" (id 3) (at 146.05 130.81 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Digi-Key Part No." "490-7198-1-ND" (id 4) (at 146.05 130.81 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Link" "https://www.digikey.com/en/products/detail/murata-electronics/GRM188C81C106MA73D/3900463" (id 5) (at 146.05 130.81 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Manufacturer" "Murata Electronics" (id 6) (at 146.05 130.81 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Manufacturer PN" "GRM188C81C106MA73D" (id 7) (at 146.05 130.81 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Description" "CAP CER 10UF 16V X6S 0603" (id 8) (at 146.05 130.81 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (pin "1" (uuid 10682502-dab3-4156-9f83-b340040f0064))
+    (pin "2" (uuid 43e26d32-34e0-4fd6-99cc-79bb9bb70714))
+  )
+
   (symbol (lib_id "power:+5V") (at 250.19 95.25 0) (unit 1)
     (in_bom yes) (on_board yes) (fields_autoplaced)
     (uuid 6e7b32e2-521d-41c4-9419-547418a5bfc1)
@@ -5068,26 +5068,26 @@
     (in_bom yes) (on_board yes)
     (uuid 738ec6f4-ce2c-4d88-966c-282be5fd7513)
     (property "Reference" "C113" (id 0) (at 194.31 80.01 90))
-    (property "Value" "10uF" (id 1) (at 191.77 85.09 90))
-    (property "Footprint" "Capacitor_SMD:C_0603_1608Metric" (id 2) (at 194.31 82.55 0)
+    (property "Value" "" (id 1) (at 191.77 85.09 90))
+    (property "Footprint" "" (id 2) (at 194.31 82.55 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 194.31 82.55 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Digi-Key Part No." "1276-1006-1-ND" (id 4) (at 194.31 82.55 0)
+    (property "Digi-Key Part No." "490-7198-1-ND" (id 4) (at 194.31 82.55 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Link" "https://www.digikey.com/en/products/detail/samsung-electro-mechanics/CL10B104KA8NNNC/3886664" (id 5) (at 194.31 82.55 0)
+    (property "Link" "https://www.digikey.com/en/products/detail/murata-electronics/GRM188C81C106MA73D/3900463" (id 5) (at 194.31 82.55 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Manufacturer" "Samsung Electro-Mechanics" (id 6) (at 194.31 82.55 0)
+    (property "Manufacturer" "Murata Electronics" (id 6) (at 194.31 82.55 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Manufacturer PN" "CL10B104KA8NNNC" (id 7) (at 194.31 82.55 0)
+    (property "Manufacturer PN" "GRM188C81C106MA73D" (id 7) (at 194.31 82.55 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Description" "CAP CER 0.1UF 25V X7R 0603" (id 8) (at 194.31 82.55 0)
+    (property "Description" "CAP CER 10UF 16V X6S 0603" (id 8) (at 194.31 82.55 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (pin "1" (uuid cca35fb9-6312-458f-a32c-b92e350c6a88))
@@ -7434,10 +7434,10 @@
     (path "/91dd2452-6baf-4651-a8c1-d54f60a5ff5b"
       (reference "C124") (unit 1) (value "100nF") (footprint "Capacitor_SMD:C_0603_1608Metric")
     )
-    (path "/5e46f9b8-27ca-428e-9b24-8aaad6d75d0e"
+    (path "/5ab35832-744c-4db2-888b-e9ca106db8b3"
       (reference "C125") (unit 1) (value "10uF") (footprint "Capacitor_SMD:C_0603_1608Metric")
     )
-    (path "/16cc8a9f-1003-407d-b999-29609c049c67"
+    (path "/6a94604c-3e18-4468-a890-eb9dcd8a9629"
       (reference "C126") (unit 1) (value "10uF") (footprint "Capacitor_SMD:C_0603_1608Metric")
     )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/8c7d301d-21af-4130-93cd-4bebe0942727"
@@ -7476,7 +7476,7 @@
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/021ad0f0-803b-4c21-b330-63b488205bd8"
       (reference "C212") (unit 1) (value "100nF") (footprint "Capacitor_SMD:C_0603_1608Metric")
     )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/7600b491-afa0-4043-bd36-7d6a11f2a791"
+    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/0c8d4f60-6a35-4f7f-9222-8d3d151aec21"
       (reference "C213") (unit 1) (value "10uF") (footprint "Capacitor_SMD:C_0603_1608Metric")
     )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/0fac0199-4032-4f23-bcdf-98487dc2973f"
@@ -7509,13 +7509,13 @@
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/8b1c051c-4c3a-4a5b-a37c-42fa19ad93cd"
       (reference "C223") (unit 1) (value "10nF") (footprint "Capacitor_SMD:C_0603_1608Metric")
     )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/c1862cce-ad12-49b3-b553-43ced661d9f4"
+    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/15141ed1-0fc3-47ba-8bcc-dfc5f1deb7c2"
       (reference "C224") (unit 1) (value "10uF") (footprint "Capacitor_SMD:C_0603_1608Metric")
     )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/27e20b88-b74a-4dee-90ad-198230c042c9"
+    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/5d8fcfa2-4966-4bf3-970f-25575d0445f8"
       (reference "C225") (unit 1) (value "10uF") (footprint "Capacitor_SMD:C_0603_1608Metric")
     )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/122512f8-e7b7-4afc-9983-cdc61a42ef58"
+    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/f14cc0d3-76c9-429b-8f7b-b166187a18a9"
       (reference "C226") (unit 1) (value "10uF") (footprint "Capacitor_SMD:C_0603_1608Metric")
     )
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/f40d6557-8a16-4a94-8510-c9fc57259cf3"
@@ -7533,7 +7533,7 @@
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/76dc1819-8c2c-4b59-8b9e-00fb20f7c071"
       (reference "C305") (unit 1) (value "1uF") (footprint "Capacitor_SMD:C_0201_0603Metric")
     )
-    (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/7d73ba74-1b0c-480b-a944-51833ca4f1d0"
+    (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/5c5cf4cb-b9e1-4a1d-a820-0d0b0bd053d0"
       (reference "C306") (unit 1) (value "10uF") (footprint "Capacitor_SMD:C_0603_1608Metric")
     )
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/891a8550-96e1-43f5-961b-5fb6990912b9"
@@ -7551,7 +7551,7 @@
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/c935f68c-5b78-4709-b338-79fe02e54476"
       (reference "C311") (unit 1) (value "4.7nF") (footprint "Capacitor_SMD:C_0603_1608Metric")
     )
-    (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/51100f77-6464-40f4-8504-664b97ee1bec"
+    (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/345224f9-ca30-4313-9c1d-4f7e59ebd995"
       (reference "C312") (unit 1) (value "10uF") (footprint "Capacitor_SMD:C_0603_1608Metric")
     )
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/86289dd2-27eb-43b8-af29-a1eb62859928"
