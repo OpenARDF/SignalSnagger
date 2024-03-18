@@ -6,8 +6,8 @@
 
   (title_block
     (title "SignalSnagger")
-    (date "2024-03-16")
-    (rev "0.308")
+    (date "2024-03-18")
+    (rev "0.309")
   )
 
   (lib_symbols
@@ -1684,7 +1684,7 @@
   (symbol (lib_id "Device:R_US") (at 29.21 87.63 0) (unit 1)
     (in_bom yes) (on_board yes)
     (uuid 0ee7f5cc-b913-4fd9-83fb-3855a6132b22)
-    (property "Reference" "R315" (id 0) (at 26.67 90.17 90)
+    (property "Reference" "R931" (id 0) (at 26.67 90.17 90)
       (effects (font (size 1.27 1.27)) (justify left))
     )
     (property "Value" "10k" (id 1) (at 30.48 87.63 0)
@@ -2370,7 +2370,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x01") (at 29.21 66.04 90) (unit 1)
     (in_bom yes) (on_board yes)
     (uuid 5305e634-bacf-4ba8-90e7-a2ca8c978062)
-    (property "Reference" "J303" (id 0) (at 26.67 68.58 0)
+    (property "Reference" "J903" (id 0) (at 26.67 68.58 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
     (property "Value" "36-5005-ND" (id 1) (at 34.29 62.23 90)
@@ -3183,7 +3183,7 @@
   (symbol (lib_id "Device:R_US") (at 29.21 78.74 0) (unit 1)
     (in_bom yes) (on_board yes)
     (uuid a5c989bb-de7a-4ca6-843f-bec8e69a15f5)
-    (property "Reference" "R314" (id 0) (at 26.67 78.74 90))
+    (property "Reference" "R930" (id 0) (at 26.67 78.74 90))
     (property "Value" "49.9k" (id 1) (at 33.02 78.74 0))
     (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (id 2) (at 30.226 78.994 90)
       (effects (font (size 1.27 1.27)) hide)

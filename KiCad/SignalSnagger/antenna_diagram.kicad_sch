@@ -6,8 +6,8 @@
 
   (title_block
     (title "SignalSnagger")
-    (date "2024-03-16")
-    (rev "0.308")
+    (date "2024-03-18")
+    (rev "0.309")
   )
 
   (lib_symbols
