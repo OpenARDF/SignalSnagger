@@ -6,8 +6,8 @@
 
   (title_block
     (title "SignalSnagger")
-    (date "2024-03-18")
-    (rev "0.310")
+    (date "2024-03-27")
+    (rev "0.311")
   )
 
   (lib_symbols
@@ -4102,11 +4102,11 @@
     (pin "8" (uuid ccc602fe-50f3-46f6-845d-42a108eb6585))
   )
 
-  (symbol (lib_id "Device:C_Trim_Small") (at 90.17 95.25 270) (unit 1)
+  (symbol (lib_id "Device:C_Trim_Small") (at 90.17 95.25 90) (mirror x) (unit 1)
     (in_bom yes) (on_board yes)
     (uuid 3ad8e564-13c0-45ed-b571-a8203aa9f7d4)
     (property "Reference" "C103" (id 0) (at 90.17 90.17 90))
-    (property "Value" "8.5-100pF" (id 1) (at 91.44 92.71 90))
+    (property "Value" "8.5-100pF" (id 1) (at 90.17 92.71 90))
     (property "Footprint" "Capacitor_THT:VC07B" (id 2) (at 90.17 95.25 0)
       (effects (font (size 1.27 1.27)) hide)
     )
@@ -4165,7 +4165,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x01") (at 115.57 113.03 180) (unit 1)
     (in_bom yes) (on_board yes)
     (uuid 3be554d6-823f-4d9c-a16c-d371973bacd7)
-    (property "Reference" "J109" (id 0) (at 116.84 115.57 0)
+    (property "Reference" "J909" (id 0) (at 116.84 115.57 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
     (property "Value" "36-5006-ND" (id 1) (at 119.38 110.49 0)
@@ -4477,7 +4477,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x01") (at 120.65 96.52 180) (unit 1)
     (in_bom yes) (on_board yes)
     (uuid 60c7fee4-1aad-4981-b1ec-5f32a5ec1971)
-    (property "Reference" "J110" (id 0) (at 121.92 99.06 0)
+    (property "Reference" "J910" (id 0) (at 121.92 99.06 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
     (property "Value" "36-5006-ND" (id 1) (at 123.19 93.98 0)
@@ -5330,11 +5330,11 @@
     (pin "1" (uuid 0954e557-d3a0-4c0f-8cd1-48b5fafaf758))
   )
 
-  (symbol (lib_id "Device:C_Small") (at 251.46 82.55 270) (unit 1)
+  (symbol (lib_id "Device:C_Small") (at 251.46 82.55 90) (mirror x) (unit 1)
     (in_bom yes) (on_board yes) (fields_autoplaced)
     (uuid 935fb625-810b-4886-9682-5be4f99044f8)
-    (property "Reference" "C919" (id 0) (at 251.4536 77.2881 90))
-    (property "Value" "390pF" (id 1) (at 251.4536 79.825 90))
+    (property "Reference" "C919" (id 0) (at 251.4663 77.2881 90))
+    (property "Value" "390pF" (id 1) (at 251.4663 79.825 90))
     (property "Footprint" "Capacitor_SMD:C_0603_1608Metric" (id 2) (at 251.46 82.55 0)
       (effects (font (size 1.27 1.27)) hide)
     )
@@ -5489,10 +5489,10 @@
     (property "Reference" "JP103" (id 0) (at 40.64 105.41 90)
       (effects (font (size 1.27 1.27)) (justify right))
     )
-    (property "Value" "" (id 1) (at 37.5721 102.87 0)
+    (property "Value" "Jumper_2_Bridged" (id 1) (at 37.5721 102.87 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Footprint" "" (id 2) (at 39.37 102.87 0)
+    (property "Footprint" "Jumper:Jumper_THT-1x02_Bridged_Circular" (id 2) (at 39.37 102.87 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 39.37 102.87 0)
@@ -5616,10 +5616,10 @@
     (property "Reference" "JP107" (id 0) (at 69.85 101.6 90)
       (effects (font (size 1.27 1.27)) (justify right))
     )
-    (property "Value" "" (id 1) (at 75.6721 102.87 0)
+    (property "Value" "Jumper_2_Bridged" (id 1) (at 75.6721 102.87 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Footprint" "" (id 2) (at 77.47 102.87 0)
+    (property "Footprint" "Jumper:Jumper_THT-1x02_Bridged_Circular" (id 2) (at 77.47 102.87 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 77.47 102.87 0)
@@ -5811,10 +5811,10 @@
     (property "Reference" "JP106" (id 0) (at 64.77 105.41 90)
       (effects (font (size 1.27 1.27)) (justify right))
     )
-    (property "Value" "" (id 1) (at 61.7021 102.87 0)
+    (property "Value" "Jumper_2_Bridged" (id 1) (at 61.7021 102.87 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Footprint" "" (id 2) (at 63.5 102.87 0)
+    (property "Footprint" "Jumper:Jumper_THT-1x02_Bridged_Circular" (id 2) (at 63.5 102.87 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 63.5 102.87 0)
@@ -6183,16 +6183,16 @@
     (pin "2" (uuid 457d0718-c16e-497d-8642-00747fc94c90))
   )
 
-  (symbol (lib_id "Device:R_US") (at 251.46 88.9 270) (unit 1)
+  (symbol (lib_id "Device:R_US") (at 251.46 88.9 90) (mirror x) (unit 1)
     (in_bom yes) (on_board yes)
     (uuid d992b780-b4b9-466e-8b77-6f904f50b44c)
-    (property "Reference" "R915" (id 0) (at 248.92 86.36 90)
+    (property "Reference" "R915" (id 0) (at 254 86.36 90)
       (effects (font (size 1.27 1.27)) (justify right))
     )
-    (property "Value" "4.99k" (id 1) (at 256.54 86.36 90)
+    (property "Value" "4.99k" (id 1) (at 246.38 86.36 90)
       (effects (font (size 1.27 1.27)) (justify right))
     )
-    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (id 2) (at 251.206 89.916 90)
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (id 2) (at 251.714 89.916 90)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 251.46 88.9 0)
@@ -6293,10 +6293,10 @@
     (property "Reference" "JP104" (id 0) (at 44.45 101.6 90)
       (effects (font (size 1.27 1.27)) (justify right))
     )
-    (property "Value" "" (id 1) (at 50.2721 102.87 0)
+    (property "Value" "Jumper_2_Bridged" (id 1) (at 50.2721 102.87 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Footprint" "" (id 2) (at 52.07 102.87 0)
+    (property "Footprint" "Jumper:Jumper_THT-1x02_Bridged_Circular" (id 2) (at 52.07 102.87 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 52.07 102.87 0)
@@ -6887,6 +6887,9 @@
     )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/31c9bfb5-523b-4e7f-8f4f-d79a85d8d4cb"
       (reference "#FLG0103") (unit 1) (value "PWR_FLAG") (footprint "")
+    )
+    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/e82e0d0d-31ce-41e5-8345-5d87bc746c22"
+      (reference "#FLG0104") (unit 1) (value "PWR_FLAG") (footprint "")
     )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/69d7ac5d-7209-4052-bfe1-09cab315d2c2"
       (reference "#FLG0203") (unit 1) (value "PWR_FLAG") (footprint "")
@@ -7641,12 +7644,6 @@
     (path "/d7d31544-a2bf-4ba0-8307-8924e326bbdf"
       (reference "J108") (unit 1) (value "36-5005-ND") (footprint "Connector_Pin:Pin_D1.6mm_L8.5mm_W2.8mm_FlatFork")
     )
-    (path "/3be554d6-823f-4d9c-a16c-d371973bacd7"
-      (reference "J109") (unit 1) (value "36-5006-ND") (footprint "Connector_Pin:Pin_D1.6mm_L8.5mm_W2.8mm_FlatFork")
-    )
-    (path "/60c7fee4-1aad-4981-b1ec-5f32a5ec1971"
-      (reference "J110") (unit 1) (value "36-5006-ND") (footprint "Connector_Pin:Pin_D1.6mm_L8.5mm_W2.8mm_FlatFork")
-    )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/94ee7f6c-e345-453f-bf58-315bb9e28f19"
       (reference "J201") (unit 1) (value "Conn_01x01_Female") (footprint "Oddities:Dummy_Empty")
     )
@@ -7667,12 +7664,6 @@
     )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/e0b12304-0dfb-4583-af2f-7656fcfe4c07"
       (reference "J207") (unit 1) (value "Conn_01x01_Female") (footprint "Oddities:Dummy_Empty")
-    )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/31b611e5-8a18-4edf-97dd-f900720a3838"
-      (reference "J208") (unit 1) (value "Conn_01x01_Female") (footprint "Oddities:Dummy_Empty")
-    )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/f76bbdd4-1b26-4474-9989-177afedfda2c"
-      (reference "J209") (unit 1) (value "Conn_01x01_Female") (footprint "Oddities:Dummy_Empty")
     )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/295a8b7c-f40b-4316-bd9e-2802f830c295"
       (reference "J210") (unit 1) (value "Conn_01x01_Female") (footprint "Oddities:Dummy_Empty")
@@ -7698,10 +7689,10 @@
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/232d846b-2f6c-41e7-a260-33590e1962d0"
       (reference "J217") (unit 1) (value "Conn_01x01_Female") (footprint "Oddities:Dummy_Empty")
     )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/c92c0f87-cf62-4291-9530-f78a5f90bcb0"
+    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/3607f77d-4bce-4f1c-9c2b-64ff3b390118"
       (reference "J218") (unit 1) (value "Conn_01x02") (footprint "Connector_PinSocket_1.27mm:PinSocket_1x02_P1.27mm_Vertical")
     )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/3607f77d-4bce-4f1c-9c2b-64ff3b390118"
+    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/c92c0f87-cf62-4291-9530-f78a5f90bcb0"
       (reference "J219") (unit 1) (value "Conn_01x02") (footprint "Connector_PinSocket_1.27mm:PinSocket_1x02_P1.27mm_Vertical")
     )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/75a7a637-a2c4-4a6c-ba69-ad6a409df370"
@@ -7721,6 +7712,12 @@
     )
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/5305e634-bacf-4ba8-90e7-a2ca8c978062"
       (reference "J903") (unit 1) (value "36-5005-ND") (footprint "Connector_Pin:Pin_D1.6mm_L8.5mm_W2.8mm_FlatFork")
+    )
+    (path "/3be554d6-823f-4d9c-a16c-d371973bacd7"
+      (reference "J909") (unit 1) (value "36-5006-ND") (footprint "Connector_Pin:Pin_D1.6mm_L8.5mm_W2.8mm_FlatFork")
+    )
+    (path "/60c7fee4-1aad-4981-b1ec-5f32a5ec1971"
+      (reference "J910") (unit 1) (value "36-5006-ND") (footprint "Connector_Pin:Pin_D1.6mm_L8.5mm_W2.8mm_FlatFork")
     )
     (path "/a02b79db-cd64-4fe6-a4ff-546efbbc5258"
       (reference "JP103") (unit 1) (value "Jumper_2_Bridged") (footprint "Jumper:Jumper_THT-1x02_Bridged_Circular")
@@ -7953,10 +7950,10 @@
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/d1780ddc-dcc6-403f-8dc7-846fb77b4842"
       (reference "RV901") (unit 1) (value "100k") (footprint "Potentiometer_SMD:Potentiometer_Bourns_TC33X_Vertical")
     )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/582a6632-3d1f-48ad-ae8a-14d369bd0d13"
+    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/dcac99c9-5df9-410e-8775-91ad1ce7f29b"
       (reference "SW201") (unit 1) (value "SW_SPST") (footprint "Button_Switch_SMD:SW_SPST_TL1014BF160QG")
     )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/dcac99c9-5df9-410e-8775-91ad1ce7f29b"
+    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/582a6632-3d1f-48ad-ae8a-14d369bd0d13"
       (reference "SW202") (unit 1) (value "SW_SPST") (footprint "Button_Switch_SMD:SW_SPST_TL1014BF160QG")
     )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/30c80187-3840-4a8a-9b47-d90bd2736ce3"
@@ -8031,11 +8028,11 @@
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/5b7e859a-3601-404b-8454-66a7e2c8a383"
       (reference "U902") (unit 1) (value "LM386") (footprint "Package_SO:SO-8_3.9x4.9mm_P1.27mm")
     )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/c4309d15-fc9e-40a5-b2e2-370d1ea18df1"
-      (reference "X201") (unit 1) (value "ECS-327TXO-30-TR") (footprint "Oscillator:Oscillator_SMD_ECS_327TXO")
-    )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/80af0ec6-5f6d-4b15-a47c-8ad196343281"
       (reference "X202") (unit 1) (value "25 MHz") (footprint "Crystal:Crystal_SMD_TXETCLSANF-4Pin")
+    )
+    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/c4309d15-fc9e-40a5-b2e2-370d1ea18df1"
+      (reference "X901") (unit 1) (value "ECS-327TXO-30-TR") (footprint "Oscillator:Oscillator_SMD_ECS_327TXO")
     )
   )
 )
