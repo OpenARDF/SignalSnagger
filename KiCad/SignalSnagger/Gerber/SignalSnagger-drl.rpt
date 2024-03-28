@@ -1,0 +1,37 @@
+Drill report for SignalSnagger.kicad_pcb
+Created on 
+
+Copper Layer Stackup:
+    =============================================================
+    L1 :  F.Cu                      front
+    L2 :  In1.Cu                    in1
+    L3 :  In2.Cu                    in2
+    L4 :  B.Cu                      back
+
+
+Drill file 'SignalSnagger-PTH.drl' contains
+    plated through holes:
+    =============================================================
+    T1  0.400mm  0.0157"  (195 holes)
+    T2  0.500mm  0.0197"  (95 holes)
+    T3  0.650mm  0.0256"  (15 holes)
+    T4  0.700mm  0.0276"  (22 holes)
+    T5  0.900mm  0.0354"  (3 holes)
+    T6  1.000mm  0.0394"  (41 holes)
+    T7  1.600mm  0.0630"  (9 holes)
+    T8  1.750mm  0.0689"  (2 holes)
+    T9  2.100mm  0.0827"  (3 holes)  (with 1 slot)
+    T10  2.600mm  0.1024"  (2 holes)
+
+    Total plated holes count 387
+
+
+Drill file 'SignalSnagger-NPTH.drl' contains
+    unplated through holes:
+    =============================================================
+    T1  0.750mm  0.0295"  (8 holes)
+    T2  1.500mm  0.0591"  (2 holes)
+    T3  3.175mm  0.1250"  (4 holes)
+    T4  4.400mm  0.1732"  (2 holes)
+
+    Total unplated holes count 16
