@@ -12,7 +12,7 @@ Copper Layer Stackup:
 Drill file 'SignalSnagger-PTH.drl' contains
     plated through holes:
     =============================================================
-    T1  0.400mm  0.0157"  (320 holes)
+    T1  0.400mm  0.0157"  (324 holes)
     T2  0.500mm  0.0197"  (98 holes)
     T3  0.600mm  0.0236"  (8 holes)
     T4  0.650mm  0.0256"  (15 holes)
@@ -24,7 +24,7 @@ Drill file 'SignalSnagger-PTH.drl' contains
     T10  2.100mm  0.0827"  (3 holes)  (with 1 slot)
     T11  2.600mm  0.1024"  (2 holes)
 
-    Total plated holes count 515
+    Total plated holes count 519
 
 
 Drill file 'SignalSnagger-NPTH.drl' contains
