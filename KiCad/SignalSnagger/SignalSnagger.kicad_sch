@@ -3899,10 +3899,10 @@
     (property "Reference" "U102" (id 0) (at 212.09 43.18 0)
       (effects (font (size 1.524 1.524) bold) (justify left))
     )
-    (property "Value" "QS3253QG8" (id 1) (at 210.82 45.72 0)
+    (property "Value" "" (id 1) (at 210.82 45.72 0)
       (effects (font (size 1.27 1.27) bold) (justify left))
     )
-    (property "Footprint" "Package_SO:SSOP-16_3.9x4.9mm_P0.635mm" (id 2) (at 199.39 54.61 0)
+    (property "Footprint" "" (id 2) (at 199.39 54.61 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "https://www.diodes.com/assets/Datasheets/PI5C3253.pdf" (id 3) (at 199.39 54.61 0)
@@ -7981,7 +7981,7 @@
       (reference "TP901") (unit 1) (value "Conn_01x03") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical")
     )
     (path "/2d0c2951-63ff-4560-b766-36e57ba946b0"
-      (reference "U102") (unit 1) (value "QS3253QG8") (footprint "Package_SO:SSOP-16_3.9x4.9mm_P0.635mm")
+      (reference "U102") (unit 1) (value "QS3253QG8") (footprint "Package_SO:SSOP-16_4.4x5.2mm_P0.65mm")
     )
     (path "/2fa45223-79ea-411b-839f-8bddbb1c8fec"
       (reference "U103") (unit 1) (value "REF4132B33") (footprint "Package_TO_SOT_SMD:SOT-23-5")
