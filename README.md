@@ -5,3 +5,5 @@ The SignalSlinger project is 100% Open Source. All software and hardware design 
 
 BOM: https://docs.google.com/spreadsheets/d/1Z3T1SeX6hfT8fjVtJgXu2S2YWHPFD_kywdSzAihOS8g/edit?usp=sharing
 
+Also check out SignalSnagger's sister project: <a href="https://github.com/OpenARDF/SignalSlinger">SignalSlinger</a>.
+
