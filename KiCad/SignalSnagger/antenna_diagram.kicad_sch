@@ -6219,7 +6219,7 @@
     (property "Reference" "Knob401" (id 0) (at 165.1 54.61 0)
       (effects (font (size 2 2) bold) (justify left))
     )
-    (property "Value" "Logo_Open_Hardware_Small" (id 1) (at 168.91 52.705 0)
+    (property "Value" "" (id 1) (at 168.91 52.705 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Footprint" "" (id 2) (at 168.91 46.99 0)
