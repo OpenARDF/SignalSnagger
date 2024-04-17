@@ -6,8 +6,8 @@
 
   (title_block
     (title "SignalSnagger")
-    (date "2024-04-11")
-    (rev "0.316")
+    (date "2024-04-13")
+    (rev "0.317")
   )
 
   (lib_symbols
@@ -6007,19 +6007,19 @@
     (property "Datasheet" "~" (id 3) (at 34.29 140.97 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Digi-Key Part No." "118-PV36W103C01B00-ND" (id 4) (at 34.29 140.97 0)
+    (property "Digi-Key Part No." "3362P-103LF-ND" (id 4) (at 34.29 140.97 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Link" "https://www.digikey.com/en/products/detail/bourns-inc/PV36W103C01B00/666502?s=N4IgTCBcDaIAoDUDMA2A6gRgAxIMJYwCEssQBdAXyA" (id 5) (at 34.29 140.97 0)
+    (property "Link" "https://www.digikey.com/en/products/detail/bourns-inc/3362P-1-103LF/1088412?s=N4IgTCBcDaIMxwGxgAoFoCMAGOAZAYmgHIAiIAugL5A" (id 5) (at 34.29 140.97 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Manufacturer" "Bourns Inc." (id 6) (at 34.29 140.97 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Manufacturer PN" "PV36W103C01B00" (id 7) (at 34.29 140.97 0)
+    (property "Manufacturer PN" "3362P-1-103LF" (id 7) (at 34.29 140.97 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Description" "10 kOhms 0.5W, 1/2W PC Pins Through Hole Trimmer Potentiometer Cermet 25 Turn Top Adjustment" (id 8) (at 34.29 140.97 0)
+    (property "Description" "TRIMMER 10K OHM 0.5W PC PIN TOP" (id 8) (at 34.29 140.97 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (pin "1" (uuid 128c54f6-8386-417c-8cf4-5e5ab81a6e91))
@@ -7716,12 +7716,6 @@
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/c92c0f87-cf62-4291-9530-f78a5f90bcb0"
       (reference "J219") (unit 1) (value "Conn_01x02") (footprint "Connector_PinSocket_1.27mm:PinSocket_1x02_P1.27mm_Vertical")
     )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/75a7a637-a2c4-4a6c-ba69-ad6a409df370"
-      (reference "J220") (unit 1) (value "Conn_01x02") (footprint "Connector_PinSocket_1.27mm:PinSocket_1x02_P1.27mm_Vertical")
-    )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/746816c7-3382-4b5c-882f-d7c732a2109a"
-      (reference "J221") (unit 1) (value "Conn_01x02") (footprint "Connector_PinSocket_1.27mm:PinSocket_1x02_P1.27mm_Vertical")
-    )
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/2167c153-43de-4ca6-92b5-25469c6e2ce5"
       (reference "J301") (unit 1) (value "35RASMT2BHSNTRX") (footprint "Connector_Audio:SWITCHCRAFT_35RASMT2BHSNTRX")
     )
@@ -7765,7 +7759,7 @@
       (reference "JP301") (unit 1) (value "SolderJumper_2_Open") (footprint "Jumper:SolderJumper-2_P1.3mm_Open_RoundedPad1.0x1.5mm")
     )
     (path "/a07b7207-b2ba-4964-b1bd-fe9eb7be7391/3433a5ee-7118-4568-bf67-046adea068c5"
-      (reference "Knob401") (unit 1) (value "Logo_Open_Hardware_Small") (footprint "")
+      (reference "Knob401") (unit 1) (value "Logo_Open_Hardware_Small") (footprint "Oddities:Dummy_Empty")
     )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/baca905f-d9c0-4905-a617-69cf46299e1f"
       (reference "L201") (unit 1) (value "10uH") (footprint "Inductor_SMD:L_0603_1608Metric")
@@ -7982,12 +7976,6 @@
     )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/30c80187-3840-4a8a-9b47-d90bd2736ce3"
       (reference "SW203") (unit 1) (value "PEC12R-4225F-S0024") (footprint "Rotary_Encoder:RotaryEncoder_Bourns_PEC12R-Switch_Vertical_CircularMountingHoles")
-    )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/49c07b13-c544-46db-8fe8-5ac770912603"
-      (reference "SW204") (unit 1) (value "SW_SPST") (footprint "Button_Switch_SMD:SW_SPST_TL1014BF160QG")
-    )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/3ff4f5d0-18a9-4866-8bae-506ef99ebc25"
-      (reference "SW205") (unit 1) (value "SW_SPST") (footprint "Button_Switch_SMD:SW_SPST_TL1014BF160QG")
     )
     (path "/7b1937a3-71cc-478c-8b81-a58e971b1455"
       (reference "T101") (unit 1) (value "Transformer_1P_SS") (footprint "Oddities:FT-37_Core_3_windings_Horiz_TH")
