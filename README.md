@@ -13,7 +13,7 @@ The mechanical design is optimized for simplicity, ruggedness, and ergonomic com
 
 <b>Electronics Design</b>
 
-The electronics design is optimized to avoid part obsolescence and to provide high performance. SignalSlinger uses a Software Defined Radio approach, utilizing a quadrature sampling detector to provide high dynamic range and to maximize software-upgradable features. A 25-MHz processor capable of sampling the baseband signal can filter and process the audio to achieve reliable signal strength indication and signal detection, supporting DSP algorithms to achieve unparalleled SNR performance to detect weak signals deep in the noise.
+The electronics design is optimized to avoid part obsolescence and to provide high performance. SignalSlinger uses a Software Defined Radio approach, utilizing a quadrature sampling detector to provide high dynamic range and to maximize software-upgradable features. A 25-MHz processor capable of sampling the baseband signal can filter and process the audio to achieve reliable signal strength indication and signal detection, and supports DSP algorithms to achieve unparalleled SNR performance to detect weak signals deep in the noise.
 
 <b>Free and Open Design</b>
 
