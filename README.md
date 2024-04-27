@@ -15,6 +15,8 @@ The mechanical design is optimized for simplicity, ruggedness, and ergonomic com
 
 The electronics design is optimized to avoid part obsolescence and to provide high performance. SignalSlinger uses a Software Defined Radio approach, utilizing a quadrature sampling detector to provide high dynamic range and to maximize software-upgradable features. A 25-MHz processor capable of sampling the baseband signal can filter and process the audio to achieve reliable signal strength indication and signal detection, supporting DSP algorithms to achieve unparalleled SNR performance to detect weak signals deep in the noise.
 
+<b>Free and Open Design</b>
+
 The SignalSlinger project is 100% Open Source. All software and hardware design documents can be downloaded from this GitHub repository.
 
 BOM: https://docs.google.com/spreadsheets/d/1Z3T1SeX6hfT8fjVtJgXu2S2YWHPFD_kywdSzAihOS8g/edit?usp=sharing
