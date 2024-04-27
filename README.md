@@ -1,5 +1,7 @@
 # SignalSnagger
-Status: SignalSnagger is still in development. Product design and BOM contents are preliminary and incomplete.
+<b>Project Status</b>
+
+SignalSnagger is still in development. Product design and BOM contents are preliminary and incomplete.
 
 <b>Concept</b>
 
