@@ -5,7 +5,7 @@ SignalSnagger is still in development. Product design and BOM contents are preli
 
 <b>Concept</b>
 
-SignalSnagger is an 80-meter band radio orienteering (ARDF) direction-finding receiver designed to operate in the Amateur Radio Service 3.5 MHz to 3.7 MHz frequency range. The receiver is designed to perform well in all common radio orienteering event formats: classic, sprint, and foxoring. Using a precision temperature-compensated signal generator, it is stable and accurate. A tuned loop with a "sense antenna," based on Dale Hunt's WB6BYU proven design, provides reliable signal-direction readings over a wide range of signal levels. This is an affordable, modern, competition-grade receiver design.
+SignalSnagger is an 80-meter band radio orienteering (ARDF) direction-finding receiver designed to operate in the Amateur Radio Service 3.5 MHz to 3.7 MHz frequency range. The receiver is designed to perform well in all common radio orienteering event formats: classic, sprint, and foxoring. Using a precision temperature-compensated signal generator, SignalSnagger's frequency is stable and accurate. A tuned loop with a "sense antenna," based on Dale Hunt's WB6BYU proven design, provides reliable signal-direction readings over a wide range of signal levels. This is an affordable, modern, competition-grade receiver design.
 
 ![Docs/SignalSnagger1.png](Docs/SignalSnagger1.png)
 
