@@ -560,7 +560,7 @@ int main(void)
 	atmel_start_init();
 //	LEDS.blink(LEDS_OFF, true);
 
-	init_receiver((Frequency_Hz)3570000);
+	init_receiver((Frequency_Hz)3570500);
 		
 	/* Check that the RTC is running */
 	set_system_time(YEAR_2000_EPOCH);

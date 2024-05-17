@@ -748,8 +748,8 @@ void atmel_start_init(void)
 
 00000700 <main>:
      700:	0e 94 c3 00 	call	0x186	; 0x186 <atmel_start_init>
-     704:	60 e5       	ldi	r22, 0x50	; 80
-     706:	79 e7       	ldi	r23, 0x79	; 121
+     704:	64 e4       	ldi	r22, 0x44	; 68
+     706:	7b e7       	ldi	r23, 0x7B	; 123
      708:	86 e3       	ldi	r24, 0x36	; 54
      70a:	90 e0       	ldi	r25, 0x00	; 0
      70c:	0e 94 0b 16 	call	0x2c16	; 0x2c16 <_Z13init_receiverm>
