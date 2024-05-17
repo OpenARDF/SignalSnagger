@@ -34,6 +34,8 @@ src\morse.cpp
 
 src\protected_io.S
 
+src\rtc.cpp
+
 src\si5351.cpp
 
 src\slpctrl.cpp

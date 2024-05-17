@@ -50,7 +50,13 @@ volatile Frequency_Hz g_rx_frequency = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 		
 		if((*freq < RX_MAXIMUM_80M_FREQUENCY) && (*freq > RX_MINIMUM_80M_FREQUENCY))    /* 80m */
 		{
-			if(!si5351_set_freq(*freq, TX_CLOCK_HF_0, leaveClockOff))
+			if(!si5351_set_freq(*freq, SI5351_CLK0, leaveClockOff))
+			{
+				g_rx_frequency = *freq;
+				err = false;
+			}
+			
+			if(!si5351_set_freq(*freq, SI5351_CLK1, leaveClockOff))
 			{
 				g_rx_frequency = *freq;
 				err = false;
@@ -105,12 +111,22 @@ volatile Frequency_Hz g_rx_frequency = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 			return(ERROR_CODE_RF_OSCILLATOR_ERROR);
 		}
 
-		if((code = si5351_drive_strength(TX_CLOCK_HF_0, SI5351_DRIVE_8MA)))
+		if((code = si5351_drive_strength(SI5351_CLK0, SI5351_DRIVE_8MA)))
 		{
 			return( code);
 		}
-		
-		if((code = si5351_clock_enable(TX_CLOCK_HF_0, SI5351_CLK_DISABLED)))
+
+		if((code = si5351_clock_enable(SI5351_CLK0, SI5351_CLK_DISABLED)))
+		{
+			return( code);
+		}
+
+		if((code = si5351_drive_strength(SI5351_CLK1, SI5351_DRIVE_8MA)))
+		{
+			return( code);
+		}
+
+		if((code = si5351_clock_enable(SI5351_CLK1, SI5351_CLK_DISABLED)))
 		{
 			return( code);
 		}

@@ -18,6 +18,7 @@
 #include "binio.h"
 #include "leds.h"
 #include "CircularStringBuff.h"
+#include "rtc.h"
 //#include "dac0.h"
 
 #include <cpuint.h>
@@ -562,15 +563,16 @@ int main(void)
 	init_receiver((Frequency_Hz)3570000);
 		
 	/* Check that the RTC is running */
-// 	set_system_time(YEAR_2000_EPOCH);
-// 	time_t now = time(null);
-// 	while((util_delay_ms(2000)) && (now == time(null)));
-// 	
-// 	if(now == time(null))
-// 	{
-// 		g_hardware_error |= (int)HARDWARE_NO_RTC;
-// 		RTC_init_backup();
-// 	}
+	set_system_time(YEAR_2000_EPOCH);
+	time_t now = time(null);
+	while((util_delay_ms(2000)) && (now == time(null)));
+	
+	if(now == time(null))
+	{
+		g_hardware_error |= (int)HARDWARE_NO_RTC;
+		RTC_init_backup();
+		LEDS.blink(LEDS_OFF, true);
+	}
 
 	while (1) {
 		if(g_handle_counted_leftsense_presses)
@@ -599,8 +601,6 @@ int main(void)
 			LEDS.init(LEDS_GREEN_ON_CONSTANT);
 		}
 		
-		
-		
 		if(g_handle_counted_rightsense_presses)
 		{
 			if(g_handle_counted_rightsense_presses == 1)
@@ -626,8 +626,6 @@ int main(void)
 			g_long_rightsense_press = false;
 			LEDS.init(LEDS_GREEN_ON_CONSTANT);
 		}
-		
-		
 		
 		if(g_handle_counted_encoder_presses)
 		{

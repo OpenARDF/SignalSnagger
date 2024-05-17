@@ -21,66 +21,19 @@
  *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  *  SOFTWARE.
  *
- *
- * receiver.h
- *
+ * rtc.h
  */
 
 
-#ifndef TRANSMITTER_H_
-#define TRANSMITTER_H_
+#ifndef __RTC_H__
+#define __RTC_H__
 
-#include "defs.h"
-#include "include/si5351.h"
+void RTC_init(void);
+void RTC_init(uint16_t cal);
+void RTC_init_backup(void);
+void RTC_init_backup(uint16_t cal);
+void RTC_set_calibration(uint16_t cal);
+uint16_t RTC_get_cal(void);
+void RTC_zero(void);
 
-typedef int16_t Attenuation;
-
-/*
- * Define clock pins
- */
-// #define TX_CLOCK_VHF_FM SI5351_CLK2
-// #define SI5351_CLK0 SI5351_CLK1
-// #define TX_CLOCK_VHF SI5351_CLK0
-
-#define EEPROM_TX_80M_FREQUENCY_DEFAULT 3540000
-
-#define BUCK_9V 175
-#define BUCK_8V 150
-#define BUCK_7V 125
-#define BUCK_6V 100
-#define BUCK_5V 75
-#define BUCK_0V 0
-
-#define RX_MINIMUM_80M_FREQUENCY (uint32_t)3500000
-#define RX_MAXIMUM_80M_FREQUENCY (uint32_t)4000000
-
-/**
- */
- void shutdown_receiver(void);
-	
-/**
- */
- void restart_receiver(void);
-	
-/**
- */
-EC init_receiver(void);
-EC init_receiver(Frequency_Hz freq);
- 
-/** 
- */
- bool rxIsInitialized(void);
-
-/**
- */
- EC rxSetParameters(void);
-
-/**
- */
- bool rxSetFrequency(Frequency_Hz *freq, bool leaveClockOff);
-
-/**
- */
- Frequency_Hz rxGetFrequencty(void);
-
-#endif  /* TRANSMITTER_H_ */
+#endif //__RTC_H__
