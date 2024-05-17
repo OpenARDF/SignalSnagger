@@ -50,13 +50,13 @@ volatile Frequency_Hz g_rx_frequency = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 		
 		if((*freq < RX_MAXIMUM_80M_FREQUENCY) && (*freq > RX_MINIMUM_80M_FREQUENCY))    /* 80m */
 		{
-			if(!si5351_set_freq(*freq, SI5351_CLK0, leaveClockOff))
+			if(!si5351_set_freq(*freq, SI5351_CLK0, leaveClockOff, 0))
 			{
 				g_rx_frequency = *freq;
 				err = false;
 			}
 			
-			if(!si5351_set_freq(*freq, SI5351_CLK1, leaveClockOff))
+			if(!si5351_set_freq(*freq, SI5351_CLK1, leaveClockOff, 50))
 			{
 				g_rx_frequency = *freq;
 				err = false;
