@@ -42,11 +42,6 @@ void system_init()
 	CPUINT_init(); /* Interrupts must also be enabled before timer interrupts will function */
 	BINIO_init();
 
-// 	LED_set_RED_dir(PORT_DIR_OUT);
-// 	LED_set_RED_level(OFF);
-// 	LED_set_GREEN_dir(PORT_DIR_OUT);
-// 	LED_set_GREEN_level(OFF);
-
 	SLPCTRL_init();
 	
 	DAC0_init();

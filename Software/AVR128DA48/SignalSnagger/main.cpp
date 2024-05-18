@@ -57,7 +57,7 @@ typedef enum
 	HARDWARE_NO_FET_BIAS = 0x10
 } HardwareError_t;
 
-
+#define QUAD_MASK ((1 << ROTARY_A_IN) | (ROTARY_B_IN))
 
 /***********************************************************************
  * Global Variables & String Constants
@@ -93,6 +93,9 @@ static volatile uint8_t g_CARDIOID_FRONT_delay = 0;
 static volatile bool g_shutting_down_wifi = false;
 static volatile bool g_wifi_ready = false;
 static volatile uint16_t g_hardware_error = (uint16_t)HARDWARE_OK;
+
+static volatile uint8_t g_rotary_count = 0;
+#define ROTARY_SYNC_DELAY 600
 
 extern Frequency_Hz g_rx_frequency;
 char g_messages_text[STATION_ID+1][MAX_PATTERN_TEXT_LENGTH + 1];
@@ -184,22 +187,6 @@ void handle_1sec_tasks(void)
 {
 }
 
-/**
-PORTF interrupts:
-Rotary encoder
-*/
-ISR(PORTF_PORT_vect)
-{
-	uint8_t x = VPORTD.INTFLAGS;
-	
-	if(x & (1 << ROTARY_A_IN)) /* e */
-	{
-	}
-
-    VPORTD.INTFLAGS = 0xFF; /* Clear all PORTD interrupt flags */
-}
-
-
 
 /**
 Periodic tasks not requiring precise timing. Rate = 300 Hz
@@ -218,6 +205,8 @@ ISR(TCB0_INT_vect)
 		uint8_t holdSwitch = 0, nowSwitch = 0;
 		static uint8_t leftsenseReleased = false, rightsenseReleased = false, encoderReleased = false;
 		static uint8_t leftsenseLongPressEnabled = true, rightsenseLongPressEnabled = true, encoderLongPressEnabled = true;
+		static uint16_t holdRotaryCount = 0;
+		static uint16_t rotaryNoMotionCountdown = 0;
 		
 		fiftyMS++;
 		if(!(fiftyMS % 6))
@@ -435,6 +424,32 @@ ISR(TCB0_INT_vect)
 				g_encoder_presses_count = 0;
 			}
 		}
+		
+		/**********************
+		 * This is a kluge that helps ensure that the rotary encoder count remains in sync with the
+		 * encoder's indents. This kluge seems to be necessary because when the encoder is turned
+		 * rapidly (and especially if the direction of turn reverses) a transition can be missed,
+		 * causing indents to no longer align. Testing indicates that this re-alignment is rarely needed,
+		 * but when it is provided it improves user experience. */
+		if(holdRotaryCount == g_rotary_count)
+		{
+			rotaryNoMotionCountdown--;  /* underflow of the countdown is harmless */
+
+			if(!rotaryNoMotionCountdown)
+			{
+				if(g_rotary_count % 4)  /* need to make the count be a multiple of 4 edges */
+				{
+					g_rotary_count += 2;
+					g_rotary_count = ((g_rotary_count >> 2) << 2);
+				}
+			}
+		}
+		else
+		{
+			rotaryNoMotionCountdown = ROTARY_SYNC_DELAY;
+			holdRotaryCount = g_rotary_count;
+		}
+
 							
 		/**
 		 * Handle Periodic ADC Readings
@@ -525,20 +540,78 @@ Handle switch closure interrupts
 */
 ISR(PORTA_PORT_vect)
 {
-// 	uint8_t x = VPORTA.INTFLAGS;
-// 	
-// 	if(x & (1 << SWITCH))
-// 	{
-// 		if(g_sleeping)
-// 		{
-// 			g_go_to_sleep_now = false;
-// 			g_sleeping = false;
-// 			g_awakenedBy = AWAKENED_BY_BUTTONPRESS;	
-// 			g_waiting_for_next_event = false; /* Ensure the wifi module does not get shut off prematurely */
-// 		}
-// 	}
+	// 	uint8_t x = VPORTA.INTFLAGS;
+	//
+	// 	if(x & (1 << SWITCH))
+	// 	{
+	// 		if(g_sleeping)
+	// 		{
+	// 			g_go_to_sleep_now = false;
+	// 			g_sleeping = false;
+	// 			g_awakenedBy = AWAKENED_BY_BUTTONPRESS;
+	// 			g_waiting_for_next_event = false; /* Ensure the wifi module does not get shut off prematurely */
+	// 		}
+	// 	}
 	
 	VPORTA.INTFLAGS = 0xFF; /* Clear all flags */
+}
+
+/**
+PORTF Interrupts
+Handle rotary encoder interrupts
+*/
+ISR(PORTF_PORT_vect)
+{
+	uint8_t x = VPORTF.INTFLAGS;
+	
+	if(x & ((1 << ROTARY_B_IN) | (1 << ROTARY_A_IN)))
+	{
+		static uint8_t portBhistory = 0xFF; /* power-up default is high because of the pull-up */
+		uint8_t quad = VPORTF.IN;
+		uint8_t changedbits = VPORTF.IN ^ portBhistory;
+		portBhistory = quad;
+
+		if(!changedbits)    /* noise? */
+		{
+			return;
+		}
+
+		quad = changedbits & QUAD_MASK; /* A and B for quadrature rotary encoder */
+
+		/* Note: the following logic results in the count incrementing by 4 for each full
+		 * quadrature cycle. The click count can be derived by shifting right twice (dividing
+		 * by four). */
+		if(quad)
+		{
+			bool asignal = (VPORTF.IN & (1 << ROTARY_A_IN)) >> ROTARY_A_IN;
+			bool bsignal = (VPORTF.IN & (1 << ROTARY_B_IN)) >> ROTARY_B_IN;
+
+			if(quad == (1 << ROTARY_A_IN))   /* "A" changed */
+			{
+				if(asignal == bsignal)
+				{
+					g_rotary_count++;
+				}
+				else
+				{
+					g_rotary_count--;
+				}
+			}
+			else if(quad == (1 << ROTARY_B_IN))  /* "B" changed */
+			{
+				if(asignal == bsignal)
+				{
+					g_rotary_count--;
+				}
+				else
+				{
+					g_rotary_count++;
+				}
+			}
+		}
+ 	}
+	
+	VPORTF.INTFLAGS = 0xFF; /* Clear all flags */
 }
 
 
@@ -557,8 +630,8 @@ void powerUp5V(void)
 
 int main(void)
 {
+	static uint16_t holdRotaryCount = 0;
 	atmel_start_init();
-//	LEDS.blink(LEDS_OFF, true);
 
 	init_receiver((Frequency_Hz)3570500);
 		
@@ -666,6 +739,16 @@ int main(void)
 			sprintf(g_tempStr, "%u", g_last_status_code);
 			g_last_status_code = STATUS_CODE_IDLE;
 		}
+		
+		/*********************************
+		* Handle Rotary Encoder Turns
+		*********************************/
+		uint16_t newRotaryCount = g_rotary_count >> 2;
+		if(newRotaryCount != holdRotaryCount)
+		{
+			holdRotaryCount = newRotaryCount;
+		}
+
 				
 		/********************************
 		 * Handle sleep

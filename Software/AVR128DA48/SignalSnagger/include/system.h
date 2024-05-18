@@ -47,9 +47,16 @@ extern "C" {
 
 void mcu_init(void)
 {
-	/* On AVR devices all peripherals are enabled from power on reset, this
-	 * disables all peripherals to save power. Driver shall enable
-	 * peripheral if used */
+	/*
+	After Reset, all outputs are tri-stated, and digital input buffers enabled even if there is no clock running.
+	The following steps are all optional when initializing PORT operation:
+	• Enable or disable the output driver for pin Pxn by respectively writing ‘1’ to bit n in the PORTx.DIRSET or
+	PORTx.DIRCLR register
+	• Set the output driver for pin Pxn to high or low level respectively by writing ‘1’ to bit n in the PORTx.OUTSET or
+	PORTx.OUTCLR register
+	• Read the input of pin Pxn by reading bit n in the PORTx.IN register
+	• Configure the individual pin configurations and interrupt control for pin Pxn in PORTx.PINnCTRL
+	*/
 
 	/* Set all pins to low power mode */
 
@@ -61,21 +68,21 @@ void mcu_init(void)
 		*((uint8_t *)&PORTB + 0x10 + i) |= 1 << PORT_PULLUPEN_bp;
 	}
 
-	for (uint8_t i = 0; i < 8; i++) {
-		*((uint8_t *)&PORTC + 0x10 + i) |= 1 << PORT_PULLUPEN_bp;
-	}
+// 	for (uint8_t i = 0; i < 8; i++) {
+// 		*((uint8_t *)&PORTC + 0x10 + i) |= 1 << PORT_PULLUPEN_bp;
+// 	}
 
-	for (uint8_t i = 0; i < 8; i++) {
-		*((uint8_t *)&PORTD + 0x10 + i) |= 1 << PORT_PULLUPEN_bp;
-	}
+// 	for (uint8_t i = 0; i < 8; i++) {
+// 		*((uint8_t *)&PORTD + 0x10 + i) |= 1 << PORT_PULLUPEN_bp;
+// 	}
 
-	for (uint8_t i = 0; i < 8; i++) {
-		*((uint8_t *)&PORTE + 0x10 + i) |= 1 << PORT_PULLUPEN_bp;
-	}
+// 	for (uint8_t i = 0; i < 8; i++) {
+// 		*((uint8_t *)&PORTE + 0x10 + i) |= 1 << PORT_PULLUPEN_bp;
+// 	}
 
-	for (uint8_t i = 0; i < 8; i++) {
-		*((uint8_t *)&PORTF + 0x10 + i) |= 1 << PORT_PULLUPEN_bp;
-	}
+// 	for (uint8_t i = 0; i < 8; i++) {
+// 		*((uint8_t *)&PORTF + 0x10 + i) |= 1 << PORT_PULLUPEN_bp;
+// 	}
 }
 #ifdef __cplusplus
 }

@@ -20,6 +20,8 @@ src\cpuint.cpp
 
 src\dac0.cpp
 
+src\display.cpp
+
 src\driver_init.cpp
 
 src\eeprommanager.cpp
