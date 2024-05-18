@@ -139,7 +139,7 @@ extern volatile int16_t g_on_air_seconds;
 extern volatile int16_t g_ID_period_seconds;
 extern volatile int16_t g_intra_cycle_delay_time;
 volatile float g_voltage_threshold = UNUSED_VAR;
-uint16_t g_clock_calibration = UNUSED_VAR;
+// uint16_t g_clock_calibration = UNUSED_VAR;
 volatile uint8_t g_days_to_run = UNUSED_VAR;
 uint16_t g_i2c_failure_count = UNUSED_VAR;
 

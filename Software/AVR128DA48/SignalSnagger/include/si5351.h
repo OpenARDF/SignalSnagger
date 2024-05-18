@@ -443,7 +443,7 @@ bool si5351_init(Si5351_Xtal_load_pF, Frequency_Hz);
 
 /**
  */
-bool si5351_set_freq(Frequency_Hz, Si5351_clock, bool clocksOff);
+bool si5351_set_freq(Frequency_Hz, Si5351_clock, bool clocksOff, uint8_t phase);
 
 /**
  */

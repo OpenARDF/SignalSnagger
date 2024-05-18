@@ -51,12 +51,14 @@ C_SRCS +=  \
 ../src/clkctrl.cpp \
 ../src/cpuint.cpp \
 ../src/dac0.cpp \
+../src/display.cpp \
 ../src/driver_init.cpp \
 ../src/eeprommanager.cpp \
 ../src/Goertzel.cpp \
 ../src/i2c.cpp \
 ../src/leds.cpp \
 ../src/morse.cpp \
+../src/rtc.cpp \
 ../src/si5351.cpp \
 ../src/slpctrl.cpp \
 ../src/tcb.cpp \
@@ -81,6 +83,7 @@ src/CircularStringBuff.o \
 src/clkctrl.o \
 src/cpuint.o \
 src/dac0.o \
+src/display.o \
 src/driver_init.o \
 src/eeprommanager.o \
 src/Goertzel.o \
@@ -88,6 +91,7 @@ src/i2c.o \
 src/leds.o \
 src/morse.o \
 src/protected_io.o \
+src/rtc.o \
 src/si5351.o \
 src/slpctrl.o \
 src/tcb.o \
@@ -104,6 +108,7 @@ src/CircularStringBuff.o \
 src/clkctrl.o \
 src/cpuint.o \
 src/dac0.o \
+src/display.o \
 src/driver_init.o \
 src/eeprommanager.o \
 src/Goertzel.o \
@@ -111,6 +116,7 @@ src/i2c.o \
 src/leds.o \
 src/morse.o \
 src/protected_io.o \
+src/rtc.o \
 src/si5351.o \
 src/slpctrl.o \
 src/tcb.o \
@@ -127,6 +133,7 @@ src/CircularStringBuff.d \
 src/clkctrl.d \
 src/cpuint.d \
 src/dac0.d \
+src/display.d \
 src/driver_init.d \
 src/eeprommanager.d \
 src/Goertzel.d \
@@ -134,6 +141,7 @@ src/i2c.d \
 src/leds.d \
 src/morse.d \
 src/protected_io.d \
+src/rtc.d \
 src/si5351.d \
 src/slpctrl.d \
 src/tcb.d \
@@ -150,6 +158,7 @@ src/CircularStringBuff.d \
 src/clkctrl.d \
 src/cpuint.d \
 src/dac0.d \
+src/display.d \
 src/driver_init.d \
 src/eeprommanager.d \
 src/Goertzel.d \
@@ -157,6 +166,7 @@ src/i2c.d \
 src/leds.d \
 src/morse.d \
 src/protected_io.d \
+src/rtc.d \
 src/si5351.d \
 src/slpctrl.d \
 src/tcb.d \
@@ -240,6 +250,13 @@ src/dac0.o: ../src/dac0.cpp
 	@echo Finished building: $<
 	
 
+src/display.o: ../src/display.cpp
+	@echo Building file: $<
+	@echo Invoking: AVR8/GNU C Compiler : 7.3.0
+	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\avr8\avr8-gnu-toolchain\bin\avr-g++.exe$(QUOTE) -funsigned-char -funsigned-bitfields -DDEBUG  -I"../Config" -I"../include" -I"../utils" -I"../utils/assembler" -I".." -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\AVR-Dx_DFP\1.9.103\include"  -O1 -ffunction-sections -fdata-sections -g2 -Wall -mmcu=avr128da48 -B "C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\AVR-Dx_DFP\1.9.103\gcc\dev\avr128da48" -c -fno-threadsafe-statics -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
+	@echo Finished building: $<
+	
+
 src/driver_init.o: ../src/driver_init.cpp
 	@echo Building file: $<
 	@echo Invoking: AVR8/GNU C Compiler : 7.3.0
@@ -276,6 +293,13 @@ src/leds.o: ../src/leds.cpp
 	
 
 src/morse.o: ../src/morse.cpp
+	@echo Building file: $<
+	@echo Invoking: AVR8/GNU C Compiler : 7.3.0
+	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\avr8\avr8-gnu-toolchain\bin\avr-g++.exe$(QUOTE) -funsigned-char -funsigned-bitfields -DDEBUG  -I"../Config" -I"../include" -I"../utils" -I"../utils/assembler" -I".." -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\AVR-Dx_DFP\1.9.103\include"  -O1 -ffunction-sections -fdata-sections -g2 -Wall -mmcu=avr128da48 -B "C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\AVR-Dx_DFP\1.9.103\gcc\dev\avr128da48" -c -fno-threadsafe-statics -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
+	@echo Finished building: $<
+	
+
+src/rtc.o: ../src/rtc.cpp
 	@echo Building file: $<
 	@echo Invoking: AVR8/GNU C Compiler : 7.3.0
 	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\avr8\avr8-gnu-toolchain\bin\avr-g++.exe$(QUOTE) -funsigned-char -funsigned-bitfields -DDEBUG  -I"../Config" -I"../include" -I"../utils" -I"../utils/assembler" -I".." -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\AVR-Dx_DFP\1.9.103\include"  -O1 -ffunction-sections -fdata-sections -g2 -Wall -mmcu=avr128da48 -B "C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\AVR-Dx_DFP\1.9.103\gcc\dev\avr128da48" -c -fno-threadsafe-statics -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 

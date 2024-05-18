@@ -200,21 +200,21 @@ void BINIO_init(void)
 	
 	PORTF_set_pin_dir(1, PORT_DIR_OFF);	/* Unused */
 	
-	PORTF_set_pin_dir(ROTARY_B, PORT_DIR_OUT); /* Rotary encoder B voltage out */
-	PORTF_set_pin_level(ROTARY_B, HIGH);
+	PORTF_set_pin_dir(ROTARY_B, PORT_DIR_IN); /* Rotary encoder B voltage out */
+	PORTF_set_pin_pull_mode(ROTARY_B, PORT_PULL_UP);
 	
 	PORTF_set_pin_dir(ROTARY_B_IN, PORT_DIR_IN); /* Rotary encoder B read */
 	
 	PORTF_set_pin_dir(ROTARY_A_IN, PORT_DIR_IN); /* Rotary encoder A read */
 	
-	PORTF_set_pin_dir(ROTARY_A, PORT_DIR_OUT); /* Rotary encoder A voltage out */
-	PORTF_set_pin_level(ROTARY_A, HIGH);
+	PORTF_set_pin_dir(ROTARY_A, PORT_DIR_IN); /* Rotary encoder A voltage out */
+	PORTF_set_pin_pull_mode(ROTARY_A, PORT_PULL_UP);
 	
 	PORTF_set_pin_dir(6, PORT_DIR_OFF); /* Unused */
 	
 	/* PORT Pin Interrupts */
-// 	PORTA.PIN2CTRL = 0x0A; /* Enable RTC SQW 1-sec interrupts */
-// 	PORTD.PIN1CTRL = 0x09; /* Enable antenna change interrupts */
+ 	PORTD.PIN3CTRL = 0x01; /* Enable encoder change interrupts on both edges */
+ 	PORTD.PIN4CTRL = 0x01; /* Enable encoder change interrupts on both edges */
 }
 
 void BINIO_sleep()

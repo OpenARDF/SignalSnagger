@@ -227,6 +227,9 @@
     <Compile Include="include\dac0.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="include\display.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="include\driver_init.h">
       <SubType>compile</SubType>
     </Compile>
@@ -252,6 +255,9 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="include\rstctrl.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="include\rtc.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="include\si5351.h">
@@ -296,6 +302,9 @@
     <Compile Include="src\dac0.cpp">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="src\display.cpp">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="src\driver_init.cpp">
       <SubType>compile</SubType>
     </Compile>
@@ -315,6 +324,9 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\protected_io.S">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\rtc.cpp">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\si5351.cpp">

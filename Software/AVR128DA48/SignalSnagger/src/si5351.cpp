@@ -205,6 +205,8 @@
 	bool si5351_read_bulk(uint8_t, uint8_t *, uint8_t);
 	bool set_integer_mode(Si5351_clock, bool);
 	bool ms_div(Si5351_clock, uint8_t, bool);
+	EC si5351_set_phase(Si5351_clock clk, uint8_t phase);
+	EC si5351_get_phase(Si5351_clock clk, uint8_t* phase);
 
 #ifdef SUPPORT_STATUS_READS
 		bool si5351_read_sys_status(Si5351Status *);
@@ -334,7 +336,7 @@ bool g_si5351_initialized = false;
  * Returns true on failure
  *
  */
-	bool si5351_set_freq(Frequency_Hz freq_Fout, Si5351_clock clk, bool clocksOff)
+	bool si5351_set_freq(Frequency_Hz freq_Fout, Si5351_clock clk, bool clocksOff, uint8_t phase)
 	{
 		Union_si5351_regs ms_reg;
 		Frequency_Hz freq_VCO = 0;
@@ -448,7 +450,7 @@ bool g_si5351_initialized = false;
 			break;
 		}
 
-		/* http://www.silabs.com/Support%20Documents/TechnicalDocs/Si5351-B.pdf */
+		/* https://www.skyworksinc.com/-/media/Skyworks/SL/documents/public/application-notes/AN619.pdf */
 		/* Page 19 */
 		/* I2C Programming Procedure */
 		/* */
@@ -532,6 +534,11 @@ bool g_si5351_initialized = false;
 		/* Apply PLLA or PLLB soft reset */
 		/* Reg. 177 = 0xAC */
 /*	pll_reset(target_pll); */
+
+		if(phase)
+		{
+			si5351_set_phase(clk, phase);
+		}
 
 		/* Block 6: */
 		/* Enable desired outputs */
@@ -723,6 +730,47 @@ bool g_si5351_initialized = false;
 		data[0] = reg_val;
 		if(si5351_write_bulk(SI5351_CLK0_CTRL + (uint8_t)clk, data, 1)) return ERROR_CODE_CLKGEN_NONRESPONSIVE;
 
+		return ERROR_CODE_NO_ERROR;
+	}
+	
+/*
+ * si5351_set_phase(void)
+ *
+ * Sets the clock phase.
+ *  https://www.skyworksinc.com/-/media/Skyworks/SL/documents/public/application-notes/AN619.pdf
+ * CLKx_PHOFF[4:0] = Round( DesiredOffset(sec) x 4 x Fvco)
+ */
+	EC si5351_set_phase(Si5351_clock clk, uint8_t phase)
+	{
+		uint8_t reg_val;
+		uint8_t data[2];
+		const uint8_t mask = 0x7F;
+
+		reg_val = phase & mask;
+		data[0] = reg_val;
+		if(si5351_write_bulk(SI5351_CLK0_CTRL + (uint8_t)clk, data, 1)) return ERROR_CODE_CLKGEN_NONRESPONSIVE;
+
+		return ERROR_CODE_NO_ERROR;
+	}
+	
+/*
+ * si5351_get_phase(void)
+ *
+ * Returns the clock phase.
+ *  https://www.skyworksinc.com/-/media/Skyworks/SL/documents/public/application-notes/AN619.pdf 
+ * CLKx_PHOFF[4:0] = Round( DesiredOffset(sec) x 4 x Fvco)
+ */
+	EC si5351_get_phase(Si5351_clock clk, uint8_t* phase)
+	{
+		uint8_t data[2];
+
+		if(si5351_read_bulk(SI5351_CLK0_CTRL + (uint8_t)clk, data, 1))
+		{
+			return ERROR_CODE_CLKGEN_NONRESPONSIVE;
+		}
+		
+		if(phase) *phase = data[0];
+		
 		return ERROR_CODE_NO_ERROR;
 	}
 
@@ -958,7 +1006,6 @@ bool g_si5351_initialized = false;
 	{
 		return(g_si5351_ref_correction);
 	}
-
 
 /*
  * bool pll_calc(Frequency_Hz vco_freq, Union_si5351_regs *reg, int32_t correction)
@@ -1402,7 +1449,6 @@ bool g_si5351_initialized = false;
 		params[i++] = ms_reg.reg.p2_0;
 
 		/* Write the parameters */
-
 		switch(clk)
 		{
 			case SI5351_CLK0:

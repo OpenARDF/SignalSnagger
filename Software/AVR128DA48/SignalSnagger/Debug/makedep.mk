@@ -20,6 +20,8 @@ src\cpuint.cpp
 
 src\dac0.cpp
 
+src\display.cpp
+
 src\driver_init.cpp
 
 src\eeprommanager.cpp
@@ -33,6 +35,8 @@ src\leds.cpp
 src\morse.cpp
 
 src\protected_io.S
+
+src\rtc.cpp
 
 src\si5351.cpp
 

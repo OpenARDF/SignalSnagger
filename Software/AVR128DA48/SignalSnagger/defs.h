@@ -33,7 +33,7 @@
 
 /******************************************************
  * Set the text that gets displayed to the user */
-#define SW_REVISION "0.01"
+#define SW_REVISION "0.05"
 
 //#define TRANQUILIZE_WATCHDOG
 
@@ -78,6 +78,7 @@ typedef enum {
 	ERROR_CODE_EVENT_ENDED_IN_PAST = 0xD0,
 	ERROR_CODE_ATMEGA_NOT_RESPONDING = 0xD1,
 	ERROR_CODE_RF_OSCILLATOR_ERROR = 0xD2,
+	ERROR_CODE_DISPLAY_NONRESPONSIVE = 0xE0,
 	ERROR_CODE_POWER_LEVEL_NOT_SUPPORTED = 0xF5,
 	ERROR_CODE_NO_ANTENNA_PREVENTS_POWER_SETTING = 0xF6,
 	ERROR_CODE_NO_ANTENNA_FOR_BAND = 0xF7,
