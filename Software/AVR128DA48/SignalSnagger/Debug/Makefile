@@ -61,6 +61,7 @@ C_SRCS +=  \
 ../src/rtc.cpp \
 ../src/si5351.cpp \
 ../src/slpctrl.cpp \
+../src/tca.cpp \
 ../src/tcb.cpp \
 ../src/receiver.cpp \
 ../src/util.cpp
@@ -94,6 +95,7 @@ src/protected_io.o \
 src/rtc.o \
 src/si5351.o \
 src/slpctrl.o \
+src/tca.o \
 src/tcb.o \
 src/receiver.o \
 src/util.o
@@ -119,6 +121,7 @@ src/protected_io.o \
 src/rtc.o \
 src/si5351.o \
 src/slpctrl.o \
+src/tca.o \
 src/tcb.o \
 src/receiver.o \
 src/util.o
@@ -144,6 +147,7 @@ src/protected_io.d \
 src/rtc.d \
 src/si5351.d \
 src/slpctrl.d \
+src/tca.d \
 src/tcb.d \
 src/receiver.d \
 src/util.d
@@ -169,6 +173,7 @@ src/protected_io.d \
 src/rtc.d \
 src/si5351.d \
 src/slpctrl.d \
+src/tca.d \
 src/tcb.d \
 src/receiver.d \
 src/util.d
@@ -314,6 +319,13 @@ src/si5351.o: ../src/si5351.cpp
 	
 
 src/slpctrl.o: ../src/slpctrl.cpp
+	@echo Building file: $<
+	@echo Invoking: AVR8/GNU C Compiler : 7.3.0
+	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\avr8\avr8-gnu-toolchain\bin\avr-g++.exe$(QUOTE) -funsigned-char -funsigned-bitfields -DDEBUG  -I"../Config" -I"../include" -I"../utils" -I"../utils/assembler" -I".." -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\AVR-Dx_DFP\1.9.103\include"  -O1 -ffunction-sections -fdata-sections -g2 -Wall -mmcu=avr128da48 -B "C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\AVR-Dx_DFP\1.9.103\gcc\dev\avr128da48" -c -fno-threadsafe-statics -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
+	@echo Finished building: $<
+	
+
+src/tca.o: ../src/tca.cpp
 	@echo Building file: $<
 	@echo Invoking: AVR8/GNU C Compiler : 7.3.0
 	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\avr8\avr8-gnu-toolchain\bin\avr-g++.exe$(QUOTE) -funsigned-char -funsigned-bitfields -DDEBUG  -I"../Config" -I"../include" -I"../utils" -I"../utils/assembler" -I".." -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\AVR-Dx_DFP\1.9.103\include"  -O1 -ffunction-sections -fdata-sections -g2 -Wall -mmcu=avr128da48 -B "C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\AVR-Dx_DFP\1.9.103\gcc\dev\avr128da48" -c -fno-threadsafe-statics -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 

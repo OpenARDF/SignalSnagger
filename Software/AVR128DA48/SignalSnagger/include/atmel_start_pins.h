@@ -8,6 +8,9 @@
 #ifndef ATMEL_START_PINS_H_INCLUDED
 #define ATMEL_START_PINS_H_INCLUDED
 
+#define GREEN_PIN 4
+#define RED_PIN 5
+
 #include <port.h>
 
 /************************************************************************************
@@ -215,7 +218,7 @@ PORTC Helper Functions
  */
 static inline void LED_set_RED_pull_mode(const enum port_pull_mode pull_mode)
 {
-	PORTC_set_pin_pull_mode(6, pull_mode);
+	PORTC_set_pin_pull_mode(RED_PIN, pull_mode);
 }
 
 /**
@@ -231,7 +234,7 @@ static inline void LED_set_RED_pull_mode(const enum port_pull_mode pull_mode)
  */
 static inline void LED_set_RED_dir(const enum port_dir dir)
 {
-	PORTC_set_pin_dir(6, dir);
+	PORTC_set_pin_dir(RED_PIN, dir);
 }
 
 /**
@@ -247,7 +250,7 @@ static inline void LED_set_RED_dir(const enum port_dir dir)
  */
 static inline void LED_set_GREEN_dir(const enum port_dir dir)
 {
-	PORTC_set_pin_dir(5, dir);
+	PORTC_set_pin_dir(GREEN_PIN, dir);
 }
 
 /**
@@ -265,7 +268,7 @@ static inline void LED_set_GREEN_dir(const enum port_dir dir)
  */
 static inline void LED_set_RED_isc(const PORT_ISC_t isc)
 {
-	PORTC_pin_set_isc(6, isc);
+	PORTC_pin_set_isc(RED_PIN, isc);
 }
 
 /**
@@ -278,7 +281,7 @@ static inline void LED_set_RED_isc(const PORT_ISC_t isc)
  */
 static inline void LED_set_RED_inverted(const bool inverted)
 {
-	PORTC_pin_set_inverted(6, inverted);
+	PORTC_pin_set_inverted(RED_PIN, inverted);
 }
 
 /**
@@ -291,7 +294,7 @@ static inline void LED_set_RED_inverted(const bool inverted)
  */
 static inline void LED_set_RED_level(const bool level)
 {
-	PORTC_set_pin_level(6, level); /* Low == LED off */
+	PORTC_set_pin_level(RED_PIN, level); /* Low == LED off */
 }
 
 /**
@@ -304,7 +307,7 @@ static inline void LED_set_RED_level(const bool level)
  */
 static inline void LED_set_GREEN_level(const bool level)
 {
-	PORTC_set_pin_level(5, level); /* Low == LED off */
+	PORTC_set_pin_level(GREEN_PIN, level); /* Low == LED off */
 }
 
 /**
@@ -314,7 +317,7 @@ static inline void LED_set_GREEN_level(const bool level)
  */
 static inline void LED_toggle_RED_level()
 {
-	PORTC_toggle_pin_level(6);
+	PORTC_toggle_pin_level(RED_PIN);
 }
 
 /**
@@ -324,7 +327,7 @@ static inline void LED_toggle_RED_level()
  */
 static inline void LED_toggle_GREEN_level()
 {
-	PORTC_toggle_pin_level(5);
+	PORTC_toggle_pin_level(GREEN_PIN);
 }
 
 /**
@@ -334,7 +337,7 @@ static inline void LED_toggle_GREEN_level()
  */
 static inline bool LED_get_RED_level()
 {
-	return PORTC_get_pin_level(6);
+	return PORTC_get_pin_level(RED_PIN);
 }
 
 /**

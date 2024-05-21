@@ -1,4 +1,4 @@
-src/driver_init.d src/driver_init.o: ../src/driver_init.cpp ../defs.h \
+src/tca.d src/tca.o: ../src/tca.cpp ../defs.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\avr\io.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\avr\sfr_defs.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\inttypes.h \
@@ -12,17 +12,12 @@ src/driver_init.d src/driver_init.o: ../src/driver_init.cpp ../defs.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\avr\fuse.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\avr\lock.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\avr\interrupt.h \
- ../include/driver_init.h ../utils\compiler.h \
+ ../include/tca.h ../utils/compiler.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\avr\builtins.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\lib\gcc\avr\7.3.0\include\stdbool.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\lib\gcc\avr\7.3.0\include\stddef.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\stdlib.h \
- ../utils/interrupt_avr8.h ../Config/clock_config.h ../include/port.h \
- ../utils/compiler.h ../include/atmel_start_pins.h ../include/clkctrl.h \
- ../include/slpctrl.h ../include/cpuint.h ../include/tcb.h \
- ../include/bod.h ../include/system.h ../include/ccp.h \
- ../include/protected_io.h ../include/port.h ../include/dac0.h \
- ../include/binio.h ../include/tca.h
+ ../utils/interrupt_avr8.h
 
 ../defs.h:
 
@@ -52,9 +47,9 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\
 
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\avr\interrupt.h:
 
-../include/driver_init.h:
+../include/tca.h:
 
-../utils\compiler.h:
+../utils/compiler.h:
 
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\avr\builtins.h:
 
@@ -65,35 +60,3 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\lib\
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\stdlib.h:
 
 ../utils/interrupt_avr8.h:
-
-../Config/clock_config.h:
-
-../include/port.h:
-
-../utils/compiler.h:
-
-../include/atmel_start_pins.h:
-
-../include/clkctrl.h:
-
-../include/slpctrl.h:
-
-../include/cpuint.h:
-
-../include/tcb.h:
-
-../include/bod.h:
-
-../include/system.h:
-
-../include/ccp.h:
-
-../include/protected_io.h:
-
-../include/port.h:
-
-../include/dac0.h:
-
-../include/binio.h:
-
-../include/tca.h:

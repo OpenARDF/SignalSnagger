@@ -269,6 +269,9 @@
     <Compile Include="include\system.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="include\tca.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="include\tcb.h">
       <SubType>compile</SubType>
     </Compile>
@@ -333,6 +336,9 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\slpctrl.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\tca.cpp">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\tcb.cpp">

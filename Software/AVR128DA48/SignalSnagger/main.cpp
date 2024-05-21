@@ -94,8 +94,9 @@ static volatile bool g_shutting_down_wifi = false;
 static volatile bool g_wifi_ready = false;
 static volatile uint16_t g_hardware_error = (uint16_t)HARDWARE_OK;
 
-static volatile uint8_t g_rotary_count = 0;
-#define ROTARY_SYNC_DELAY 600
+static volatile int g_rotary_count = 0;
+static volatile int g_rotary_edges = 0;
+#define ROTARY_SYNC_DELAY 150
 
 extern Frequency_Hz g_rx_frequency;
 char g_messages_text[STATION_ID+1][MAX_PATTERN_TEXT_LENGTH + 1];
@@ -205,7 +206,7 @@ ISR(TCB0_INT_vect)
 		uint8_t holdSwitch = 0, nowSwitch = 0;
 		static uint8_t leftsenseReleased = false, rightsenseReleased = false, encoderReleased = false;
 		static uint8_t leftsenseLongPressEnabled = true, rightsenseLongPressEnabled = true, encoderLongPressEnabled = true;
-		static uint16_t holdRotaryCount = 0;
+		static int holdRotaryEdges = 0;
 		static uint16_t rotaryNoMotionCountdown = 0;
 		
 		fiftyMS++;
@@ -215,13 +216,13 @@ ISR(TCB0_INT_vect)
 			holdSwitch = portAdebouncedVals() & switch_bits;
 			debounce();
 			nowSwitch = portAdebouncedVals() & switch_bits;
+		
+			int8_t leftSense = holdSwitch & (1 << SENSE_SWITCH_LEFT);
+			int8_t rightSense = holdSwitch & (1 << SENSE_SWITCH_RIGHT);
+			int8_t encoderSwitch = holdSwitch & (1 << ENCODER_SWITCH);
 			
 			if(holdSwitch != nowSwitch) /* Change detected */
 			{
-				int8_t leftSense = holdSwitch & (1 << SENSE_SWITCH_LEFT);
-				int8_t rightSense = holdSwitch & (1 << SENSE_SWITCH_RIGHT);
-				int8_t encoderSwitch = holdSwitch & (1 << ENCODER_SWITCH);
-				
 				int8_t changed = nowSwitch ^ holdSwitch;
 				
 				if(changed & (1 << SENSE_SWITCH_LEFT)) // left sense button changed
@@ -253,20 +254,6 @@ ISR(TCB0_INT_vect)
 						leftsenseLongPressEnabled = true;
 					}
 				}
-				else if(!leftSense) /* Switch closed and unchanged */
-				{
-					if(!g_long_leftsense_press && leftsenseLongPressEnabled)
-					{
-						if(++g_leftsense_closed_time >= 200)
-						{
-							g_long_leftsense_press = true;
-							g_leftsense_closed_time = 0;
-							g_leftsense_presses_count = 0;
-							leftsenseLongPressEnabled = false;
-						}
-					}
-				}
-
 				
 				if(changed & (1 << SENSE_SWITCH_RIGHT))
 				{
@@ -295,19 +282,6 @@ ISR(TCB0_INT_vect)
 						}
 						
 						rightsenseLongPressEnabled = true;
-					}
-				}
-				else if(!rightSense) /* Switch closed and unchanged */
-				{
-					if(!g_long_rightsense_press && rightsenseLongPressEnabled)
-					{
-						if(++g_rightsense_closed_time >= 200)
-						{
-							g_long_rightsense_press = true;
-							g_rightsense_closed_time = 0;
-							g_rightsense_presses_count = 0;
-							rightsenseLongPressEnabled = false;
-						}
 					}
 				}
 				
@@ -340,7 +314,38 @@ ISR(TCB0_INT_vect)
 						encoderLongPressEnabled = true;
 					}
 				}
-				else if(!encoderSwitch) /* Switch closed and unchanged */
+			}
+			else // no switches have changed
+			{
+				if(!leftSense) /* Switch closed and unchanged */
+				{
+					if(!g_long_leftsense_press && leftsenseLongPressEnabled)
+					{
+						if(++g_leftsense_closed_time >= 200)
+						{
+							g_long_leftsense_press = true;
+							g_leftsense_closed_time = 0;
+							g_leftsense_presses_count = 0;
+							leftsenseLongPressEnabled = false;
+						}
+					}
+				}
+
+				if(!rightSense) /* Switch closed and unchanged */
+				{
+					if(!g_long_rightsense_press && rightsenseLongPressEnabled)
+					{
+						if(++g_rightsense_closed_time >= 200)
+						{
+							g_long_rightsense_press = true;
+							g_rightsense_closed_time = 0;
+							g_rightsense_presses_count = 0;
+							rightsenseLongPressEnabled = false;
+						}
+					}
+				}
+
+				if(!encoderSwitch) /* Switch closed and unchanged */
 				{
 					if(!g_long_encoder_press && encoderLongPressEnabled)
 					{
@@ -426,28 +431,44 @@ ISR(TCB0_INT_vect)
 		}
 		
 		/**********************
-		 * This is a kluge that helps ensure that the rotary encoder count remains in sync with the
-		 * encoder's indents. This kluge seems to be necessary because when the encoder is turned
-		 * rapidly (and especially if the direction of turn reverses) a transition can be missed,
+		 * The following code includes a kluge that helps ensure that the rotary encoder count remains
+		 * in sync with the encoder's indents. This kluge seems to be necessary because when the encoder 
+		 * is turned rapidly (and especially if the direction of turn reverses) a transition can be missed,
 		 * causing indents to no longer align. Testing indicates that this re-alignment is rarely needed,
 		 * but when it is provided it improves user experience. */
-		if(holdRotaryCount == g_rotary_count)
+		if(g_rotary_edges)
 		{
-			rotaryNoMotionCountdown--;  /* underflow of the countdown is harmless */
+			bool neg = g_rotary_edges < 0;
+			int val = abs(g_rotary_edges);
 
-			if(!rotaryNoMotionCountdown)
+			if(holdRotaryEdges == g_rotary_edges)
 			{
-				if(g_rotary_count % 4)  /* need to make the count be a multiple of 4 edges */
+				if(rotaryNoMotionCountdown) rotaryNoMotionCountdown--;
+
+				if(!rotaryNoMotionCountdown)
 				{
-					g_rotary_count += 2;
-					g_rotary_count = ((g_rotary_count >> 2) << 2);
+					val = ((val + 3) >> 2) << 2; // Round up and make divisible by 4
 				}
 			}
-		}
-		else
-		{
-			rotaryNoMotionCountdown = ROTARY_SYNC_DELAY;
-			holdRotaryCount = g_rotary_count;
+			else
+			{
+				int temp = val >> 2;
+				if(neg)
+				{
+					g_rotary_count -= temp;
+				}
+				else
+				{
+					g_rotary_count += temp;
+				}
+				
+				val -= (temp << 2);		
+			
+				rotaryNoMotionCountdown = ROTARY_SYNC_DELAY;
+				holdRotaryEdges = g_rotary_edges;
+			}
+			
+			g_rotary_edges = neg ? -val : val;
 		}
 
 							
@@ -540,10 +561,10 @@ Handle switch closure interrupts
 */
 ISR(PORTA_PORT_vect)
 {
-	// 	uint8_t x = VPORTA.INTFLAGS;
-	//
-	// 	if(x & (1 << SWITCH))
-	// 	{
+	uint8_t x = VPORTA.INTFLAGS;
+
+	if(x & ((1 << SENSE_SWITCH_LEFT) | ((1 << SENSE_SWITCH_RIGHT))))
+	{
 	// 		if(g_sleeping)
 	// 		{
 	// 			g_go_to_sleep_now = false;
@@ -551,10 +572,15 @@ ISR(PORTA_PORT_vect)
 	// 			g_awakenedBy = AWAKENED_BY_BUTTONPRESS;
 	// 			g_waiting_for_next_event = false; /* Ensure the wifi module does not get shut off prematurely */
 	// 		}
-	// 	}
+	}
 	
 	VPORTA.INTFLAGS = 0xFF; /* Clear all flags */
 }
+
+
+
+// Previous state of the encoder (both pins)
+volatile uint8_t prev_state = 0;
 
 /**
 PORTF Interrupts
@@ -566,52 +592,41 @@ ISR(PORTF_PORT_vect)
 	
 	if(x & ((1 << ROTARY_B_IN) | (1 << ROTARY_A_IN)))
 	{
-		static uint8_t portBhistory = 0xFF; /* power-up default is high because of the pull-up */
-		uint8_t quad = VPORTF.IN;
-		uint8_t changedbits = VPORTF.IN ^ portBhistory;
-		portBhistory = quad;
+		uint8_t curr_state = (PORTF.IN & (PIN3_bm | PIN4_bm)) >> 3;
 
-		if(!changedbits)    /* noise? */
+		// Calculate the state transition
+		uint8_t transition = (prev_state << 2) | curr_state;
+
+		// Decode the transition (Quadrature code)
+		switch (transition) 
 		{
-			return;
+			case 0b0001:
+			case 0b0111:
+			case 0b1110:
+			case 0b1000:
+			{
+				g_rotary_edges++;
+			}
+			break;
+			
+			case 0b0010:
+			case 0b0100:
+			case 0b1101:
+			case 0b1011:
+			{
+				g_rotary_edges--;
+			}
+			break;
+			
+			// Cases 0b0000, 0b0101, 0b1010, 0b1111 represent no valid state change
 		}
 
-		quad = changedbits & QUAD_MASK; /* A and B for quadrature rotary encoder */
-
-		/* Note: the following logic results in the count incrementing by 4 for each full
-		 * quadrature cycle. The click count can be derived by shifting right twice (dividing
-		 * by four). */
-		if(quad)
-		{
-			bool asignal = (VPORTF.IN & (1 << ROTARY_A_IN)) >> ROTARY_A_IN;
-			bool bsignal = (VPORTF.IN & (1 << ROTARY_B_IN)) >> ROTARY_B_IN;
-
-			if(quad == (1 << ROTARY_A_IN))   /* "A" changed */
-			{
-				if(asignal == bsignal)
-				{
-					g_rotary_count++;
-				}
-				else
-				{
-					g_rotary_count--;
-				}
-			}
-			else if(quad == (1 << ROTARY_B_IN))  /* "B" changed */
-			{
-				if(asignal == bsignal)
-				{
-					g_rotary_count--;
-				}
-				else
-				{
-					g_rotary_count++;
-				}
-			}
-		}
- 	}
+		// Update the previous state
+		prev_state = curr_state;
+	}
 	
-	VPORTF.INTFLAGS = 0xFF; /* Clear all flags */
+    // Clear the interrupt flags for PF3 and PF4
+    PORTF.INTFLAGS = PIN3_bm | PIN4_bm;
 }
 
 
@@ -627,10 +642,11 @@ void powerUp5V(void)
 	PORTA_set_pin_level(PWR_5V_ENABLE, HIGH);  /* Enable 5V power regulator */
 }
 
+			static int plus = 0, minus = 0;
+
 
 int main(void)
 {
-	static uint16_t holdRotaryCount = 0;
 	atmel_start_init();
 
 	init_receiver((Frequency_Hz)3570500);
@@ -638,13 +654,13 @@ int main(void)
 	/* Check that the RTC is running */
 	set_system_time(YEAR_2000_EPOCH);
 	time_t now = time(null);
-	while((util_delay_ms(2000)) && (now == time(null)));
+ 	while((util_delay_ms(2000)) && (now == time(null)));
 	
 	if(now == time(null))
 	{
 		g_hardware_error |= (int)HARDWARE_NO_RTC;
-		RTC_init_backup();
-		LEDS.blink(LEDS_OFF, true);
+// 		RTC_init_backup();
+// 		LEDS.blink(LEDS_OFF, true);
 	}
 
 	while (1) {
@@ -652,11 +668,11 @@ int main(void)
 		{
 			if(g_handle_counted_leftsense_presses == 1)
 			{
-				LEDS.blink(LEDS_GREEN_BLINK_FAST, true);
+				LEDS.blink(LEDS_RED_BLINK_SLOW, true);
 			}
 			else if (g_handle_counted_leftsense_presses == 2)
 			{
-				LEDS.blink(LEDS_GREEN_BLINK_SLOW);
+				LEDS.blink(LEDS_RED_OFF);
 			}
 			
 			g_handle_counted_leftsense_presses = 0;
@@ -671,18 +687,18 @@ int main(void)
 		if(g_long_leftsense_press)
 		{
 			g_long_leftsense_press = false;
-			LEDS.init(LEDS_GREEN_ON_CONSTANT);
+			LEDS.init(LEDS_RED_THEN_GREEN_BLINK_SLOW);
 		}
 		
 		if(g_handle_counted_rightsense_presses)
 		{
 			if(g_handle_counted_rightsense_presses == 1)
 			{
-				LEDS.blink(LEDS_RED_BLINK_FAST, true);
+				LEDS.blink(LEDS_GREEN_BLINK_SLOW, true);
 			}
 			else if (g_handle_counted_rightsense_presses == 2)
 			{
-				LEDS.blink(LEDS_RED_BLINK_SLOW);
+				LEDS.blink(LEDS_GREEN_OFF);
 			}
 			
 			g_handle_counted_rightsense_presses = 0;
@@ -697,18 +713,18 @@ int main(void)
 		if(g_long_rightsense_press)
 		{
 			g_long_rightsense_press = false;
-			LEDS.init(LEDS_GREEN_ON_CONSTANT);
+			LEDS.init(LEDS_RED_THEN_GREEN_BLINK_FAST);
 		}
 		
 		if(g_handle_counted_encoder_presses)
 		{
 			if(g_handle_counted_encoder_presses == 1)
 			{
-				LEDS.blink(LEDS_RED_THEN_GREEN_BLINK_FAST);
+				LEDS.blink(LEDS_RED_AND_GREEN_BLINK_FAST);
 			}
 			else if (g_handle_counted_encoder_presses == 2)
 			{
-				LEDS.blink(LEDS_RED_THEN_GREEN_BLINK_SLOW);
+				LEDS.blink(LEDS_RED_AND_GREEN_BLINK_SLOW);
 			}
 			
 			g_handle_counted_encoder_presses = 0;
@@ -724,9 +740,8 @@ int main(void)
 		{
 			g_long_encoder_press = false;
 			LEDS.init(LEDS_GREEN_ON_CONSTANT);
+			LEDS.blink(LEDS_RED_ON_CONSTANT);
 		}
-		
-		
 		
 		if(g_last_error_code)
 		{
@@ -743,10 +758,22 @@ int main(void)
 		/*********************************
 		* Handle Rotary Encoder Turns
 		*********************************/
-		uint16_t newRotaryCount = g_rotary_count >> 2;
-		if(newRotaryCount != holdRotaryCount)
-		{
-			holdRotaryCount = newRotaryCount;
+		if(g_rotary_count)
+		{			
+			if(g_rotary_count > 0)
+			{
+				LEDS.blink(LEDS_RED_BLINK_FAST);
+				LEDS.blink(LEDS_GREEN_ON_CONSTANT);
+				plus++;
+				g_rotary_count--;
+			}
+			else
+			{
+				LEDS.blink(LEDS_GREEN_BLINK_FAST);
+				LEDS.blink(LEDS_RED_ON_CONSTANT);
+				minus++;
+				g_rotary_count++;
+			}
 		}
 
 				
