@@ -50,17 +50,7 @@ volatile Frequency_Hz g_rx_frequency = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 		
 		if((*freq < RX_MAXIMUM_80M_FREQUENCY) && (*freq > RX_MINIMUM_80M_FREQUENCY))    /* 80m */
 		{
-			if(!si5351_set_freq(*freq, SI5351_CLK0, leaveClockOff, 0))
-			{
-				g_rx_frequency = *freq;
-				err = false;
-			}
-			
-			if(!si5351_set_freq(*freq, SI5351_CLK1, leaveClockOff, 50))
-			{
-				g_rx_frequency = *freq;
-				err = false;
-			}
+			si5351_set_rx_freq(*freq, false);
 		}
 
 		return(err);
@@ -131,7 +121,18 @@ volatile Frequency_Hz g_rx_frequency = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 			return( code);
 		}
 
-		err = rxSetFrequency((Frequency_Hz*)&g_rx_frequency, false);
+		if((g_rx_frequency < RX_MAXIMUM_80M_FREQUENCY) && (g_rx_frequency > RX_MINIMUM_80M_FREQUENCY))    /* 80m */
+		{
+			if((code = si5351_init_for_quad(7500000)))
+			{
+				return(code);
+			}
+// 			if((code = si5351_set_rx_freq(g_rx_frequency, true)))
+// 			{
+// 				return(code);
+// 			}
+		}
+
 		if(!err)
 		{
 			g_rx_initialized = true;

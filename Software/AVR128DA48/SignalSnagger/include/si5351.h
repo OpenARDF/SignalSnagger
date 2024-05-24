@@ -113,10 +113,6 @@ extern "C" {
  *  Calls to si5351_set_freq() set one output clock only: it must be called once for each clock that will be used.
  *  Unused clocks will remain powered down. Setting the frequency of a clock also enables that clock's output.
  *
- *  si5351_set_vcoB_freq() should only be called once, and it must be called prior to setting CLK1 or CLK2 output
- *  frequencies. Calling si5351_set_vcoB_freq() after CLK1 or CLK2 has been set will change the output frequencies
- *  of both those clocks to a indeterminate values.
- *
  *  The Si5351 integrated circuit places certain limitations on the ranges and combinations of frequencies that be
  *  assigned to each of the three clock outputs. It is the library user's responsibility to be sufficiently familiar
  *  with the Si5351 specification so as to avoid illegal settings.
@@ -153,7 +149,8 @@ extern "C" {
 #define SI5351_XTAL_FREQ                                25000000UL
 #define SI5351_PLL_FIXED                                900000000UL
 
-#define SI5351_PLL_VCO_MIN                              600000000UL
+#define SI5351_PLL_VCO_MIN                            600000000UL
+//#define SI5351_PLL_VCO_MIN                              444500000UL
 #define SI5351_PLL_VCO_MAX                              900000000UL /* This must be defined as an even number to support frequency-setting algorithm */
 #define SI5351_MULTISYNTH_MIN_FREQ                      1000000UL
 #define SI5351_MULTISYNTH_DIVBY4_FREQ                   150000000UL
@@ -163,6 +160,8 @@ extern "C" {
 #define SI5351_CLKOUT_MIN_FREQ                          8000UL
 #define SI5351_CLKOUT_MAX_FREQ                          SI5351_MULTISYNTH_MAX_FREQ
 #define SI5351_CLKOUT67_MAX_FREQ                        SI5351_MULTISYNTH67_MAX_FREQ
+#define SI5351_CLKIN_MAX_FREQ							10000000
+#define SI5351_CLKIN_MIN_FREQ							40000000
 
 #define SI5351_PLL_A_MIN                                15
 #define SI5351_PLL_A_MAX                                90
@@ -224,14 +223,14 @@ extern "C" {
 #define SI5351_PARAMETERS_LENGTH                        8
 #define SI5351_PLLA_PARAMETERS                          26
 #define SI5351_PLLB_PARAMETERS                          34
-#define SI5351_CLK0_PARAMETERS                          42
-#define SI5351_CLK1_PARAMETERS                          50
-#define SI5351_CLK2_PARAMETERS                          58
-#define SI5351_CLK3_PARAMETERS                          66
-#define SI5351_CLK4_PARAMETERS                          74
-#define SI5351_CLK5_PARAMETERS                          82
-#define SI5351_CLK6_PARAMETERS                          90
-#define SI5351_CLK7_PARAMETERS                          91
+#define SI5351_MS0_PARAMETERS                           42
+#define SI5351_MS1_PARAMETERS                           50
+#define SI5351_MS2_PARAMETERS                           58
+#define SI5351_MS3_PARAMETERS                           66
+#define SI5351_MS4_PARAMETERS                           74
+#define SI5351_MS5_PARAMETERS                           82
+#define SI5351_MS6_PARAMETERS                           90
+#define SI5351_MS7_PARAMETERS                           91
 #define SI5351_CLK6_7_OUTPUT_DIVIDER                    92
 #define SI5351_OUTPUT_CLK_DIV_MASK                      (7 << 4)
 #define SI5351_OUTPUT_CLK6_DIV_MASK                     (7 << 0)
@@ -380,50 +379,6 @@ extern "C" {
 		Si5351RegSet ms;
 	} Union_si5351_regs;
 
-	typedef struct si5351Status
-	{
-		uint8_t SYS_INIT;
-		uint8_t LOL_B;
-		uint8_t LOL_A;
-		uint8_t LOS;
-		uint8_t REVID;
-	} Si5351Status;
-
-	typedef struct si5351IntStatus
-	{
-		uint8_t SYS_INIT_STKY;
-		uint8_t LOL_B_STKY;
-		uint8_t LOL_A_STKY;
-		uint8_t LOS_STKY;
-	} Si5351IntStatus;
-
-	typedef struct
-	{
-		Frequency_Hz freq;
-		bool enabled;
-		Si5351_drive drive;
-	} ClockPin;
-
-/*
- *  SI5351Device type:
- *  Defines all the parameters that a library user might want to keep track of. Usage:
- *
- *       SI5351 clock_chip;
- *       clock_chip.clk0 = 145520000;
- *
- *  TODO: The library might make use of this for certain function calls, such as initialization,
- *  to support efficient passing of all needed parameters.
- */
-	typedef struct
-	{
-		ClockPin clk0;
-		ClockPin clk1;
-		ClockPin clk2;
-		Si5351_Xtal_load_pF xtal_load;
-		int32_t correction;
-		Frequency_Hz vcoB;
-	} SI5351Device;
-
 /********************************************************************************************************************
  * Public Function Prototypes
  ******************************************************************************************************************** */
@@ -440,10 +395,13 @@ void si5351_start_comms(void);
 /**
  */
 bool si5351_init(Si5351_Xtal_load_pF, Frequency_Hz);
+EC si5351_init_for_quad(Frequency_Hz freq_Fout);
+EC si5351_set_quad_frequency(IncrType direction);
 
 /**
  */
-bool si5351_set_freq(Frequency_Hz, Si5351_clock, bool clocksOff, uint8_t phase);
+//bool si5351_set_freq(Frequency_Hz, Si5351_clock, bool clocksOff, uint8_t phase);
+EC si5351_set_rx_freq(Frequency_Hz freq_Fout, bool do_reset);
 
 /**
  */
@@ -464,14 +422,6 @@ void si5351_set_correction(int32_t);
 /**
  */
 int32_t si5351_get_correction(void);
-
-/**
- */
-void si5351_set_vcoB_freq(Frequency_Hz);
-
-/**
- */
-void pll_reset(Si5351_pll);
 
 #ifdef SUPPORT_STATUS_READS
 /**

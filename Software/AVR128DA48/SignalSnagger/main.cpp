@@ -19,6 +19,7 @@
 #include "leds.h"
 #include "CircularStringBuff.h"
 #include "rtc.h"
+#include "tca.h"
 //#include "dac0.h"
 
 #include <cpuint.h>
@@ -98,7 +99,7 @@ static volatile int g_rotary_count = 0;
 static volatile int g_rotary_edges = 0;
 #define ROTARY_SYNC_DELAY 150
 
-extern Frequency_Hz g_rx_frequency;
+extern volatile Frequency_Hz g_rx_frequency;
 char g_messages_text[STATION_ID+1][MAX_PATTERN_TEXT_LENGTH + 1];
 volatile uint8_t g_id_codespeed = EEPROM_ID_CODE_SPEED_DEFAULT;
 volatile uint8_t g_pattern_codespeed = EEPROM_PATTERN_CODE_SPEED_DEFAULT;
@@ -118,6 +119,7 @@ volatile bool g_sending_station_ID = false;											/* Allows a small extensio
 static volatile bool g_sufficient_power_detected = false;
 static volatile bool g_enableHardwareWDResets = false;
 extern volatile bool g_tx_power_is_zero;
+extern uint16_t g_clock_calibration;
 
 static volatile bool g_go_to_sleep_now = false;
 static volatile bool g_sleeping = false;
@@ -180,6 +182,17 @@ Frequency_Hz getFrequencySetting(void);
 int repChar(char *str, char orig, char rep);
 char *trimwhitespace(char *str);
 
+ISR(RTC_CNT_vect)
+{
+	uint8_t x = RTC.INTFLAGS;
+	
+    if (x & RTC_OVF_bm )
+    {
+        system_tick();
+	}
+ 
+    RTC.INTFLAGS = (RTC_OVF_bm | RTC_CMP_bm);
+}
 /**
 1-Second Interrupts:
 One-second counter based on RTC.
@@ -220,6 +233,22 @@ ISR(TCB0_INT_vect)
 			int8_t leftSense = holdSwitch & (1 << SENSE_SWITCH_LEFT);
 			int8_t rightSense = holdSwitch & (1 << SENSE_SWITCH_RIGHT);
 			int8_t encoderSwitch = holdSwitch & (1 << ENCODER_SWITCH);
+			
+			if(!leftSense)
+			{
+				PORTA_set_pin_level(CARDIOID_BACK, LOW);
+				PORTA_set_pin_level(CARDIOID_FRONT, HIGH);
+			}
+			else if(!rightSense)
+			{
+				PORTA_set_pin_level(CARDIOID_FRONT, LOW);
+				PORTA_set_pin_level(CARDIOID_BACK, HIGH);
+			}
+			else
+			{
+				PORTA_set_pin_level(CARDIOID_FRONT, LOW);
+				PORTA_set_pin_level(CARDIOID_BACK, LOW);
+			}
 			
 			if(holdSwitch != nowSwitch) /* Change detected */
 			{
@@ -642,8 +671,6 @@ void powerUp5V(void)
 	PORTA_set_pin_level(PWR_5V_ENABLE, HIGH);  /* Enable 5V power regulator */
 }
 
-			static int plus = 0, minus = 0;
-
 
 int main(void)
 {
@@ -651,6 +678,8 @@ int main(void)
 
 	init_receiver((Frequency_Hz)3570500);
 		
+	RTC_set_calibration(g_clock_calibration);
+					
 	/* Check that the RTC is running */
 	set_system_time(YEAR_2000_EPOCH);
 	time_t now = time(null);
@@ -659,8 +688,8 @@ int main(void)
 	if(now == time(null))
 	{
 		g_hardware_error |= (int)HARDWARE_NO_RTC;
-// 		RTC_init_backup();
-// 		LEDS.blink(LEDS_OFF, true);
+ 		RTC_init_backup();
+ 		LEDS.blink(LEDS_RED_AND_GREEN_BLINK_FAST, true);
 	}
 
 	while (1) {
@@ -759,21 +788,28 @@ int main(void)
 		* Handle Rotary Encoder Turns
 		*********************************/
 		if(g_rotary_count)
-		{			
+		{
+			static uint8_t pwm = 50;
+			
 			if(g_rotary_count > 0)
 			{
 				LEDS.blink(LEDS_RED_BLINK_FAST);
 				LEDS.blink(LEDS_GREEN_ON_CONSTANT);
-				plus++;
 				g_rotary_count--;
+				pwm++;
+				si5351_set_quad_frequency(UP);
 			}
 			else
 			{
 				LEDS.blink(LEDS_GREEN_BLINK_FAST);
 				LEDS.blink(LEDS_RED_ON_CONSTANT);
-				minus++;
 				g_rotary_count++;
+				pwm--;
+				si5351_set_quad_frequency(DOWN);
 			}
+			
+			pwm = CLAMP(0, pwm, 100);
+			setPWM(pwm);
 		}
 
 				

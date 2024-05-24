@@ -165,9 +165,15 @@ void BINIO_init(void)
 	/* PORTD.PIN7 = Battery voltage */
 
 	/* PORTE *************************************************************************************/
-	PORTE_set_pin_dir(0, PORT_DIR_OFF); /* Unused */
-	PORTE_set_pin_dir(1, PORT_DIR_OFF); /* Unused */
-	PORTE_set_pin_dir(2, PORT_DIR_OFF); /* Unused */
+// 	PORTE_set_pin_dir(0, PORT_DIR_OFF); /* Unused */
+// 	PORTE_set_pin_dir(1, PORT_DIR_OFF); /* Unused */
+// 	PORTE_set_pin_dir(2, PORT_DIR_OFF); /* Unused */
+	
+	PORTE_set_pin_dir(0, PORT_DIR_OUT);
+	
+	PORTE_set_pin_dir(1, PORT_DIR_OUT);
+	
+	PORTE_set_pin_dir(2, PORT_DIR_OUT);
 	
 	PORTE_set_pin_dir(PWM, PORT_DIR_OUT);
 	PORTE_set_pin_level(PWM, LOW);

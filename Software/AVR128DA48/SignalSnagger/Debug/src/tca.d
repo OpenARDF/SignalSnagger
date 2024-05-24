@@ -17,7 +17,7 @@ src/tca.d src/tca.o: ../src/tca.cpp ../defs.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\lib\gcc\avr\7.3.0\include\stdbool.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\lib\gcc\avr\7.3.0\include\stddef.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\stdlib.h \
- ../utils/interrupt_avr8.h
+ ../utils/interrupt_avr8.h ../include/port.h ../include/binio.h
 
 ../defs.h:
 
@@ -60,3 +60,7 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\lib\
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\stdlib.h:
 
 ../utils/interrupt_avr8.h:
+
+../include/port.h:
+
+../include/binio.h:

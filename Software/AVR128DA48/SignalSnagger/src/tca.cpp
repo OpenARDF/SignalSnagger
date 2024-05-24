@@ -31,6 +31,9 @@
 #include "defs.h"
 #include "tca.h"
 
+#include "port.h"
+#include "binio.h"
+
 void TIMERA_init(void)
 {
 	/********************************************************************************/
@@ -43,19 +46,30 @@ void TIMERA_init(void)
 	WOn.
 	*/
 
-	TCA0.SINGLE.PER = 0x095F; /* Set timer period to 10 kHz */
+	PORTE_set_pin_dir(PWM, PORT_DIR_OUT);
+	PORTE_set_pin_dir(0, PORT_DIR_OUT);
+	PORTE_set_pin_dir(1, PORT_DIR_OUT);
+	PORTE_set_pin_dir(2, PORT_DIR_OUT);
+// 	TCA0.SINGLE.PER = 0x095F; /* Set timer period to 10 kHz */
+// 	PORTMUX.TCAROUTEA = PORTMUX_TCA0_PORTE_gc; /* PWM WO3 out on PE3 */ 
+// 	TCA0.SINGLE.CTRLB = TCA_SINGLE_WGMODE_SINGLESLOPE_gc; /* Set waveform generation mode single-slope, and enable compare channel */
+// 	TCA0.SINGLE.CMP0 = TCA0.SINGLE.PER >> 1; /* Start at 50% duty cycle */
+// 	TCA0.SINGLE.CTRLB |= (TCA_SINGLE_CMP0EN_bm | TCA_SINGLE_CMP1EN_bm | TCA_SINGLE_CMP2_bm); /* enable compare channel 0 */
+// 	TCA0.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm; /* enable TimerA0 */
+	TCA0.SPLIT.CTRLD |= 0x01;
+	TCA0.SPLIT.HPER = 0xFF; /* Set timer period to 10 kHz */
 	PORTMUX.TCAROUTEA = PORTMUX_TCA0_PORTE_gc; /* PWM WO3 out on PE3 */ 
-	TCA0.SINGLE.CTRLB = TCA_SINGLE_WGMODE_SINGLESLOPE_gc; /* Set waveform generation mode single-slope, and enable compare channel */
-	TCA0.SINGLE.CMP0 = TCA0.SINGLE.PER >> 1; /* Start at 50% duty cycle */
-	TCA0.SINGLE.CTRLB |= TCA_SINGLE_CMP0EN_bm; /* enable compare channel 0 */
-	TCA0.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm; /* enable TimerA0 */
+	TCA0.SPLIT.CTRLB |= TCA_SPLIT_HCMP0EN_bm; /* Set waveform generation mode single-slope, and enable compare channel */
+	TCA0.SPLIT.HCMP0 = TCA0.SPLIT.HPER >> 1; /* Start at 50% duty cycle */
+	TCA0.SPLIT.CTRLB |= (TCA_SPLIT_CLKSEL2_bp); /* enable compare channel 0 */
+	TCA0.SPLIT.CTRLA |= (TCA_SPLIT_CLKSEL_DIV8_gc | TCA_SPLIT_ENABLE_bm); /* enable TimerA0 */
 }
 
 void setPWM(uint8_t duty)
 {
-	uint16_t dc = CLAMP(0, duty, 100);
+	uint8_t dc = CLAMP(0, duty, 100);
 	
-	uint32_t newCMP = (((uint32_t)(TCA0.SINGLE.PER) * dc) / 100);
-	TCA0.SINGLE.CMP0 = (uint16_t)newCMP;
+	uint16_t newCMP = (((uint32_t)(TCA0.SPLIT.HPER) * dc) / 100);
+	TCA0.SPLIT.HCMP0 = (uint8_t)newCMP;
 	return;
 }
