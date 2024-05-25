@@ -123,7 +123,7 @@ volatile Frequency_Hz g_rx_frequency = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 
 		if((g_rx_frequency < RX_MAXIMUM_80M_FREQUENCY) && (g_rx_frequency > RX_MINIMUM_80M_FREQUENCY))    /* 80m */
 		{
-			if((code = si5351_init_for_quad(7500000)))
+			if((code = si5351_init_for_quad(g_rx_frequency)))
 			{
 				return(code);
 			}

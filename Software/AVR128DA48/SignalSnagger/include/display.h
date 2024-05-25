@@ -237,7 +237,7 @@ public:
 
 	virtual size_t write(uint8_t *buffer, size_t size);
 
-private:
+
 	void reset();
 	void init();
 	void finishCommand();
@@ -245,6 +245,8 @@ private:
 	EC sendData(uint8_t val);
 	EC sendBuffer(uint8_t *buffer, size_t size);
 	bool display_write_bulk(uint8_t regAddr, uint8_t *data, uint8_t bytes);
+
+private:
 	display_t id;
 	uint8_t columns, rows;
 	uint8_t i2cAddr;

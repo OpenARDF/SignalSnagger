@@ -20,6 +20,7 @@
 #include "CircularStringBuff.h"
 #include "rtc.h"
 #include "tca.h"
+#include "display.h"
 //#include "dac0.h"
 
 #include <cpuint.h>
@@ -77,44 +78,23 @@ static volatile bool g_powering_off = false;
 static volatile bool g_battery_measurements_active = false;
 static volatile uint16_t g_maximum_battery = 0;
 
-static volatile bool g_antenna_connection_changed = true;
-volatile AntConnType g_antenna_connect_state = ANT_CONNECTION_UNDETERMINED;
-
-static volatile bool g_start_event = false;
-static volatile bool g_end_event = false;
-
-static volatile int32_t g_on_the_air = 0;
 static volatile int g_sendID_seconds_countdown = 0;
 static volatile uint16_t g_code_throttle = 50;
 static volatile uint16_t g_enunciation_code_throttle = 50;
 static volatile uint8_t g_WiFi_shutdown_seconds = 120;
-static volatile bool g_report_seconds = false;
-static volatile bool g_wifi_active = true;
-static volatile uint8_t g_CARDIOID_FRONT_delay = 0;
-static volatile bool g_shutting_down_wifi = false;
-static volatile bool g_wifi_ready = false;
 static volatile uint16_t g_hardware_error = (uint16_t)HARDWARE_OK;
 
 static volatile int g_rotary_count = 0;
 static volatile int g_rotary_edges = 0;
+static volatile bool g_rotary_shaft_pressed = false;
 #define ROTARY_SYNC_DELAY 150
 
-extern volatile Frequency_Hz g_rx_frequency;
-char g_messages_text[STATION_ID+1][MAX_PATTERN_TEXT_LENGTH + 1];
-volatile uint8_t g_id_codespeed = EEPROM_ID_CODE_SPEED_DEFAULT;
-volatile uint8_t g_pattern_codespeed = EEPROM_PATTERN_CODE_SPEED_DEFAULT;
-volatile uint8_t g_foxoring_pattern_codespeed = EEPROM_FOXORING_PATTERN_CODESPEED_DEFAULT;
-volatile uint16_t g_time_needed_for_ID = 0;
-volatile int16_t g_on_air_seconds = EEPROM_ON_AIR_TIME_DEFAULT;                      /* amount of time to spend on the air */
-volatile int16_t g_off_air_seconds = EEPROM_OFF_AIR_TIME_DEFAULT;                    /* amount of time to wait before returning to the air */
-volatile int16_t g_intra_cycle_delay_time = EEPROM_INTRA_CYCLE_DELAY_TIME_DEFAULT;   /* offset time into a repeating transmit cycle */
-volatile int16_t g_ID_period_seconds = EEPROM_ID_TIME_INTERVAL_DEFAULT;              /* amount of time between ID/callsign transmissions */
-volatile time_t g_event_start_epoch = EEPROM_START_TIME_DEFAULT;
-volatile time_t g_event_finish_epoch = EEPROM_FINISH_TIME_DEFAULT;
-volatile bool g_event_enabled = EEPROM_EVENT_ENABLED_DEFAULT;                        /* indicates that the conditions for executing the event are set */
-volatile bool g_seconds_transition = false;
+static uint8_t g_rf_gain_setting = 50;
 
-volatile bool g_sending_station_ID = false;											/* Allows a small extension of transmissions to ensure the ID is fully sent */
+extern volatile Frequency_Hz g_rx_frequency;
+volatile bool g_seconds_transition = false;
+volatile time_t g_seconds_since_poweron = 0;
+volatile bool g_display_active = false;
 
 static volatile bool g_sufficient_power_detected = false;
 static volatile bool g_enableHardwareWDResets = false;
@@ -161,6 +141,7 @@ volatile uint16_t g_check_temperature = 0;
 
 Enunciation_t g_enunciator = LED_ONLY;
 
+Display display = Display();
 leds LEDS = leds();
 CircularStringBuff g_text_buff = CircularStringBuff(TEXT_BUFF_SIZE);
 
@@ -189,6 +170,9 @@ ISR(RTC_CNT_vect)
     if (x & RTC_OVF_bm )
     {
         system_tick();
+		g_seconds_transition = true;
+		g_seconds_since_poweron++;
+		if(g_seconds_since_poweron == 5) g_display_active = true;
 	}
  
     RTC.INTFLAGS = (RTC_OVF_bm | RTC_CMP_bm);
@@ -248,6 +232,15 @@ ISR(TCB0_INT_vect)
 			{
 				PORTA_set_pin_level(CARDIOID_FRONT, LOW);
 				PORTA_set_pin_level(CARDIOID_BACK, LOW);
+			}
+			
+			if(!encoderSwitch)
+			{
+				g_rotary_shaft_pressed = true;
+			}
+			else
+			{
+				g_rotary_shaft_pressed = false;
 			}
 			
 			if(holdSwitch != nowSwitch) /* Change detected */
@@ -674,6 +667,10 @@ void powerUp5V(void)
 
 int main(void)
 {
+	Frequency_Hz hold_rx_frequency;
+	uint8_t hold_rf_gain_setting;
+	bool splash_displayed = true;
+	
 	atmel_start_init();
 
 	init_receiver((Frequency_Hz)3570500);
@@ -691,8 +688,66 @@ int main(void)
  		RTC_init_backup();
  		LEDS.blink(LEDS_RED_AND_GREEN_BLINK_FAST, true);
 	}
+	
+	display.begin(DOGS104);
+//	display.cls();
+	g_text_buff.putString((char*)"00Signal");
+	g_text_buff.putString((char*)"12Snagger!");
+	sprintf(g_tempStr, "30Ver:%s", SW_REVISION);
+	g_text_buff.putString((char*)g_tempStr);
+	hold_rf_gain_setting = g_rf_gain_setting;
+	hold_rx_frequency = g_rx_frequency;
 
 	while (1) {
+		if(g_display_active)
+		{
+			if(splash_displayed)
+			{
+				splash_displayed = false;
+				display.cls();
+				hold_rx_frequency = 0; /* force update */
+				hold_rf_gain_setting = 0xff; /* force update */
+			}
+			
+			if(hold_rx_frequency != g_rx_frequency)
+			{
+				char str[11];
+				hold_rx_frequency = g_rx_frequency;
+			
+				frequencyString(str, hold_rx_frequency);
+				sprintf(g_tempStr, "00%s", str);
+				g_text_buff.putString(g_tempStr);
+			}
+		
+			if(hold_rf_gain_setting != g_rf_gain_setting)
+			{
+				hold_rf_gain_setting = g_rf_gain_setting;
+			
+				sprintf(g_tempStr, "10Gain:%d  ", g_rf_gain_setting);
+				g_text_buff.putString(g_tempStr);
+			}
+		}
+		
+		if(g_text_buff.size())
+		{
+			size_t s;
+			g_text_buff.getString(g_tempStr, &s);
+			
+			while(s > 2)
+			{
+				char r = g_tempStr[0];
+				char c = g_tempStr[1];
+				uint8_t row = r - '0';
+				uint8_t col = c - '0';
+				
+				display.locate(row, col);
+				s -= 2;
+				display.sendBuffer((uint8_t*)&g_tempStr[2], s);
+				
+				g_text_buff.getString(g_tempStr, &s);
+			}
+		}
+		
 		if(g_handle_counted_leftsense_presses)
 		{
 			if(g_handle_counted_leftsense_presses == 1)
@@ -789,27 +844,43 @@ int main(void)
 		*********************************/
 		if(g_rotary_count)
 		{
-			static uint8_t pwm = 50;
+			uint8_t pwm = g_rf_gain_setting;
 			
-			if(g_rotary_count > 0)
-			{
-				LEDS.blink(LEDS_RED_BLINK_FAST);
-				LEDS.blink(LEDS_GREEN_ON_CONSTANT);
-				g_rotary_count--;
-				pwm++;
-				si5351_set_quad_frequency(UP);
-			}
-			else
+			if(g_rotary_count < 0)
 			{
 				LEDS.blink(LEDS_GREEN_BLINK_FAST);
 				LEDS.blink(LEDS_RED_ON_CONSTANT);
+				
+				if(g_rotary_shaft_pressed)
+				{
+					pwm++;
+				}
+				else
+				{
+					si5351_set_quad_frequency(UP);
+				}
+				
 				g_rotary_count++;
-				pwm--;
-				si5351_set_quad_frequency(DOWN);
+			}
+			else
+			{
+				LEDS.blink(LEDS_RED_BLINK_FAST);
+				LEDS.blink(LEDS_GREEN_ON_CONSTANT);
+				
+				if(g_rotary_shaft_pressed)
+				{
+					pwm--;
+				}
+				else
+				{
+					si5351_set_quad_frequency(DOWN);					
+				}
+
+				g_rotary_count--;
 			}
 			
-			pwm = CLAMP(0, pwm, 100);
-			setPWM(pwm);
+			g_rx_frequency = si5351_get_frequency(SI5351_CLK0);			
+			g_rf_gain_setting = setPWM(pwm);
 		}
 
 				

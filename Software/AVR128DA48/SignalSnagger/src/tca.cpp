@@ -65,11 +65,11 @@ void TIMERA_init(void)
 	TCA0.SPLIT.CTRLA |= (TCA_SPLIT_CLKSEL_DIV8_gc | TCA_SPLIT_ENABLE_bm); /* enable TimerA0 */
 }
 
-void setPWM(uint8_t duty)
+uint8_t setPWM(uint8_t duty)
 {
 	uint8_t dc = CLAMP(0, duty, 100);
 	
 	uint16_t newCMP = (((uint32_t)(TCA0.SPLIT.HPER) * dc) / 100);
 	TCA0.SPLIT.HCMP0 = (uint8_t)newCMP;
-	return;
+	return(dc);
 }
