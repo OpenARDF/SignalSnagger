@@ -27,12 +27,15 @@ class CircularStringBuff {
     CircularStringBuff(size_t);
 
     void put(char item);
+	bool putString(char* string);
     char get(void);
+	void getString(char* str, size_t *length);
     void reset(void);
     bool empty(void) const;
     bool full(void) const;
     size_t capacity(void) const;
     size_t size(void) const;
+	size_t remaining(void) const;
 	char pop(void);
 	void setBusy(bool busy);
 	bool isBusy(void);

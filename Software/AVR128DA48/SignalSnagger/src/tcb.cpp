@@ -36,6 +36,11 @@ extern volatile uint16_t g_i2c1_timeout_ticks;
  */
 int8_t TIMERB_init()
 {
+/********************************************************************************/
+/**
+Main program periodic interrupt timer
+*/
+
 TCB0.INTCTRL = 1 << TCB_CAPT_bp   /* Capture or Timeout: enabled */
 | 0 << TCB_OVF_bp; /* OverFlow Interrupt: disabled */
 
@@ -52,8 +57,9 @@ TCB0.INTFLAGS = (TCB_CAPT_bm | TCB_OVF_bm); /* Clear flag */
 
 /********************************************************************************/
 /** 
-LED Timer
+Utility ms timer
 */
+
 TCB1.INTCTRL = 1 << TCB_CAPT_bp   /* Capture or Timeout: enabled */
 | 0 << TCB_OVF_bp; /* OverFlow Interrupt: disabled */
 
@@ -92,6 +98,9 @@ CPUINT.LVL1VEC = 30; /* Set to level 1 - highest priority interrupt */
 
 
 /********************************************************************************/
+/**
+LED Timer
+*/
 
 TCB3.INTCTRL = 1 << TCB_CAPT_bp   /* Capture or Timeout: enabled */
 | 0 << TCB_OVF_bp; /* OverFlow Interrupt: disabled */
@@ -170,6 +179,8 @@ ISR(TCB2_INT_vect)
 		if(g_i2c0_timeout_ticks) g_i2c0_timeout_ticks--;
 	}
 	TCB2.INTFLAGS = TCB_CAPT_bm | TCB_OVF_bm; /* Clear flags */
+	
+	return;
 }
 
 
@@ -193,6 +204,8 @@ ISR(TCB1_INT_vect)
     }
 
     TCB1.INTFLAGS = TCB_CAPT_bm | TCB_OVF_bm; /* clear interrupt flags */
+
+	return;
 }
 
 int8_t TIMERB_sleep()

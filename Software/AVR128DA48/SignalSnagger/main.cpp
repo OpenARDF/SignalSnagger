@@ -19,6 +19,8 @@
 #include "leds.h"
 #include "CircularStringBuff.h"
 #include "rtc.h"
+#include "tca.h"
+#include "display.h"
 //#include "dac0.h"
 
 #include <cpuint.h>
@@ -76,47 +78,32 @@ static volatile bool g_powering_off = false;
 static volatile bool g_battery_measurements_active = false;
 static volatile uint16_t g_maximum_battery = 0;
 
-static volatile bool g_antenna_connection_changed = true;
-volatile AntConnType g_antenna_connect_state = ANT_CONNECTION_UNDETERMINED;
-
-static volatile bool g_start_event = false;
-static volatile bool g_end_event = false;
-
-static volatile int32_t g_on_the_air = 0;
 static volatile int g_sendID_seconds_countdown = 0;
 static volatile uint16_t g_code_throttle = 50;
 static volatile uint16_t g_enunciation_code_throttle = 50;
 static volatile uint8_t g_WiFi_shutdown_seconds = 120;
-static volatile bool g_report_seconds = false;
-static volatile bool g_wifi_active = true;
-static volatile uint8_t g_CARDIOID_FRONT_delay = 0;
-static volatile bool g_shutting_down_wifi = false;
-static volatile bool g_wifi_ready = false;
 static volatile uint16_t g_hardware_error = (uint16_t)HARDWARE_OK;
 
-static volatile uint8_t g_rotary_count = 0;
-#define ROTARY_SYNC_DELAY 600
+static volatile bool g_rotary_enable = false;
+static volatile int g_rotary_count = 0;
+static volatile int g_rotary_edges = 0;
+static volatile bool g_rotary_shaft_pressed = false;
+#define ROTARY_SYNC_DELAY 150
 
-extern Frequency_Hz g_rx_frequency;
-char g_messages_text[STATION_ID+1][MAX_PATTERN_TEXT_LENGTH + 1];
-volatile uint8_t g_id_codespeed = EEPROM_ID_CODE_SPEED_DEFAULT;
-volatile uint8_t g_pattern_codespeed = EEPROM_PATTERN_CODE_SPEED_DEFAULT;
-volatile uint8_t g_foxoring_pattern_codespeed = EEPROM_FOXORING_PATTERN_CODESPEED_DEFAULT;
-volatile uint16_t g_time_needed_for_ID = 0;
-volatile int16_t g_on_air_seconds = EEPROM_ON_AIR_TIME_DEFAULT;                      /* amount of time to spend on the air */
-volatile int16_t g_off_air_seconds = EEPROM_OFF_AIR_TIME_DEFAULT;                    /* amount of time to wait before returning to the air */
-volatile int16_t g_intra_cycle_delay_time = EEPROM_INTRA_CYCLE_DELAY_TIME_DEFAULT;   /* offset time into a repeating transmit cycle */
-volatile int16_t g_ID_period_seconds = EEPROM_ID_TIME_INTERVAL_DEFAULT;              /* amount of time between ID/callsign transmissions */
-volatile time_t g_event_start_epoch = EEPROM_START_TIME_DEFAULT;
-volatile time_t g_event_finish_epoch = EEPROM_FINISH_TIME_DEFAULT;
-volatile bool g_event_enabled = EEPROM_EVENT_ENABLED_DEFAULT;                        /* indicates that the conditions for executing the event are set */
+static volatile bool g_leftSense_pressed = false;
+static volatile bool g_rightSense_pressed = false;
+
+static uint8_t g_rf_gain_setting = 50;
+
+extern volatile Frequency_Hz g_rx_frequency;
 volatile bool g_seconds_transition = false;
-
-volatile bool g_sending_station_ID = false;											/* Allows a small extension of transmissions to ensure the ID is fully sent */
+volatile time_t g_seconds_since_poweron = 0;
+volatile bool g_display_active = false;
 
 static volatile bool g_sufficient_power_detected = false;
 static volatile bool g_enableHardwareWDResets = false;
 extern volatile bool g_tx_power_is_zero;
+extern uint16_t g_clock_calibration;
 
 static volatile bool g_go_to_sleep_now = false;
 static volatile bool g_sleeping = false;
@@ -130,14 +117,13 @@ static volatile SleepType g_sleepType = SLEEP_FOREVER;
 // static uint16_t g_ADCFilterThreshold[NUMBER_OF_POLLED_ADC_CHANNELS] = { 500, 500, 500, 500 };
 // static volatile bool g_adcUpdated[NUMBER_OF_POLLED_ADC_CHANNELS] = { false, false, false, false };
 // static volatile uint16_t g_lastConversionResult[NUMBER_OF_POLLED_ADC_CHANNELS];
-#define NUMBER_OF_POLLED_ADC_CHANNELS 3
-#define BATT_VOLTAGE_RESULT 2
-#define ASSI_FAR 1
+#define NUMBER_OF_POLLED_ADC_CHANNELS 2
+#define BATT_VOLTAGE_RESULT 1
 #define ASSI_NEAR 0
-static ADC_Active_Channel_t g_adcChannelOrder[NUMBER_OF_POLLED_ADC_CHANNELS] = { ADC_ASSI_NEAR, ADC_ASSI_FAR, ADCBatteryVoltage };
-static const uint16_t g_adcChannelConversionPeriod_ticks[NUMBER_OF_POLLED_ADC_CHANNELS] = { TIMER2_5_8HZ, TIMER2_0_5HZ, TIMER2_0_5HZ };
-static volatile uint16_t g_adcCountdownCount[NUMBER_OF_POLLED_ADC_CHANNELS] = { 100, 1000, 2000 };
-static volatile bool g_adcUpdated[NUMBER_OF_POLLED_ADC_CHANNELS] = { false, false, false };
+static ADC_Active_Channel_t g_adcChannelOrder[NUMBER_OF_POLLED_ADC_CHANNELS] = { ADC_ASSI_NEAR, ADCBatteryVoltage };
+static const uint16_t g_adcChannelConversionPeriod_ticks[NUMBER_OF_POLLED_ADC_CHANNELS] = { TIMER2_20HZ, TIMER2_0_5HZ };
+static volatile uint16_t g_adcCountdownCount[NUMBER_OF_POLLED_ADC_CHANNELS] = { 100, 2000 };
+static volatile bool g_adcUpdated[NUMBER_OF_POLLED_ADC_CHANNELS] = { false, false };
 static volatile uint16_t g_lastConversionResult[NUMBER_OF_POLLED_ADC_CHANNELS];
 
 extern Goertzel g_goertzel;
@@ -158,6 +144,7 @@ volatile uint16_t g_check_temperature = 0;
 
 Enunciation_t g_enunciator = LED_ONLY;
 
+Display display = Display();
 leds LEDS = leds();
 CircularStringBuff g_text_buff = CircularStringBuff(TEXT_BUFF_SIZE);
 
@@ -179,6 +166,21 @@ Frequency_Hz getFrequencySetting(void);
 int repChar(char *str, char orig, char rep);
 char *trimwhitespace(char *str);
 
+ISR(RTC_CNT_vect)
+{
+	uint8_t x = RTC.INTFLAGS;
+	
+    if (x & RTC_OVF_bm )
+    {
+        system_tick();
+		g_seconds_transition = true;
+		g_seconds_since_poweron++;
+		if(g_seconds_since_poweron == 2) g_rotary_enable = true;
+		if(g_seconds_since_poweron == 5) g_display_active = true;
+	}
+ 
+    RTC.INTFLAGS = (RTC_OVF_bm | RTC_CMP_bm);
+}
 /**
 1-Second Interrupts:
 One-second counter based on RTC.
@@ -205,7 +207,7 @@ ISR(TCB0_INT_vect)
 		uint8_t holdSwitch = 0, nowSwitch = 0;
 		static uint8_t leftsenseReleased = false, rightsenseReleased = false, encoderReleased = false;
 		static uint8_t leftsenseLongPressEnabled = true, rightsenseLongPressEnabled = true, encoderLongPressEnabled = true;
-		static uint16_t holdRotaryCount = 0;
+		static int holdRotaryEdges = 0;
 		static uint16_t rotaryNoMotionCountdown = 0;
 		
 		fiftyMS++;
@@ -215,13 +217,42 @@ ISR(TCB0_INT_vect)
 			holdSwitch = portAdebouncedVals() & switch_bits;
 			debounce();
 			nowSwitch = portAdebouncedVals() & switch_bits;
+		
+			int8_t leftSense = holdSwitch & (1 << SENSE_SWITCH_LEFT);
+			int8_t rightSense = holdSwitch & (1 << SENSE_SWITCH_RIGHT);
+			int8_t encoderSwitch = holdSwitch & (1 << ENCODER_SWITCH);
+			
+			if(!leftSense && rightSense)
+			{
+				PORTA_set_pin_level(CARDIOID_BACK, LOW);
+				PORTA_set_pin_level(CARDIOID_FRONT, HIGH);
+				g_leftSense_pressed = true;
+			}
+			else if(!rightSense && leftSense)
+			{
+				PORTA_set_pin_level(CARDIOID_FRONT, LOW);
+				PORTA_set_pin_level(CARDIOID_BACK, HIGH);
+				g_rightSense_pressed = true;
+			}
+			else
+			{
+				PORTA_set_pin_level(CARDIOID_FRONT, LOW);
+				PORTA_set_pin_level(CARDIOID_BACK, LOW);
+				g_leftSense_pressed = false;
+				g_rightSense_pressed = false;
+			}
+			
+			if(!encoderSwitch)
+			{
+				g_rotary_shaft_pressed = true;
+			}
+			else
+			{
+				g_rotary_shaft_pressed = false;
+			}
 			
 			if(holdSwitch != nowSwitch) /* Change detected */
 			{
-				int8_t leftSense = holdSwitch & (1 << SENSE_SWITCH_LEFT);
-				int8_t rightSense = holdSwitch & (1 << SENSE_SWITCH_RIGHT);
-				int8_t encoderSwitch = holdSwitch & (1 << ENCODER_SWITCH);
-				
 				int8_t changed = nowSwitch ^ holdSwitch;
 				
 				if(changed & (1 << SENSE_SWITCH_LEFT)) // left sense button changed
@@ -253,20 +284,6 @@ ISR(TCB0_INT_vect)
 						leftsenseLongPressEnabled = true;
 					}
 				}
-				else if(!leftSense) /* Switch closed and unchanged */
-				{
-					if(!g_long_leftsense_press && leftsenseLongPressEnabled)
-					{
-						if(++g_leftsense_closed_time >= 200)
-						{
-							g_long_leftsense_press = true;
-							g_leftsense_closed_time = 0;
-							g_leftsense_presses_count = 0;
-							leftsenseLongPressEnabled = false;
-						}
-					}
-				}
-
 				
 				if(changed & (1 << SENSE_SWITCH_RIGHT))
 				{
@@ -295,19 +312,6 @@ ISR(TCB0_INT_vect)
 						}
 						
 						rightsenseLongPressEnabled = true;
-					}
-				}
-				else if(!rightSense) /* Switch closed and unchanged */
-				{
-					if(!g_long_rightsense_press && rightsenseLongPressEnabled)
-					{
-						if(++g_rightsense_closed_time >= 200)
-						{
-							g_long_rightsense_press = true;
-							g_rightsense_closed_time = 0;
-							g_rightsense_presses_count = 0;
-							rightsenseLongPressEnabled = false;
-						}
 					}
 				}
 				
@@ -340,7 +344,38 @@ ISR(TCB0_INT_vect)
 						encoderLongPressEnabled = true;
 					}
 				}
-				else if(!encoderSwitch) /* Switch closed and unchanged */
+			}
+			else // no switches have changed
+			{
+				if(!leftSense) /* Switch closed and unchanged */
+				{
+					if(!g_long_leftsense_press && leftsenseLongPressEnabled)
+					{
+						if(++g_leftsense_closed_time >= 200)
+						{
+							g_long_leftsense_press = true;
+							g_leftsense_closed_time = 0;
+							g_leftsense_presses_count = 0;
+							leftsenseLongPressEnabled = false;
+						}
+					}
+				}
+
+				if(!rightSense) /* Switch closed and unchanged */
+				{
+					if(!g_long_rightsense_press && rightsenseLongPressEnabled)
+					{
+						if(++g_rightsense_closed_time >= 200)
+						{
+							g_long_rightsense_press = true;
+							g_rightsense_closed_time = 0;
+							g_rightsense_presses_count = 0;
+							rightsenseLongPressEnabled = false;
+						}
+					}
+				}
+
+				if(!encoderSwitch) /* Switch closed and unchanged */
 				{
 					if(!g_long_encoder_press && encoderLongPressEnabled)
 					{
@@ -426,28 +461,44 @@ ISR(TCB0_INT_vect)
 		}
 		
 		/**********************
-		 * This is a kluge that helps ensure that the rotary encoder count remains in sync with the
-		 * encoder's indents. This kluge seems to be necessary because when the encoder is turned
-		 * rapidly (and especially if the direction of turn reverses) a transition can be missed,
+		 * The following code includes a kluge that helps ensure that the rotary encoder count remains
+		 * in sync with the encoder's indents. This kluge seems to be necessary because when the encoder 
+		 * is turned rapidly (and especially if the direction of turn reverses) a transition can be missed,
 		 * causing indents to no longer align. Testing indicates that this re-alignment is rarely needed,
 		 * but when it is provided it improves user experience. */
-		if(holdRotaryCount == g_rotary_count)
+		if(g_rotary_edges)
 		{
-			rotaryNoMotionCountdown--;  /* underflow of the countdown is harmless */
+			bool neg = g_rotary_edges < 0;
+			int val = abs(g_rotary_edges);
 
-			if(!rotaryNoMotionCountdown)
+			if(holdRotaryEdges == g_rotary_edges)
 			{
-				if(g_rotary_count % 4)  /* need to make the count be a multiple of 4 edges */
+				if(rotaryNoMotionCountdown) rotaryNoMotionCountdown--;
+
+				if(!rotaryNoMotionCountdown)
 				{
-					g_rotary_count += 2;
-					g_rotary_count = ((g_rotary_count >> 2) << 2);
+					val = ((val + 3) >> 2) << 2; // Round up and make divisible by 4
 				}
 			}
-		}
-		else
-		{
-			rotaryNoMotionCountdown = ROTARY_SYNC_DELAY;
-			holdRotaryCount = g_rotary_count;
+			else
+			{
+				int temp = val >> 2;
+				if(neg)
+				{
+					g_rotary_count -= temp;
+				}
+				else
+				{
+					g_rotary_count += temp;
+				}
+				
+				val -= (temp << 2);		
+			
+				rotaryNoMotionCountdown = ROTARY_SYNC_DELAY;
+				holdRotaryEdges = g_rotary_edges;
+			}
+			
+			g_rotary_edges = neg ? -val : val;
 		}
 
 							
@@ -485,47 +536,28 @@ ISR(TCB0_INT_vect)
 			static uint16_t holdConversionResult;
 			uint16_t hold = ADC0_read(); //ADC;
 			
-			if((hold > 10) && (hold < 4090))
+			if((hold >= 0) && (hold < 4090))
 			{
 				holdConversionResult = hold; // (uint16_t)(((uint32_t)hold * ADC_REF_VOLTAGE_mV) >> 10);    /* millivolts at ADC pin */
 				uint16_t lastResult = g_lastConversionResult[indexConversionInProcess];
 
 				g_adcUpdated[indexConversionInProcess] = true;
-
-	// 			if(g_adcChannelOrder[indexConversionInProcess] == ADCExternalBatteryVoltage)
-	// 			{
-	// 				bool directionUP = holdConversionResult > lastResult;
-	// 				uint16_t delta = directionUP ? holdConversionResult - lastResult : lastResult - holdConversionResult;
-	// 
-	// 				if(delta > g_ADCFilterThreshold[indexConversionInProcess])
-	// 				{
-	// 					lastResult = holdConversionResult;
-	// 					g_adcCountdownCount[indexConversionInProcess] = 100; /* speed up next conversion */
-	// 				}
-	// 				else
-	// 				{
-	// 					if(directionUP)
-	// 					{
-	// 						lastResult++;
-	// 					}
-	// 					else if(delta)
-	// 					{
-	// 						lastResult--;
-	// 					}
-	// 
-	// 					g_battery_measurements_active = true;
-	// 				}
-	// 			}
-	// 			else
-	// 			{
- 					lastResult = holdConversionResult;
-	// 			}
-
-				g_lastConversionResult[indexConversionInProcess] = lastResult;
-			}
-			else
-			{
-				hold = g_lastConversionResult[indexConversionInProcess];
+				
+				if(g_adcChannelOrder[indexConversionInProcess] == ADC_ASSI_NEAR)
+				{
+					if(holdConversionResult > lastResult)
+					{
+						g_lastConversionResult[indexConversionInProcess] = (holdConversionResult + (lastResult<<1)) / 3;
+					}
+					else
+					{
+						g_lastConversionResult[indexConversionInProcess] = (holdConversionResult + (lastResult<<3)) / 9;
+					}
+				}
+				else
+				{
+					g_lastConversionResult[indexConversionInProcess] = holdConversionResult;
+				}
 			}
 
 			conversionInProcess = false;
@@ -540,10 +572,10 @@ Handle switch closure interrupts
 */
 ISR(PORTA_PORT_vect)
 {
-	// 	uint8_t x = VPORTA.INTFLAGS;
-	//
-	// 	if(x & (1 << SWITCH))
-	// 	{
+	uint8_t x = VPORTA.INTFLAGS;
+
+	if(x & ((1 << SENSE_SWITCH_LEFT) | ((1 << SENSE_SWITCH_RIGHT))))
+	{
 	// 		if(g_sleeping)
 	// 		{
 	// 			g_go_to_sleep_now = false;
@@ -551,10 +583,15 @@ ISR(PORTA_PORT_vect)
 	// 			g_awakenedBy = AWAKENED_BY_BUTTONPRESS;
 	// 			g_waiting_for_next_event = false; /* Ensure the wifi module does not get shut off prematurely */
 	// 		}
-	// 	}
+	}
 	
 	VPORTA.INTFLAGS = 0xFF; /* Clear all flags */
 }
+
+
+
+// Previous state of the encoder (both pins)
+volatile uint8_t prev_state = 0;
 
 /**
 PORTF Interrupts
@@ -564,54 +601,45 @@ ISR(PORTF_PORT_vect)
 {
 	uint8_t x = VPORTF.INTFLAGS;
 	
-	if(x & ((1 << ROTARY_B_IN) | (1 << ROTARY_A_IN)))
+	if(g_rotary_enable)
 	{
-		static uint8_t portBhistory = 0xFF; /* power-up default is high because of the pull-up */
-		uint8_t quad = VPORTF.IN;
-		uint8_t changedbits = VPORTF.IN ^ portBhistory;
-		portBhistory = quad;
-
-		if(!changedbits)    /* noise? */
+		if(x & ((1 << ROTARY_B_IN) | (1 << ROTARY_A_IN)))
 		{
-			return;
-		}
+			uint8_t curr_state = (PORTF.IN & (PIN3_bm | PIN4_bm)) >> 3;
 
-		quad = changedbits & QUAD_MASK; /* A and B for quadrature rotary encoder */
+			// Calculate the state transition
+			uint8_t transition = (prev_state << 2) | curr_state;
 
-		/* Note: the following logic results in the count incrementing by 4 for each full
-		 * quadrature cycle. The click count can be derived by shifting right twice (dividing
-		 * by four). */
-		if(quad)
-		{
-			bool asignal = (VPORTF.IN & (1 << ROTARY_A_IN)) >> ROTARY_A_IN;
-			bool bsignal = (VPORTF.IN & (1 << ROTARY_B_IN)) >> ROTARY_B_IN;
-
-			if(quad == (1 << ROTARY_A_IN))   /* "A" changed */
+			// Decode the transition (Quadrature code)
+			switch (transition) 
 			{
-				if(asignal == bsignal)
+				case 0b0001:
+				case 0b0111:
+				case 0b1110:
+				case 0b1000:
 				{
-					g_rotary_count++;
+					g_rotary_edges++;
 				}
-				else
+				break;
+			
+				case 0b0010:
+				case 0b0100:
+				case 0b1101:
+				case 0b1011:
 				{
-					g_rotary_count--;
+					g_rotary_edges--;
 				}
+				break;
+			
+				// Cases 0b0000, 0b0101, 0b1010, 0b1111 represent no valid state change
 			}
-			else if(quad == (1 << ROTARY_B_IN))  /* "B" changed */
-			{
-				if(asignal == bsignal)
-				{
-					g_rotary_count--;
-				}
-				else
-				{
-					g_rotary_count++;
-				}
-			}
+
+			// Update the previous state
+			prev_state = curr_state;
 		}
- 	}
-	
-	VPORTF.INTFLAGS = 0xFF; /* Clear all flags */
+	}
+    // Clear the interrupt flags for PF3 and PF4
+    PORTF.INTFLAGS = PIN3_bm | PIN4_bm;
 }
 
 
@@ -630,33 +658,131 @@ void powerUp5V(void)
 
 int main(void)
 {
-	static uint16_t holdRotaryCount = 0;
+	Frequency_Hz hold_rx_frequency = 0;
+	uint8_t hold_rf_gain_setting = 255;
+	uint16_t hold_assi_result = 0;
+	bool splash_displayed = true;
+	uint8_t x;
+	EC ec;
+	
 	atmel_start_init();
 
-	init_receiver((Frequency_Hz)3570500);
+	x = si5351_get_status() & 0x80;
+	while((util_delay_ms(1000)) && x)
+	{
+		x = si5351_get_status() & 0x80;
+	}
+	
+	ec = init_receiver((Frequency_Hz)3570500);
+	
+	if(ec != ERROR_CODE_NO_ERROR)
+	{
+		g_hardware_error |= (int)HARDWARE_NO_SI5351;
+	}
 		
+	RTC_set_calibration(g_clock_calibration);
+					
 	/* Check that the RTC is running */
 	set_system_time(YEAR_2000_EPOCH);
 	time_t now = time(null);
-	while((util_delay_ms(2000)) && (now == time(null)));
+ 	while((util_delay_ms(2000)) && (now == time(null)));
 	
 	if(now == time(null))
 	{
 		g_hardware_error |= (int)HARDWARE_NO_RTC;
-		RTC_init_backup();
-		LEDS.blink(LEDS_OFF, true);
+ 		RTC_init_backup();
+ 		LEDS.blink(LEDS_RED_AND_GREEN_BLINK_FAST, true);
 	}
+	
+	display.begin(DOGS104);
+	
+	if(g_hardware_error)
+	{
+		g_text_buff.putString((char*)"00Error:");
+		if(g_hardware_error & (int)HARDWARE_NO_SI5351)
+		{
+			g_text_buff.putString((char*)"11SI5351");
+		}
+		
+		if(g_hardware_error & (int)HARDWARE_NO_RTC)
+		{
+			g_text_buff.putString((char*)"2132kCLK");
+		}
+	}
+	else
+	{
+		g_text_buff.putString((char*)"00Signal");
+		g_text_buff.putString((char*)"12Snagger!");
+		sprintf(g_tempStr, "30Ver:%s", SW_REVISION);	
+	}
+	g_text_buff.putString((char*)g_tempStr);
 
 	while (1) {
+		if(g_display_active)
+		{
+			if(splash_displayed)
+			{
+				splash_displayed = false;
+				display.cls();
+				hold_rx_frequency = 0; /* force update */
+				hold_rf_gain_setting = 0xff; /* force update */
+			}
+			
+			if(hold_rx_frequency != g_rx_frequency)
+			{
+				char str[11];
+				hold_rx_frequency = g_rx_frequency;
+			
+				frequencyString(str, hold_rx_frequency);
+				sprintf(g_tempStr, "00%s", str);
+				g_text_buff.putString(g_tempStr);
+			}
+		
+			if(hold_rf_gain_setting != g_rf_gain_setting)
+			{
+				hold_rf_gain_setting = g_rf_gain_setting;
+			
+				sprintf(g_tempStr, "10Gain:%d  ", 100 - g_rf_gain_setting);
+				g_text_buff.putString(g_tempStr);
+			}
+			
+			if(hold_assi_result != g_lastConversionResult[0])
+			{
+				hold_assi_result = g_lastConversionResult[0];
+				sprintf(g_tempStr, "30S=%d  ", hold_assi_result);
+				g_text_buff.putString(g_tempStr);
+			}
+		}
+		
+		if(g_text_buff.size())
+		{
+			size_t s;
+			g_text_buff.getString(g_tempStr, &s);
+			
+			while(s > 2)
+			{
+				char r = g_tempStr[0];
+				char c = g_tempStr[1];
+				uint8_t row = r - '0';
+				uint8_t col = c - '0';
+				
+				display.locate(row, col);
+				s -= 2;
+				display.sendBuffer((uint8_t*)&g_tempStr[2], s);
+				
+				g_text_buff.getString(g_tempStr, &s);
+			}
+		}
+		
 		if(g_handle_counted_leftsense_presses)
 		{
 			if(g_handle_counted_leftsense_presses == 1)
 			{
-				LEDS.blink(LEDS_GREEN_BLINK_FAST, true);
+				LEDS.blink(LEDS_RED_BLINK_SLOW, true);
 			}
 			else if (g_handle_counted_leftsense_presses == 2)
 			{
-				LEDS.blink(LEDS_GREEN_BLINK_SLOW);
+				LEDS.blink(LEDS_RED_OFF);
 			}
 			
 			g_handle_counted_leftsense_presses = 0;
@@ -671,18 +797,18 @@ int main(void)
 		if(g_long_leftsense_press)
 		{
 			g_long_leftsense_press = false;
-			LEDS.init(LEDS_GREEN_ON_CONSTANT);
+			LEDS.init(LEDS_RED_THEN_GREEN_BLINK_SLOW);
 		}
 		
 		if(g_handle_counted_rightsense_presses)
 		{
 			if(g_handle_counted_rightsense_presses == 1)
 			{
-				LEDS.blink(LEDS_RED_BLINK_FAST, true);
+				LEDS.blink(LEDS_GREEN_BLINK_SLOW, true);
 			}
 			else if (g_handle_counted_rightsense_presses == 2)
 			{
-				LEDS.blink(LEDS_RED_BLINK_SLOW);
+				LEDS.blink(LEDS_GREEN_OFF);
 			}
 			
 			g_handle_counted_rightsense_presses = 0;
@@ -697,18 +823,18 @@ int main(void)
 		if(g_long_rightsense_press)
 		{
 			g_long_rightsense_press = false;
-			LEDS.init(LEDS_GREEN_ON_CONSTANT);
+			LEDS.init(LEDS_RED_THEN_GREEN_BLINK_FAST);
 		}
 		
 		if(g_handle_counted_encoder_presses)
 		{
 			if(g_handle_counted_encoder_presses == 1)
 			{
-				LEDS.blink(LEDS_RED_THEN_GREEN_BLINK_FAST);
+				LEDS.blink(LEDS_RED_AND_GREEN_BLINK_FAST);
 			}
 			else if (g_handle_counted_encoder_presses == 2)
 			{
-				LEDS.blink(LEDS_RED_THEN_GREEN_BLINK_SLOW);
+				LEDS.blink(LEDS_RED_AND_GREEN_BLINK_SLOW);
 			}
 			
 			g_handle_counted_encoder_presses = 0;
@@ -724,9 +850,8 @@ int main(void)
 		{
 			g_long_encoder_press = false;
 			LEDS.init(LEDS_GREEN_ON_CONSTANT);
+			LEDS.blink(LEDS_RED_ON_CONSTANT);
 		}
-		
-		
 		
 		if(g_last_error_code)
 		{
@@ -743,10 +868,63 @@ int main(void)
 		/*********************************
 		* Handle Rotary Encoder Turns
 		*********************************/
-		uint16_t newRotaryCount = g_rotary_count >> 2;
-		if(newRotaryCount != holdRotaryCount)
+		if(g_rotary_count)
 		{
-			holdRotaryCount = newRotaryCount;
+			uint8_t pwm = g_rf_gain_setting;
+			
+			if(g_rotary_count < 0)
+			{
+				LEDS.blink(LEDS_GREEN_BLINK_FAST);
+				LEDS.blink(LEDS_RED_ON_CONSTANT);
+				
+				if(g_rotary_shaft_pressed)
+				{
+					if(pwm) pwm--;
+				}
+				else
+				{
+					if(g_leftSense_pressed)
+					{
+						g_rx_frequency += 1000;
+					}
+					else
+					{
+						g_rx_frequency += 100;
+					}
+
+					si5351_set_quad_frequency(g_rx_frequency);
+				}
+				
+				g_rotary_count++;
+			}
+			else
+			{
+				LEDS.blink(LEDS_RED_BLINK_FAST);
+				LEDS.blink(LEDS_GREEN_ON_CONSTANT);
+				
+				if(g_rotary_shaft_pressed)
+				{
+					if(pwm < 100) pwm++;
+				}
+				else
+				{
+					if(g_leftSense_pressed)
+					{
+						g_rx_frequency -= 1000;
+					}
+					else
+					{
+						g_rx_frequency -= 100;
+					}
+
+					si5351_set_quad_frequency(g_rx_frequency);					
+				}
+
+				g_rotary_count--;
+			}
+			
+			g_rx_frequency = si5351_get_frequency(SI5351_CLK0);			
+			g_rf_gain_setting = setPWM(pwm);
 		}
 
 				

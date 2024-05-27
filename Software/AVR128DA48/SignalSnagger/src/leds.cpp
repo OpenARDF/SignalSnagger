@@ -246,6 +246,10 @@ void leds::blink(Blink_t blinkMode)
 	blink(blinkMode, false);
 }
 
+	bool isRed;
+	bool isGreen;
+	bool isBoth;	
+
 void leds::blink(Blink_t blinkMode, bool resetTimeout)
 {
 	if(resetTimeout)
@@ -255,9 +259,9 @@ void leds::blink(Blink_t blinkMode, bool resetTimeout)
 	
 	if(!led_timeout_count && (blinkMode != LEDS_OFF)) return;
 	
-	bool isRed = ((blinkMode == LEDS_RED_OFF) || (blinkMode == LEDS_RED_BLINK_FAST) || (blinkMode == LEDS_RED_BLINK_SLOW) || (blinkMode == LEDS_RED_ON_CONSTANT));
-	bool isGreen = ((blinkMode == LEDS_GREEN_OFF) || (blinkMode == LEDS_GREEN_BLINK_FAST) || (blinkMode == LEDS_GREEN_BLINK_SLOW) || (blinkMode == LEDS_GREEN_ON_CONSTANT));
-	bool isBoth = !isRed && !isGreen;	
+	isRed = ((blinkMode == LEDS_RED_OFF) || (blinkMode == LEDS_RED_BLINK_FAST) || (blinkMode == LEDS_RED_BLINK_SLOW) || (blinkMode == LEDS_RED_ON_CONSTANT));
+	isGreen = ((blinkMode == LEDS_GREEN_OFF) || (blinkMode == LEDS_GREEN_BLINK_FAST) || (blinkMode == LEDS_GREEN_BLINK_SLOW) || (blinkMode == LEDS_GREEN_ON_CONSTANT));
+	isBoth = !isRed && !isGreen;	
 		
 	if((isRed && (blinkMode != lastRedBlinkSetting)) || (isGreen && (blinkMode != lastGreenBlinkSetting)) || (isBoth && (blinkMode != lastBothBlinkSetting)))
 	{

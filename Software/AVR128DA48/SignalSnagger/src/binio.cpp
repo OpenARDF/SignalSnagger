@@ -81,28 +81,6 @@ uint8_t portFdebouncedVals(void)
 }
 
 
-/**
-
-*/
-// ISR(PORTA_PORT_vect)
-// {
-// 	static int count = 0;
-// 	
-// 	if(PORTA.INTFLAGS & (1 << ENCODER_SWITCH))
-// 	{
-// 		count++;
-// 	}
-// 	
-// 	if(PORTA.INTFLAGS & (1 << HEADPHONE_DETECT))
-// 	{
-// 		count++;
-// 	}	
-// 	
-// 	LED_toggle_GREEN_level();
-// 	
-// 	PORTA.INTFLAGS = 0xFF; /* Clear all flags */
-// }
-
 void BINIO_init(void)
 {
 	/* PORTA *************************************************************************************/
@@ -187,14 +165,19 @@ void BINIO_init(void)
 	/* PORTD.PIN7 = Battery voltage */
 
 	/* PORTE *************************************************************************************/
-	PORTE_set_pin_dir(0, PORT_DIR_OFF); /* Unused */
-	PORTE_set_pin_dir(1, PORT_DIR_OFF); /* Unused */
-	PORTE_set_pin_dir(2, PORT_DIR_OFF); /* Unused */
+// 	PORTE_set_pin_dir(0, PORT_DIR_OFF); /* Unused */
+// 	PORTE_set_pin_dir(1, PORT_DIR_OFF); /* Unused */
+// 	PORTE_set_pin_dir(2, PORT_DIR_OFF); /* Unused */
+	
+	PORTE_set_pin_dir(0, PORT_DIR_OUT);
+	
+	PORTE_set_pin_dir(1, PORT_DIR_OUT);
+	
+	PORTE_set_pin_dir(2, PORT_DIR_OUT);
 	
 	PORTE_set_pin_dir(PWM, PORT_DIR_OUT);
 	PORTE_set_pin_level(PWM, LOW);
 	
-
 	/* PORTF *************************************************************************************/
 	PORTF_set_pin_dir(X32KHZ_SQUAREWAVE, PORT_DIR_OFF);	
 	
@@ -213,8 +196,9 @@ void BINIO_init(void)
 	PORTF_set_pin_dir(6, PORT_DIR_OFF); /* Unused */
 	
 	/* PORT Pin Interrupts */
- 	PORTD.PIN3CTRL = 0x01; /* Enable encoder change interrupts on both edges */
- 	PORTD.PIN4CTRL = 0x01; /* Enable encoder change interrupts on both edges */
+	PORTF.PIN3CTRL |= PORT_ISC_BOTHEDGES_gc; 
+	PORTF.PIN4CTRL |= PORT_ISC_BOTHEDGES_gc;
+	PORTF.INTFLAGS = PIN3_bm | PIN4_bm;
 }
 
 void BINIO_sleep()

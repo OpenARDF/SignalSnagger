@@ -22,6 +22,8 @@
 #include "CircularStringBuff.h"
 #include <stdlib.h>
 #include <ctype.h>
+#include <string.h>
+#include <stdint.h>
 
 CircularStringBuff::CircularStringBuff(size_t size)
 {
@@ -80,21 +82,33 @@ size_t CircularStringBuff::capacity() const
 
 size_t CircularStringBuff::size() const
 {
-  size_t size = max_size_;
+	size_t size = max_size_;
 
-  if (!full_)
-  {
-    if (head_ >= tail_)
-    {
-      size = head_ - tail_;
-    }
-    else
-    {
-      size = max_size_ + head_ - tail_;
-    }
-  }
+	if (!full_)
+	{
+		if (head_ >= tail_)
+		{
+			size = head_ - tail_;
+		}
+		else
+		{
+			size = max_size_ + head_ - tail_;
+		}
+	}
 
-  return (size);
+	return (size);
+}
+
+size_t CircularStringBuff::remaining() const
+{
+	size_t space = 0;
+
+	if (!full_)
+	{
+		space = capacity() - size();
+	}
+
+	return(space);
 }
 
 /** 
@@ -102,7 +116,7 @@ size_t CircularStringBuff::size() const
  */
 void CircularStringBuff::put(char item)
 {
-  buf_[head_] = toupper(item);
+  buf_[head_] = item;
 
   if (full_)
   {
@@ -156,4 +170,47 @@ char CircularStringBuff::get()
   tail_ = (tail_ + 1) % max_size_;
 
   return (val);
+}
+
+bool CircularStringBuff::putString(char* string)
+{
+	bool fail = true;
+	
+	if(full_) return(fail);
+
+	size_t size = strlen(string);
+	if(size > remaining()) return(fail);
+
+	uint8_t i = 0;
+	
+	while((i < size) && !full_)
+	{
+		put(string[i++]);
+	}
+	
+	if(!full_) put('\0');
+	
+	return(full_);
+}
+
+void CircularStringBuff::getString(char* str, size_t *length)
+{
+	if(empty())
+	{
+		 str[0] = '\0';
+		 if(length) *length = 0;
+		 return;
+	}
+	
+	char c;
+	uint8_t i = 0;
+	
+	while((c = get()))
+	{
+		str[i++] = c;		
+	}
+	
+	if(length) *length = i;
+	
+	return;
 }
