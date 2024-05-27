@@ -50,7 +50,7 @@ volatile Frequency_Hz g_rx_frequency = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 		
 		if((*freq < RX_MAXIMUM_80M_FREQUENCY) && (*freq > RX_MINIMUM_80M_FREQUENCY))    /* 80m */
 		{
-			si5351_set_rx_freq(*freq, false);
+			si5351_set_quad_frequency(*freq);
 		}
 
 		return(err);
@@ -91,7 +91,7 @@ volatile Frequency_Hz g_rx_frequency = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 	
 	EC init_receiver(void)
 	{
-		EC code;
+		EC code = ERROR_CODE_NO_ERROR;
 		bool err;
 		
 		DAC0_init();
@@ -127,10 +127,6 @@ volatile Frequency_Hz g_rx_frequency = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 			{
 				return(code);
 			}
-// 			if((code = si5351_set_rx_freq(g_rx_frequency, true)))
-// 			{
-// 				return(code);
-// 			}
 		}
 
 		if(!err)

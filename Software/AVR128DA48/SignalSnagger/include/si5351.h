@@ -197,6 +197,11 @@ extern "C" {
 #define SI5351_CLK0_CTRL                                16
 #define SI5351_CLK1_CTRL                                17
 #define SI5351_CLK2_CTRL                                18
+#define SI5351_CLK3_CTRL                                19
+#define SI5351_CLK4_CTRL                                20
+#define SI5351_CLK5_CTRL                                21
+#define SI5351_CLK6_CTRL                                22
+#define SI5351_CLK7_CTRL                                23
 #define SI5351_CLK_POWERDOWN                            (1 << 7)
 #define SI5351_CLK_INTEGER_MODE                         (1 << 6)
 #define SI5351_CLK_PLL_SELECT                           (1 << 5)
@@ -221,8 +226,8 @@ extern "C" {
 #define SI5351_CLK_DISABLE_STATE_NEVER                  3
 
 #define SI5351_PARAMETERS_LENGTH                        8
-#define SI5351_PLLA_PARAMETERS                          26
-#define SI5351_PLLB_PARAMETERS                          34
+#define SI5351_PLLA_MULTISYNTH_FEEDBACK_PARAMETERS      26
+#define SI5351_PLLB_MULTISYNTH_FEEDBACK_PARAMETERS      34
 #define SI5351_MS0_PARAMETERS                           42
 #define SI5351_MS1_PARAMETERS                           50
 #define SI5351_MS2_PARAMETERS                           58
@@ -396,12 +401,8 @@ void si5351_start_comms(void);
  */
 bool si5351_init(Si5351_Xtal_load_pF, Frequency_Hz);
 EC si5351_init_for_quad(Frequency_Hz freq_Fout);
-EC si5351_set_quad_frequency(IncrType direction);
-
-/**
- */
-//bool si5351_set_freq(Frequency_Hz, Si5351_clock, bool clocksOff, uint8_t phase);
-EC si5351_set_rx_freq(Frequency_Hz freq_Fout, bool do_reset);
+EC si5351_set_quad_frequency(Frequency_Hz freq_Fout);
+uint8_t si5351_get_status(void);
 
 /**
  */

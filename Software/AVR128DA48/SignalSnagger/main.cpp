@@ -84,10 +84,14 @@ static volatile uint16_t g_enunciation_code_throttle = 50;
 static volatile uint8_t g_WiFi_shutdown_seconds = 120;
 static volatile uint16_t g_hardware_error = (uint16_t)HARDWARE_OK;
 
+static volatile bool g_rotary_enable = false;
 static volatile int g_rotary_count = 0;
 static volatile int g_rotary_edges = 0;
 static volatile bool g_rotary_shaft_pressed = false;
 #define ROTARY_SYNC_DELAY 150
+
+static volatile bool g_leftSense_pressed = false;
+static volatile bool g_rightSense_pressed = false;
 
 static uint8_t g_rf_gain_setting = 50;
 
@@ -113,14 +117,13 @@ static volatile SleepType g_sleepType = SLEEP_FOREVER;
 // static uint16_t g_ADCFilterThreshold[NUMBER_OF_POLLED_ADC_CHANNELS] = { 500, 500, 500, 500 };
 // static volatile bool g_adcUpdated[NUMBER_OF_POLLED_ADC_CHANNELS] = { false, false, false, false };
 // static volatile uint16_t g_lastConversionResult[NUMBER_OF_POLLED_ADC_CHANNELS];
-#define NUMBER_OF_POLLED_ADC_CHANNELS 3
-#define BATT_VOLTAGE_RESULT 2
-#define ASSI_FAR 1
+#define NUMBER_OF_POLLED_ADC_CHANNELS 2
+#define BATT_VOLTAGE_RESULT 1
 #define ASSI_NEAR 0
-static ADC_Active_Channel_t g_adcChannelOrder[NUMBER_OF_POLLED_ADC_CHANNELS] = { ADC_ASSI_NEAR, ADC_ASSI_FAR, ADCBatteryVoltage };
-static const uint16_t g_adcChannelConversionPeriod_ticks[NUMBER_OF_POLLED_ADC_CHANNELS] = { TIMER2_5_8HZ, TIMER2_0_5HZ, TIMER2_0_5HZ };
-static volatile uint16_t g_adcCountdownCount[NUMBER_OF_POLLED_ADC_CHANNELS] = { 100, 1000, 2000 };
-static volatile bool g_adcUpdated[NUMBER_OF_POLLED_ADC_CHANNELS] = { false, false, false };
+static ADC_Active_Channel_t g_adcChannelOrder[NUMBER_OF_POLLED_ADC_CHANNELS] = { ADC_ASSI_NEAR, ADCBatteryVoltage };
+static const uint16_t g_adcChannelConversionPeriod_ticks[NUMBER_OF_POLLED_ADC_CHANNELS] = { TIMER2_20HZ, TIMER2_0_5HZ };
+static volatile uint16_t g_adcCountdownCount[NUMBER_OF_POLLED_ADC_CHANNELS] = { 100, 2000 };
+static volatile bool g_adcUpdated[NUMBER_OF_POLLED_ADC_CHANNELS] = { false, false };
 static volatile uint16_t g_lastConversionResult[NUMBER_OF_POLLED_ADC_CHANNELS];
 
 extern Goertzel g_goertzel;
@@ -172,6 +175,7 @@ ISR(RTC_CNT_vect)
         system_tick();
 		g_seconds_transition = true;
 		g_seconds_since_poweron++;
+		if(g_seconds_since_poweron == 2) g_rotary_enable = true;
 		if(g_seconds_since_poweron == 5) g_display_active = true;
 	}
  
@@ -218,20 +222,24 @@ ISR(TCB0_INT_vect)
 			int8_t rightSense = holdSwitch & (1 << SENSE_SWITCH_RIGHT);
 			int8_t encoderSwitch = holdSwitch & (1 << ENCODER_SWITCH);
 			
-			if(!leftSense)
+			if(!leftSense && rightSense)
 			{
 				PORTA_set_pin_level(CARDIOID_BACK, LOW);
 				PORTA_set_pin_level(CARDIOID_FRONT, HIGH);
+				g_leftSense_pressed = true;
 			}
-			else if(!rightSense)
+			else if(!rightSense && leftSense)
 			{
 				PORTA_set_pin_level(CARDIOID_FRONT, LOW);
 				PORTA_set_pin_level(CARDIOID_BACK, HIGH);
+				g_rightSense_pressed = true;
 			}
 			else
 			{
 				PORTA_set_pin_level(CARDIOID_FRONT, LOW);
 				PORTA_set_pin_level(CARDIOID_BACK, LOW);
+				g_leftSense_pressed = false;
+				g_rightSense_pressed = false;
 			}
 			
 			if(!encoderSwitch)
@@ -528,47 +536,28 @@ ISR(TCB0_INT_vect)
 			static uint16_t holdConversionResult;
 			uint16_t hold = ADC0_read(); //ADC;
 			
-			if((hold > 10) && (hold < 4090))
+			if((hold >= 0) && (hold < 4090))
 			{
 				holdConversionResult = hold; // (uint16_t)(((uint32_t)hold * ADC_REF_VOLTAGE_mV) >> 10);    /* millivolts at ADC pin */
 				uint16_t lastResult = g_lastConversionResult[indexConversionInProcess];
 
 				g_adcUpdated[indexConversionInProcess] = true;
-
-	// 			if(g_adcChannelOrder[indexConversionInProcess] == ADCExternalBatteryVoltage)
-	// 			{
-	// 				bool directionUP = holdConversionResult > lastResult;
-	// 				uint16_t delta = directionUP ? holdConversionResult - lastResult : lastResult - holdConversionResult;
-	// 
-	// 				if(delta > g_ADCFilterThreshold[indexConversionInProcess])
-	// 				{
-	// 					lastResult = holdConversionResult;
-	// 					g_adcCountdownCount[indexConversionInProcess] = 100; /* speed up next conversion */
-	// 				}
-	// 				else
-	// 				{
-	// 					if(directionUP)
-	// 					{
-	// 						lastResult++;
-	// 					}
-	// 					else if(delta)
-	// 					{
-	// 						lastResult--;
-	// 					}
-	// 
-	// 					g_battery_measurements_active = true;
-	// 				}
-	// 			}
-	// 			else
-	// 			{
- 					lastResult = holdConversionResult;
-	// 			}
-
-				g_lastConversionResult[indexConversionInProcess] = lastResult;
-			}
-			else
-			{
-				hold = g_lastConversionResult[indexConversionInProcess];
+				
+				if(g_adcChannelOrder[indexConversionInProcess] == ADC_ASSI_NEAR)
+				{
+					if(holdConversionResult > lastResult)
+					{
+						g_lastConversionResult[indexConversionInProcess] = (holdConversionResult + (lastResult<<1)) / 3;
+					}
+					else
+					{
+						g_lastConversionResult[indexConversionInProcess] = (holdConversionResult + (lastResult<<3)) / 9;
+					}
+				}
+				else
+				{
+					g_lastConversionResult[indexConversionInProcess] = holdConversionResult;
+				}
 			}
 
 			conversionInProcess = false;
@@ -612,41 +601,43 @@ ISR(PORTF_PORT_vect)
 {
 	uint8_t x = VPORTF.INTFLAGS;
 	
-	if(x & ((1 << ROTARY_B_IN) | (1 << ROTARY_A_IN)))
+	if(g_rotary_enable)
 	{
-		uint8_t curr_state = (PORTF.IN & (PIN3_bm | PIN4_bm)) >> 3;
-
-		// Calculate the state transition
-		uint8_t transition = (prev_state << 2) | curr_state;
-
-		// Decode the transition (Quadrature code)
-		switch (transition) 
+		if(x & ((1 << ROTARY_B_IN) | (1 << ROTARY_A_IN)))
 		{
-			case 0b0001:
-			case 0b0111:
-			case 0b1110:
-			case 0b1000:
-			{
-				g_rotary_edges++;
-			}
-			break;
-			
-			case 0b0010:
-			case 0b0100:
-			case 0b1101:
-			case 0b1011:
-			{
-				g_rotary_edges--;
-			}
-			break;
-			
-			// Cases 0b0000, 0b0101, 0b1010, 0b1111 represent no valid state change
-		}
+			uint8_t curr_state = (PORTF.IN & (PIN3_bm | PIN4_bm)) >> 3;
 
-		// Update the previous state
-		prev_state = curr_state;
+			// Calculate the state transition
+			uint8_t transition = (prev_state << 2) | curr_state;
+
+			// Decode the transition (Quadrature code)
+			switch (transition) 
+			{
+				case 0b0001:
+				case 0b0111:
+				case 0b1110:
+				case 0b1000:
+				{
+					g_rotary_edges++;
+				}
+				break;
+			
+				case 0b0010:
+				case 0b0100:
+				case 0b1101:
+				case 0b1011:
+				{
+					g_rotary_edges--;
+				}
+				break;
+			
+				// Cases 0b0000, 0b0101, 0b1010, 0b1111 represent no valid state change
+			}
+
+			// Update the previous state
+			prev_state = curr_state;
+		}
 	}
-	
     // Clear the interrupt flags for PF3 and PF4
     PORTF.INTFLAGS = PIN3_bm | PIN4_bm;
 }
@@ -667,13 +658,27 @@ void powerUp5V(void)
 
 int main(void)
 {
-	Frequency_Hz hold_rx_frequency;
-	uint8_t hold_rf_gain_setting;
+	Frequency_Hz hold_rx_frequency = 0;
+	uint8_t hold_rf_gain_setting = 255;
+	uint16_t hold_assi_result = 0;
 	bool splash_displayed = true;
+	uint8_t x;
+	EC ec;
 	
 	atmel_start_init();
 
-	init_receiver((Frequency_Hz)3570500);
+	x = si5351_get_status() & 0x80;
+	while((util_delay_ms(1000)) && x)
+	{
+		x = si5351_get_status() & 0x80;
+	}
+	
+	ec = init_receiver((Frequency_Hz)3570500);
+	
+	if(ec != ERROR_CODE_NO_ERROR)
+	{
+		g_hardware_error |= (int)HARDWARE_NO_SI5351;
+	}
 		
 	RTC_set_calibration(g_clock_calibration);
 					
@@ -690,13 +695,27 @@ int main(void)
 	}
 	
 	display.begin(DOGS104);
-//	display.cls();
-	g_text_buff.putString((char*)"00Signal");
-	g_text_buff.putString((char*)"12Snagger!");
-	sprintf(g_tempStr, "30Ver:%s", SW_REVISION);
+	
+	if(g_hardware_error)
+	{
+		g_text_buff.putString((char*)"00Error:");
+		if(g_hardware_error & (int)HARDWARE_NO_SI5351)
+		{
+			g_text_buff.putString((char*)"11SI5351");
+		}
+		
+		if(g_hardware_error & (int)HARDWARE_NO_RTC)
+		{
+			g_text_buff.putString((char*)"2132kCLK");
+		}
+	}
+	else
+	{
+		g_text_buff.putString((char*)"00Signal");
+		g_text_buff.putString((char*)"12Snagger!");
+		sprintf(g_tempStr, "30Ver:%s", SW_REVISION);	
+	}
 	g_text_buff.putString((char*)g_tempStr);
-	hold_rf_gain_setting = g_rf_gain_setting;
-	hold_rx_frequency = g_rx_frequency;
 
 	while (1) {
 		if(g_display_active)
@@ -723,7 +742,14 @@ int main(void)
 			{
 				hold_rf_gain_setting = g_rf_gain_setting;
 			
-				sprintf(g_tempStr, "10Gain:%d  ", g_rf_gain_setting);
+				sprintf(g_tempStr, "10Gain:%d  ", 100 - g_rf_gain_setting);
+				g_text_buff.putString(g_tempStr);
+			}
+			
+			if(hold_assi_result != g_lastConversionResult[0])
+			{
+				hold_assi_result = g_lastConversionResult[0];
+				sprintf(g_tempStr, "30S=%d  ", hold_assi_result);
 				g_text_buff.putString(g_tempStr);
 			}
 		}
@@ -853,11 +879,20 @@ int main(void)
 				
 				if(g_rotary_shaft_pressed)
 				{
-					pwm++;
+					if(pwm) pwm--;
 				}
 				else
 				{
-					si5351_set_quad_frequency(UP);
+					if(g_leftSense_pressed)
+					{
+						g_rx_frequency += 1000;
+					}
+					else
+					{
+						g_rx_frequency += 100;
+					}
+
+					si5351_set_quad_frequency(g_rx_frequency);
 				}
 				
 				g_rotary_count++;
@@ -869,11 +904,20 @@ int main(void)
 				
 				if(g_rotary_shaft_pressed)
 				{
-					pwm--;
+					if(pwm < 100) pwm++;
 				}
 				else
 				{
-					si5351_set_quad_frequency(DOWN);					
+					if(g_leftSense_pressed)
+					{
+						g_rx_frequency -= 1000;
+					}
+					else
+					{
+						g_rx_frequency -= 100;
+					}
+
+					si5351_set_quad_frequency(g_rx_frequency);					
 				}
 
 				g_rotary_count--;
