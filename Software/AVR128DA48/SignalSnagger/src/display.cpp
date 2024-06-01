@@ -11,7 +11,7 @@
 #include "binio.h"
 #include "port.h"
 
-#define DISPLAY_I2C_SLAVE_ADDR  0x3C
+#define DISPLAY_I2C_SLAVE_ADDR  0x78
 
 Display::Display(uint8_t i2cAddr) {
 	this->i2cAddr = i2cAddr;
@@ -114,76 +114,92 @@ void Display::display(dispmode_t mode) {
 		sendCommand(COMMAND_TOP_VIEW);
 		finishCommand();
 		break;
+		
 		case VIEW_BOTTOM:
 		ddramStart = ADDRESS_DDRAM;
 		sendCommand(COMMAND_8BIT_4LINES_RE1_IS0);
 		sendCommand(COMMAND_BOTTOM_VIEW);
 		finishCommand();
 		break;
+		
 		case DISPLAY_ON:
 		displaycontrol |= COMMAND_DISPLAY_ON;
 		sendCommand(COMMAND_8BIT_4LINES_RE0_IS1);
 		sendCommand(COMMAND_DISPLAY | displaycontrol);
 		finishCommand();
 		break;
+		
 		case DISPLAY_OFF:
 		displaycontrol &= ~COMMAND_DISPLAY_ON;
 		sendCommand(COMMAND_8BIT_4LINES_RE0_IS1);
 		sendCommand(COMMAND_DISPLAY | displaycontrol);
 		finishCommand();
 		break;
+		
 		case CURSOR_ON:
 		displaycontrol |= COMMAND_CURSOR_ON;
 		sendCommand(COMMAND_8BIT_4LINES_RE0_IS1);
 		sendCommand(COMMAND_DISPLAY | displaycontrol);
 		finishCommand();
 		break;
+		
 		case CURSOR_OFF:
 		displaycontrol &= ~COMMAND_CURSOR_ON;
 		sendCommand(COMMAND_8BIT_4LINES_RE0_IS1);
 		sendCommand(COMMAND_DISPLAY | displaycontrol);
 		finishCommand();
 		break;
+		
 		case BLINK_ON:
 		displaycontrol |= COMMAND_BLINK_ON;
 		sendCommand(COMMAND_8BIT_4LINES_RE0_IS1);
 		sendCommand(COMMAND_DISPLAY | displaycontrol);
 		finishCommand();
 		break;
+		
 		case BLINK_OFF:
 		displaycontrol &= ~COMMAND_BLINK_ON;
 		sendCommand(COMMAND_8BIT_4LINES_RE0_IS1);
 		sendCommand(COMMAND_DISPLAY | displaycontrol);
 		finishCommand();
 		break;
+		
 		case DISPLAY_SHIFT_LEFT:
 		sendCommand(COMMAND_SHIFT | COMMAND_DISPLAY_SHIFT_LEFT);
 		break;
+		
 		case DISPLAY_SHIFT_RIGHT:
 		sendCommand(COMMAND_SHIFT | COMMAND_DISPLAY_SHIFT_RIGHT);
 		break;
+		
 		case CURSOR_SHIFT_LEFT:
 		sendCommand(COMMAND_SHIFT | COMMAND_CURSOR_SHIFT_LEFT);
 		break;
+		
 		case CURSOR_SHIFT_RIGHT:
 		sendCommand(COMMAND_SHIFT | COMMAND_CURSOR_SHIFT_RIGHT);
 		break;
+		
 		case LEFT_TO_RIGHT:
 		entrymode |= ENTRY_MODE_LEFT_TO_RIGHT;
 		sendCommand(COMMAND_ENTRY_MODE_SET | entrymode);
 		break;
+		
 		case RIGHT_TO_LEFT:
 		entrymode &= ~ENTRY_MODE_LEFT_TO_RIGHT;
 		sendCommand(COMMAND_ENTRY_MODE_SET | entrymode);
 		break;
+		
 		case AUTOSCROLL_ON:
 		entrymode |= ENTRY_MODE_SHIFT_INCREMENT;
 		sendCommand(COMMAND_ENTRY_MODE_SET | entrymode);
 		break;
+		
 		case AUTOSCROLL_OFF:
 		entrymode &= ~ENTRY_MODE_SHIFT_INCREMENT;
 		sendCommand(COMMAND_ENTRY_MODE_SET | entrymode);
 		break;
+		
 		case CONTRAST:
 		switch(id) {
 			case DOGM204:
@@ -206,12 +222,14 @@ void Display::display(dispmode_t mode) {
 			break;
 		}
 		break;
+		
 		case LINES_4:
 		if (id == DOGS164 || id == DOGS104) {
 			sendCommand(COMMAND_8BIT_4LINES_RE0_IS0);
 			lines = 4;
 		}
 		break;
+		
 		case LINES_3_1:
 		if (id == DOGS164 || id == DOGS104) {
 			sendCommand(COMMAND_8BIT_4LINES_RE1_IS0);
@@ -220,6 +238,7 @@ void Display::display(dispmode_t mode) {
 			lines = 3;
 		}
 		break;
+		
 		case LINES_3_2:
 		if (id == DOGS164 || id == DOGS104) {
 			sendCommand(COMMAND_8BIT_4LINES_RE1_IS0);
@@ -228,6 +247,7 @@ void Display::display(dispmode_t mode) {
 			lines = 3;
 		}
 		break;
+		
 		case LINES_3_3:
 		if (id == DOGS164 || id == DOGS104) {
 			sendCommand(COMMAND_8BIT_4LINES_RE1_IS0);
@@ -236,6 +256,7 @@ void Display::display(dispmode_t mode) {
 			lines = 3;
 		}
 		break;
+		
 		case LINES_2:
 		if (id == DOGS164 || id == DOGS104) {
 			sendCommand(COMMAND_8BIT_4LINES_RE1_IS0);
@@ -244,18 +265,21 @@ void Display::display(dispmode_t mode) {
 			lines = 2;
 		}
 		break;
+		
 		case SET_ROM_A:
 		sendCommand(COMMAND_8BIT_4LINES_RE1_IS0);
 		sendCommand(COMMAND_ROM_SELECT);
 		sendData(COMMAND_ROM_A);
 		finishCommand();
 		break;
+		
 		case SET_ROM_B:
 		sendCommand(COMMAND_8BIT_4LINES_RE1_IS0);
 		sendCommand(COMMAND_ROM_SELECT);
 		sendData(COMMAND_ROM_B);
 		finishCommand();
 		break;
+		
 		case SET_ROM_C:
 		sendCommand(COMMAND_8BIT_4LINES_RE1_IS0);
 		sendCommand(COMMAND_ROM_SELECT);

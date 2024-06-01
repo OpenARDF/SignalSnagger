@@ -42,6 +42,8 @@ src\si5351.cpp
 
 src\slpctrl.cpp
 
+src\tca.cpp
+
 src\tcb.cpp
 
 src\receiver.cpp

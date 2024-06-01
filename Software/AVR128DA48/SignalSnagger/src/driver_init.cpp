@@ -28,6 +28,7 @@
 #include <system.h>
 #include "dac0.h"
 #include "binio.h"
+#include "tca.h"
 
 
 /**
@@ -38,9 +39,10 @@ void system_init()
 	mcu_init();
 
 	CLKCTRL_init(); /* Set CPU clock speed appropriately */
+	TIMERA_init();  /* Set PWM timer */
 	TIMERB_init(); /* Timers must be initialized before utility_delay functions will work */
-	CPUINT_init(); /* Interrupts must also be enabled before timer interrupts will function */
 	BINIO_init();
+	CPUINT_init(); /* Interrupts must also be enabled before timer interrupts will function */
 
 	SLPCTRL_init();
 	
