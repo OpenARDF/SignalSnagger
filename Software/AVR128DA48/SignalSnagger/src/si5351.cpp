@@ -207,13 +207,11 @@ bool g_si5351_initialized = false;
  */
 	EC si5351_init_for_quad(Frequency_Hz freq_Fout)
 	{
-		uint8_t i = 0;
+		Union_si5351_regs ms_reg;
+		uint8_t i;
 		uint32_t a, b, c;
 		uint32_t bx128;
 		uint32_t bx128overc;
-		uint32_t p1;   /* 128 * a + floor((128 * b) / c) - 512 */
-		uint32_t p2;   /* 128 * b - c * floor((128 * b) / c) */
-		uint32_t p3;
 
 		uint8_t params[10];
 		Frequency_Hz freq_VCO = 0;
@@ -299,29 +297,32 @@ bool g_si5351_initialized = false;
 
 		bx128 = b << 7;
 		bx128overc = 0; // bx128 / c;
-		p1 = (uint32_t)((a << 7) + bx128overc) - 512;   /* 128 * a + floor((128 * b) / c) - 512 */
-		p2 = (uint32_t)bx128 - (c * bx128overc);        /* 128 * b - c * floor((128 * b) / c) */
-		p3 = c;
-			
+		
+		/* Write the 32-bit parameters into the union */
+		ms_reg.parameter32b.p1 = (uint32_t)((a << 7) + bx128overc) - 512;   /* 128 * a + floor((128 * b) / c) - 512 */
+		ms_reg.parameter32b.p2 = (uint32_t)bx128 - (c * bx128overc);        /* 128 * b - c * floor((128 * b) / c) */
+		ms_reg.parameter32b.p3 = c;
+		
+		/* Read the 8-bit register values out of the union */
 		/* Registers 42-43 for CLK0; 50-51 for CLK1 */
 		i=0;
-		params[i++] = (p3 >> 8) & 0xFF; /* MS0_P3[15:8] MultiSynth0 Divider AN619 p.33 */
-		params[i++] = p3 & 0xFF;		/* MS0_P3[7:0] MultiSynth0 Divider AN619 p.33 */
+		params[i++] = ms_reg.register8b.p3_1; /* MS0_P3[15:8] MultiSynth0 Divider AN619 p.33 */
+		params[i++] = ms_reg.register8b.p3_0; /* MS0_P3[7:0] MultiSynth0 Divider AN619 p.33 */
 
 		/* Register 44 for CLK0; 52 for CLK1 */
-		params[i++] = (p1 >> 16) & 0x03; /* MS0_P1[17:16] */
-//		params[i++] |= 0x10; /* turn on divide by 2 */
+		params[i++] = ms_reg.register8b.p1_2 & 0x03;
 
 		/* Registers 45-46 for CLK0 */
-		params[i++] = (p1 >> 8) & 0xFF; /* MS0_P1[15:8] MultiSynth0 Parameter 1 AN619 p.34 */
-		params[i++] = p1 & 0xFF;		/* MS0_P1[7:0] Multisynth0 Parameter 1 AN619 p. 35 */
+		params[i++] = ms_reg.register8b.p1_1; /* MS0_P1[15:8] MultiSynth0 Parameter 1 AN619 p.34 */
+		params[i++] = ms_reg.register8b.p1_0;
 
 		/* Register 47 for CLK0 */
-		params[i++] = ((p3 >> 12) & 0xF0) | ((p2 >> 16) & 0x0F); /* MS0_P3[19:16] : MS0_P2[19:16] Multisynth0 Parameter 3 and 2 AN619 p. 35 */
+		params[i] = (ms_reg.register8b.p3_2 << 4);
+		params[i++] += (ms_reg.register8b.p2_2 & 0x0F);
 
 		/* Registers 48-49 for CLK0 */
-		params[i++] = (p2 >> 8) & 0xFF;	/* MS0_P2[15:8] Multisynth0 Parameter 2 AN619 p. 35 */ 
-		params[i++] = p2 & 0xFF;		/* MS0_P2[7:0] Multisynth0 Parameter 2 AN619 p. 36 */
+		params[i++] = ms_reg.register8b.p2_1;
+		params[i++] = ms_reg.register8b.p2_0;
 
 		/* Write the parameters */
 		if(si5351_write_bulk(SI5351_MS0_PARAMETERS, params, i))
@@ -345,30 +346,32 @@ bool g_si5351_initialized = false;
 
 		bx128 = b << 7;
 		bx128overc = bx128 / c;
-		p1 = (uint32_t)((a << 7) + bx128overc) - 512;   /* 128 * a + floor((128 * b) / c) - 512 */
-		p2 = (uint32_t)bx128 - (c * bx128overc);        /* 128 * b - c * floor((128 * b) / c) */
-		p3 = c;
 
-		/* Prepare an array for parameters to be written to */
+		/* Write the 32-bit parameters into the union */
+		ms_reg.parameter32b.p1 = (uint32_t)((a << 7) + bx128overc) - 512;   /* 128 * a + floor((128 * b) / c) - 512 */
+		ms_reg.parameter32b.p2 = (uint32_t)bx128 - (c * bx128overc);        /* 128 * b - c * floor((128 * b) / c) */
+		ms_reg.parameter32b.p3 = c;
 
+		/* Read the 8-bit register values out of the union */
 		/* Registers 26-27 */
-		i = 0;
-		params[i++] = (p3 >> 8) & 0xFF;			/* MSNA_P3[15:8] */
-		params[i++] = p3 & 0xFF;				/* MSNA_P3[7:0]  */
+		i=0;
+		params[i++] = ms_reg.register8b.p3_1;			/* MSNA_P3[15:8] */
+		params[i++] = ms_reg.register8b.p3_0;			/* MSNA_P3[7:0]  */
 
 		/* Register 28 */
-		params[i++] = (p1 >> 16) & 0x03;		/* [XXXXNN] : MSNA_P1[17:16]  */
+		params[i++] = ms_reg.register8b.p1_2 & 0x03;	/* [XXXXNN] : MSNA_P1[17:16]  */
 
 		/* Registers 29-30 */
-		params[i++] = (p1 >> 8) & 0xFF;			/* MSNA_P1[15:8] */
-		params[i++] = p1 & 0xFF;				/* MSNA_P1[7:0] */
+		params[i++] = ms_reg.register8b.p1_1;			/* MSNA_P1[15:8] */
+		params[i++] = ms_reg.register8b.p1_0;			/* MSNA_P1[7:0] */
 
 		/* Register 31 */
-		params[i++] = ((p3 >> 12) & 0xF0) | ((p2 >> 16) & 0x0F);	/* MSNA_P3[19:16] : MSNA_P2[19:16] */
+		params[i] = ms_reg.register8b.p3_2 << 4;		/* MSNA_P3[19:16] : MSNA_P2[19:16] */
+		params[i++] += ms_reg.register8b.p2_2 & 0x0F;
 
 		/* Registers 32-33 */
-		params[i++] = (p2 >> 8) & 0xFF;			/* MSNA_P2[15:8] */
-		params[i++] = p2 & 0xFF;				/* MSNA_P2[7:0] */
+		params[i++] = ms_reg.register8b.p2_1;			/* MSNA_P2[15:8] */
+		params[i++] = ms_reg.register8b.p2_0;			/* MSNA_P2[7:0] */
 
 		/* Write the parameters */
 		if(si5351_write_bulk(SI5351_PLLA_MULTISYNTH_FEEDBACK_PARAMETERS, params, i))
@@ -448,10 +451,11 @@ bool g_si5351_initialized = false;
 
 		uint32_t bx128 = b << 7;
 		uint32_t bx128overc = bx128 / c;
-		ms_reg.ms.p1 = (uint32_t)((a << 7) + bx128overc) - 512;   /* 128 * a + floor((128 * b) / c) - 512 */
-		ms_reg.ms.p2 = (uint32_t)bx128 - (c * bx128overc);        /* 128 * b - c * floor((128 * b) / c) */
-		ms_reg.ms.p3 = c;
 
+		/* Write the 32-bit parameters into the union */
+		ms_reg.parameter32b.p1 = (uint32_t)((a << 7) + bx128overc) - 512;   /* 128 * a + floor((128 * b) / c) - 512 */
+		ms_reg.parameter32b.p2 = (uint32_t)bx128 - (c * bx128overc);        /* 128 * b - c * floor((128 * b) / c) */
+		ms_reg.parameter32b.p3 = c;
 		
 #ifdef DO_BOUNDS_CHECKING
 		if(a < SI5351_PLL_A_MIN)
@@ -464,26 +468,26 @@ bool g_si5351_initialized = false;
 			return(true);
 		}
 #endif
-		/* Prepare an array for parameters to be written to */
 
+		/* Read the 8-bit register values out of the union */
 		/* Registers 26-27 */
-		params[i++] = ms_reg.reg.p3_1;
-		params[i++] = ms_reg.reg.p3_0;
+		params[i++] = ms_reg.register8b.p3_1;
+		params[i++] = ms_reg.register8b.p3_0;
 
 		/* Register 28 */
-		params[i++] = ms_reg.reg.p1_2 & 0x03;
+		params[i++] = ms_reg.register8b.p1_2 & 0x03;
 
 		/* Registers 29-30 */
-		params[i++] = ms_reg.reg.p1_1;
-		params[i++] = ms_reg.reg.p1_0;
+		params[i++] = ms_reg.register8b.p1_1;
+		params[i++] = ms_reg.register8b.p1_0;
 
 		/* Register 31 */
-		params[i] = ms_reg.reg.p3_2 << 4;
-		params[i++] += ms_reg.reg.p2_2 & 0x0F;
+		params[i] = ms_reg.register8b.p3_2 << 4;
+		params[i++] += ms_reg.register8b.p2_2 & 0x0F;
 
 		/* Registers 32-33 */
-		params[i++] = ms_reg.reg.p2_1;
-		params[i++] = ms_reg.reg.p2_0;
+		params[i++] = ms_reg.register8b.p2_1;
+		params[i++] = ms_reg.register8b.p2_0;
 
 		/* Write the parameters */
 			
@@ -898,23 +902,23 @@ EC si5351_pll_reset(Si5351_pll pll)
 		uint8_t i = 0;
 
 		/* Registers 26-27 */
-		params[i++] = pll_reg.reg.p3_1;
-		params[i++] = pll_reg.reg.p3_0;
+		params[i++] = pll_reg.register8b.p3_1;
+		params[i++] = pll_reg.register8b.p3_0;
 
 		/* Register 28 */
-		params[i++] = pll_reg.reg.p1_2 & 0x03;
+		params[i++] = pll_reg.register8b.p1_2 & 0x03;
 
 		/* Registers 29-30 */
-		params[i++] = pll_reg.reg.p1_1;
-		params[i++] = pll_reg.reg.p1_0;
+		params[i++] = pll_reg.register8b.p1_1;
+		params[i++] = pll_reg.register8b.p1_0;
 
 		/* Register 31 */
-		params[i] = pll_reg.reg.p3_2 << 4;
-		params[i++] += pll_reg.reg.p2_2 & 0x0F;
+		params[i] = pll_reg.register8b.p3_2 << 4;
+		params[i++] += pll_reg.register8b.p2_2 & 0x0F;
 
 		/* Registers 32-33 */
-		params[i++] = pll_reg.reg.p2_1;
-		params[i++] = pll_reg.reg.p2_0;
+		params[i++] = pll_reg.register8b.p2_1;
+		params[i++] = pll_reg.register8b.p2_0;
 
 		/* Write the parameters */
 		if(target_pll == SI5351_PLLA)
@@ -1024,9 +1028,9 @@ EC si5351_pll_reset(Si5351_pll pll)
 
 		uint32_t bx128 = b << 7;
 		uint32_t bx128overc = bx128 / c;
-		reg->ms.p1 = (uint32_t)((a << 7) + bx128overc) - 512;   /* 128 * a + floor((128 * b) / c) - 512 */
-		reg->ms.p2 = (uint32_t)bx128 - (c * bx128overc);        /* 128 * b - c * floor((128 * b) / c) */
-		reg->ms.p3 = c;
+		reg->parameter32b.p1 = (uint32_t)((a << 7) + bx128overc) - 512;   /* 128 * a + floor((128 * b) / c) - 512 */
+		reg->parameter32b.p2 = (uint32_t)bx128 - (c * bx128overc);        /* 128 * b - c * floor((128 * b) / c) */
+		reg->parameter32b.p3 = c;
 
 		return(false);
 	}
@@ -1143,9 +1147,9 @@ EC si5351_pll_reset(Si5351_pll pll)
 
 
 		*divBy4 = (a == 4);
-		ms_reg->ms.p1 = (uint32_t)(a << 7) - 512;  /* 128 * a + floor((128 * b) / c) - 512 */
-		ms_reg->ms.p2 = 0;                         /* 128 * b - c * floor((128 * b) / c) */
-		ms_reg->ms.p3 = 1;
+		ms_reg->parameter32b.p1 = (uint32_t)(a << 7) - 512;  /* 128 * a + floor((128 * b) / c) - 512 */
+		ms_reg->parameter32b.p2 = 0;                         /* 128 * b - c * floor((128 * b) / c) */
+		ms_reg->parameter32b.p3 = 1;
 		
 // 		Union_si5351_regs pll_reg;
  		uint8_t params[10];
@@ -1154,23 +1158,23 @@ EC si5351_pll_reset(Si5351_pll pll)
 		uint8_t i = 0;
 
 		/* Registers 26-27 */
-		params[i++] = ms_reg->reg.p3_1;
-		params[i++] = ms_reg->reg.p3_0;
+		params[i++] = ms_reg->register8b.p3_1;
+		params[i++] = ms_reg->register8b.p3_0;
 
 		/* Register 28 */
-		params[i++] = ms_reg->reg.p1_2 & 0x03;
+		params[i++] = ms_reg->register8b.p1_2 & 0x03;
 
 		/* Registers 29-30 */
-		params[i++] = ms_reg->reg.p1_1;
-		params[i++] = ms_reg->reg.p1_0;
+		params[i++] = ms_reg->register8b.p1_1;
+		params[i++] = ms_reg->register8b.p1_0;
 
 		/* Register 31 */
-		params[i] = ms_reg->reg.p3_2 << 4;
-		params[i++] += ms_reg->reg.p2_2 & 0x0F;
+		params[i] = ms_reg->register8b.p3_2 << 4;
+		params[i++] += ms_reg->register8b.p2_2 & 0x0F;
 
 		/* Registers 32-33 */
-		params[i++] = ms_reg->reg.p2_1;
-		params[i++] = ms_reg->reg.p2_0;
+		params[i++] = ms_reg->register8b.p2_1;
+		params[i++] = ms_reg->register8b.p2_0;
 
 		/* Write the parameters */
 		if(target_pll == SI5351_PLLA)
@@ -1268,8 +1272,8 @@ EC si5351_pll_reset(Si5351_pll pll)
 		uint8_t data[2];
 
 		/* Registers 42-43 for CLK0; 50-51 for CLK1 */
-		params[i++] = ms_reg.reg.p3_1; /* MS0_P3[15:8] MultiSynth0 Divider AN619 p.33 */
-		params[i++] = ms_reg.reg.p3_0; /* MS0_P3[7:0] MultiSynth0 Divider AN619 p.33 */
+		params[i++] = ms_reg.register8b.p3_1; /* MS0_P3[15:8] MultiSynth0 Divider AN619 p.33 */
+		params[i++] = ms_reg.register8b.p3_0; /* MS0_P3[7:0] MultiSynth0 Divider AN619 p.33 */
 
 		/* Register 44 for CLK0; 52 for CLK1 */
 		if(si5351_read_bulk((SI5351_MS0_PARAMETERS + 2) + (clk * 8), data, 1))
@@ -1280,19 +1284,19 @@ EC si5351_pll_reset(Si5351_pll pll)
 		reg_val = data[0];
 
 		reg_val &= 0xFC;    /*~(0x03); */
-		params[i++] = reg_val | (ms_reg.reg.p1_2 & 0x03);
+		params[i++] = reg_val | (ms_reg.register8b.p1_2 & 0x03);
 
 		/* Registers 45-46 for CLK0 */
-		params[i++] = ms_reg.reg.p1_1; /* MS0_P1[15:8] MultiSynth0 Parameter 1 AN619 p.34 */
-		params[i++] = ms_reg.reg.p1_0;
+		params[i++] = ms_reg.register8b.p1_1; /* MS0_P1[15:8] MultiSynth0 Parameter 1 AN619 p.34 */
+		params[i++] = ms_reg.register8b.p1_0;
 
 		/* Register 47 for CLK0 */
-		params[i] = (ms_reg.reg.p3_2 << 4);
-		params[i++] += (ms_reg.reg.p2_2 & 0x0F);
+		params[i] = (ms_reg.register8b.p3_2 << 4);
+		params[i++] += (ms_reg.register8b.p2_2 & 0x0F);
 
 		/* Registers 48-49 for CLK0 */
-		params[i++] = ms_reg.reg.p2_1;
-		params[i++] = ms_reg.reg.p2_0;
+		params[i++] = ms_reg.register8b.p2_1;
+		params[i++] = ms_reg.register8b.p2_0;
 
 		/* Write the parameters */
 		switch(clk)

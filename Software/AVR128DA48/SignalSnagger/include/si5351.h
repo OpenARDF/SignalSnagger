@@ -355,14 +355,14 @@ extern "C" {
 		SI5351_DRIVE_NOT_SPECIFIED
 	} Si5351_drive;
 
-	typedef struct si5351RegSet
+	typedef struct Parameters32bit
 	{
 		uint32_t p1;
 		uint32_t p2;
 		uint32_t p3;
-	} Si5351RegSet;
+	} Parameters32bit;
 
-	typedef struct si5351RegBytes
+	typedef struct Registers8bit
 	{
 		uint8_t p1_0;
 		uint8_t p1_1;
@@ -376,12 +376,16 @@ extern "C" {
 		uint8_t p3_1;
 		uint8_t p3_2;
 		uint8_t p3_3;
-	} Si5351RegBytes;
+	} Registers8bit;
 
+
+	/* Create a union to facilitate storing 32-bit calculated parameters
+	and reading them out as 8-bit register values. This approach reduces the
+	amount of shifting and masking required to obtain the register values */
 	typedef union u_si5351_regs
 	{
-		Si5351RegBytes reg;
-		Si5351RegSet ms;
+		Registers8bit register8b;
+		Parameters32bit parameter32b;
 	} Union_si5351_regs;
 
 /********************************************************************************************************************
