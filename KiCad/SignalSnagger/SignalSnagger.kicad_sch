@@ -6,8 +6,8 @@
 
   (title_block
     (title "SignalSnagger")
-    (date "2024-06-01")
-    (rev "0.318")
+    (date "2024-06-04")
+    (rev "0.319")
   )
 
   (lib_symbols
@@ -4051,8 +4051,8 @@
     (property "Reference" "U103" (id 0) (at 208.28 99.06 0)
       (effects (font (size 1.54 1.54) bold))
     )
-    (property "Value" "" (id 1) (at 207.01 101.6 0))
-    (property "Footprint" "" (id 2) (at 207.01 86.36 0)
+    (property "Value" "REF4132B33" (id 1) (at 207.01 101.6 0))
+    (property "Footprint" "Package_TO_SOT_SMD:SOT-23-5" (id 2) (at 207.01 86.36 0)
       (effects (font (size 1.27 1.27) italic) hide)
     )
     (property "Datasheet" "https://www.ti.com/lit/ds/symlink/ref4132-q1.pdf?ts=1651090585321&ref_url=https%253A%252F%252Fwww.ti.com%252Fsitesearch%252Fen-us%252Fdocs%252Funiversalsearch.tsp%253FlangPref%253Den-US%2526searchTerm%253DREF4132B50DBVRQ1%2526nr%253D3" (id 3) (at 198.12 107.95 0)
@@ -7121,6 +7121,9 @@
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/b3f3d1de-90b5-4248-ad56-f018f1ee3b79"
       (reference "#PWR0162") (unit 1) (value "GNDD") (footprint "")
     )
+    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/6ca347ab-9529-47af-a7ae-a4d5f128074f"
+      (reference "#PWR0201") (unit 1) (value "+3V3") (footprint "")
+    )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/c3cbdd24-ea77-415a-84db-21b782d44558"
       (reference "#PWR0202") (unit 1) (value "GNDD") (footprint "")
     )
@@ -7198,6 +7201,9 @@
     )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/09893e32-6c5d-4b56-b9ff-3c6de7a41ba2"
       (reference "#PWR0227") (unit 1) (value "GNDD") (footprint "")
+    )
+    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/60d0adfe-ad1b-4e9f-ba18-10c5cbc46b9c"
+      (reference "#PWR0228") (unit 1) (value "GNDD") (footprint "")
     )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/1711b1a4-5d39-426d-b401-4ad66c25ac68"
       (reference "#PWR0229") (unit 1) (value "GNDD") (footprint "")
@@ -7712,20 +7718,14 @@
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/7fe1f282-7a7a-412a-a98f-f1c818ebaa1c"
       (reference "J208") (unit 1) (value "Conn_01x04") (footprint "Connector_PinHeader_1.27mm:PinHeader_1x04_P1.27mm_Vertical")
     )
+    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/588ae906-610f-456e-aac1-b88481cda914"
+      (reference "J209") (unit 1) (value "Conn_01x04") (footprint "Connector_PinHeader_1.27mm:PinHeader_1x04_P1.27mm_Vertical")
+    )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/295a8b7c-f40b-4316-bd9e-2802f830c295"
       (reference "J210") (unit 1) (value "Conn_01x01_Female") (footprint "Oddities:Dummy_Empty")
     )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/a6f58718-da4d-4e42-beba-05533fe1992f"
       (reference "J211") (unit 1) (value "Conn_01x01_Female") (footprint "Oddities:Dummy_Empty")
-    )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/41a37813-9657-4c15-8ba0-92808dc11f04"
-      (reference "J212") (unit 1) (value "Conn_01x01_Female") (footprint "Oddities:Dummy_Empty")
-    )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/d8a5c747-cc4d-4e23-a745-4d50ae5945ed"
-      (reference "J213") (unit 1) (value "Conn_01x01_Female") (footprint "Oddities:Dummy_Empty")
-    )
-    (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/227e44c6-a57f-411e-b7b0-618d49f9bc48"
-      (reference "J214") (unit 1) (value "Conn_01x01_Female") (footprint "Oddities:Dummy_Empty")
     )
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/d6b92832-117f-4f59-aaf6-0717883ff45d"
       (reference "J215") (unit 1) (value "Conn_01x01_Female") (footprint "Oddities:Dummy_Empty")
