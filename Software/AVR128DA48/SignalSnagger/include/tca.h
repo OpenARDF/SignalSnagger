@@ -17,7 +17,8 @@ extern "C" {
 #endif
 
 void TIMERA_init(void);
-uint8_t setPWM(uint8_t duty);
+void setPWM(uint16_t duty);
+uint16_t getPWM(void);
 
 #ifdef __cplusplus
 }

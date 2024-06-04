@@ -169,14 +169,15 @@ void BINIO_init(void)
 // 	PORTE_set_pin_dir(1, PORT_DIR_OFF); /* Unused */
 // 	PORTE_set_pin_dir(2, PORT_DIR_OFF); /* Unused */
 	
-	PORTE_set_pin_dir(0, PORT_DIR_OUT);
+	PORTE_set_pin_dir(0, PORT_DIR_IN);
 	
-	PORTE_set_pin_dir(1, PORT_DIR_OUT);
-	
-	PORTE_set_pin_dir(2, PORT_DIR_OUT);
+	PORTE_set_pin_dir(1, PORT_DIR_IN);
 	
 	PORTE_set_pin_dir(PWM, PORT_DIR_OUT);
 	PORTE_set_pin_level(PWM, LOW);
+		
+	PORTE_set_pin_dir(3, PORT_DIR_IN);
+
 	
 	/* PORTF *************************************************************************************/
 	PORTF_set_pin_dir(X32KHZ_SQUAREWAVE, PORT_DIR_OFF);	
@@ -285,13 +286,13 @@ void BINIO_sleep()
 	/* PORTD.PIN7 = Battery voltage */
 
 	/* PORTE *************************************************************************************/
-	PORTE_set_pin_dir(0, PORT_DIR_OFF); /* Unused */
-	PORTE_set_pin_dir(1, PORT_DIR_OFF); /* Unused */
-	PORTE_set_pin_dir(2, PORT_DIR_OFF); /* Unused */
+	PORTE_set_pin_dir(0, PORT_DIR_IN); /* Unused */
+	PORTE_set_pin_dir(1, PORT_DIR_IN); /* Unused */
 	
 	PORTE_set_pin_dir(PWM, PORT_DIR_OUT);
 	PORTE_set_pin_level(PWM, LOW);
 	
+	PORTE_set_pin_dir(3, PORT_DIR_IN); /* Unused */
 
 	/* PORTF *************************************************************************************/
 	PORTF_set_pin_dir(X32KHZ_SQUAREWAVE, PORT_DIR_OFF);
