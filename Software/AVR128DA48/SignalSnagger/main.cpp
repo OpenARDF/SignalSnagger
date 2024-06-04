@@ -879,7 +879,7 @@ int main(void)
 				
 				if(g_rotary_shaft_pressed)
 				{
-					if(pwm) pwm--;
+					if(pwm) setPWM(--pwm);
 				}
 				else
 				{
@@ -904,7 +904,8 @@ int main(void)
 				
 				if(g_rotary_shaft_pressed)
 				{
-					if(pwm < 100) pwm++;
+					if(pwm < 100) setPWM(++pwm);
+					
 				}
 				else
 				{
@@ -924,7 +925,7 @@ int main(void)
 			}
 			
 			g_rx_frequency = si5351_get_frequency(SI5351_CLK0);			
-			g_rf_gain_setting = setPWM(pwm);
+			g_rf_gain_setting = getPWM();
 		}
 
 				

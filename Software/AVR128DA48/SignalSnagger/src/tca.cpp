@@ -34,6 +34,9 @@
 #include "port.h"
 #include "binio.h"
 
+uint16_t g_pwm_setting = 0;
+#define MAX_PWM_SETTING (uint16_t)100
+
 void TIMERA_init(void)
 {
 	/********************************************************************************/
@@ -45,31 +48,45 @@ void TIMERA_init(void)
 	CMPn = BOTTOM will produce a static low signal on WOn while CMPn > TOP will produce a static high signal on
 	WOn.
 	*/
-
-	PORTE_set_pin_dir(PWM, PORT_DIR_OUT);
-	PORTE_set_pin_dir(0, PORT_DIR_OUT);
-	PORTE_set_pin_dir(1, PORT_DIR_OUT);
-	PORTE_set_pin_dir(2, PORT_DIR_OUT);
-// 	TCA0.SINGLE.PER = 0x095F; /* Set timer period to 10 kHz */
-// 	PORTMUX.TCAROUTEA = PORTMUX_TCA0_PORTE_gc; /* PWM WO3 out on PE3 */ 
-// 	TCA0.SINGLE.CTRLB = TCA_SINGLE_WGMODE_SINGLESLOPE_gc; /* Set waveform generation mode single-slope, and enable compare channel */
-// 	TCA0.SINGLE.CMP0 = TCA0.SINGLE.PER >> 1; /* Start at 50% duty cycle */
-// 	TCA0.SINGLE.CTRLB |= (TCA_SINGLE_CMP0EN_bm | TCA_SINGLE_CMP1EN_bm | TCA_SINGLE_CMP2_bm); /* enable compare channel 0 */
-// 	TCA0.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm; /* enable TimerA0 */
-	TCA0.SPLIT.CTRLD |= 0x01;
+	
+	PORTE_set_pin_dir(PWM, PORT_DIR_OUT); /* PE2 */
+	PORTE_set_pin_dir(3, PORT_DIR_IN);
+	PORTE_set_pin_pull_mode(3, PORT_PULL_OFF);
+	
+#ifdef TCA0_USE_SPLIT
+	TCA0.SPLIT.CTRLD |= TCA_SINGLE_SPLITM_bm;
 	TCA0.SPLIT.HPER = 0xFF; /* Set timer period to 10 kHz */
-	PORTMUX.TCAROUTEA = PORTMUX_TCA0_PORTE_gc; /* PWM WO3 out on PE3 */ 
+	PORTMUX.TCAROUTEA = PORTMUX_TCA0_PORTE_gc; /* Port multiplexer PWM WO3 out on PE3 */ 
 	TCA0.SPLIT.CTRLB |= TCA_SPLIT_HCMP0EN_bm; /* Set waveform generation mode single-slope, and enable compare channel */
 	TCA0.SPLIT.HCMP0 = TCA0.SPLIT.HPER >> 1; /* Start at 50% duty cycle */
-	TCA0.SPLIT.CTRLB |= (TCA_SPLIT_CLKSEL2_bp); /* enable compare channel 0 */
+	g_pwm_setting = 50;
+	TCA0.SPLIT.CTRLB |= (TCA_SPLIT_HCMP0EN_bm); /* enable high compare channel 0 */
 	TCA0.SPLIT.CTRLA |= (TCA_SPLIT_CLKSEL_DIV8_gc | TCA_SPLIT_ENABLE_bm); /* enable TimerA0 */
+#else
+	TCA0.SINGLE.PER = 0x095F; /* Set timer period to 10 kHz */
+	PORTMUX.TCAROUTEA = PORTMUX_TCA0_PORTE_gc; /* PWM WO2 out on PE2 */
+	TCA0.SINGLE.CTRLB = TCA_SINGLE_CMP2EN_bm | TCA_SINGLE_WGMODE_SINGLESLOPE_gc; /* Set waveform generation mode single-slope, and enable compare channel */
+	setPWM(MAX_PWM_SETTING/2); /* Start at 50% duty cycle */
+	TCA0.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm; /* enable TimerA0 */
+#endif
 }
 
-uint8_t setPWM(uint8_t duty)
+void setPWM(uint16_t duty)
 {
-	uint8_t dc = CLAMP(0, duty, 100);
+	uint16_t dc = CLAMP((uint16_t)0, duty, MAX_PWM_SETTING);
 	
-	uint16_t newCMP = (((uint32_t)(TCA0.SPLIT.HPER) * dc) / 100);
+#ifdef TCA0_USE_SPLIT
+	uint16_t newCMP = (((uint16_t)(TCA0.SPLIT.HPER) * dc) / MAX_PWM_SETTING);
 	TCA0.SPLIT.HCMP0 = (uint8_t)newCMP;
-	return(dc);
+#else
+	uint32_t newCMP = (((uint32_t)(TCA0.SINGLE.PER) * dc) / MAX_PWM_SETTING);
+	TCA0.SINGLE.CMP2 = (uint16_t)newCMP;
+#endif
+
+	g_pwm_setting = dc;
+}
+
+uint16_t getPWM(void)
+{
+	return(g_pwm_setting);
 }
