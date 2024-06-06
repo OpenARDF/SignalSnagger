@@ -63,7 +63,8 @@ void TIMERA_init(void)
 	TCA0.SPLIT.CTRLB |= (TCA_SPLIT_HCMP0EN_bm); /* enable high compare channel 0 */
 	TCA0.SPLIT.CTRLA |= (TCA_SPLIT_CLKSEL_DIV8_gc | TCA_SPLIT_ENABLE_bm); /* enable TimerA0 */
 #else
-	TCA0.SINGLE.PER = 0x095F; /* Set timer period to 10 kHz */
+//	TCA0.SINGLE.PER = 0x095F; /* Set timer period to 10 kHz */
+	TCA0.SINGLE.PER = 0x03E8; /* Set timer period to 10 kHz */
 	PORTMUX.TCAROUTEA = PORTMUX_TCA0_PORTE_gc; /* PWM WO2 out on PE2 */
 	TCA0.SINGLE.CTRLB = TCA_SINGLE_CMP2EN_bm | TCA_SINGLE_WGMODE_SINGLESLOPE_gc; /* Set waveform generation mode single-slope, and enable compare channel */
 	setPWM(MAX_PWM_SETTING/2); /* Start at 50% duty cycle */
