@@ -12097,16 +12097,16 @@ void TIMERA_init(void)
     5b9e:	70 e0       	ldi	r23, 0x00	; 0
     5ba0:	83 e0       	ldi	r24, 0x03	; 3
     5ba2:	0e 94 33 2d 	call	0x5a66	; 0x5a66 <PORTE_set_pin_pull_mode>
-	TCA0.SPLIT.HCMP0 = TCA0.SPLIT.HPER >> 1; /* Start at 50% duty cycle */
-	g_pwm_setting = 50;
 	TCA0.SPLIT.CTRLB |= (TCA_SPLIT_HCMP0EN_bm); /* enable high compare channel 0 */
 	TCA0.SPLIT.CTRLA |= (TCA_SPLIT_CLKSEL_DIV8_gc | TCA_SPLIT_ENABLE_bm); /* enable TimerA0 */
 #else
-	TCA0.SINGLE.PER = 0x095F; /* Set timer period to 10 kHz */
+//	TCA0.SINGLE.PER = 0x0950; /* Set timer period to 10 kHz */
+//	TCA0.SINGLE.PER = 0x03E8; /* Set timer period to 24 kHz */
+	TCA0.SINGLE.PER = 0x12A0; /* Set timer period to 5 kHz */
     5ba6:	80 e0       	ldi	r24, 0x00	; 0
     5ba8:	9a e0       	ldi	r25, 0x0A	; 10
-    5baa:	2f e5       	ldi	r18, 0x5F	; 95
-    5bac:	39 e0       	ldi	r19, 0x09	; 9
+    5baa:	20 ea       	ldi	r18, 0xA0	; 160
+    5bac:	32 e1       	ldi	r19, 0x12	; 18
     5bae:	fc 01       	movw	r30, r24
     5bb0:	26 a3       	std	Z+38, r18	; 0x26
     5bb2:	37 a3       	std	Z+39, r19	; 0x27
