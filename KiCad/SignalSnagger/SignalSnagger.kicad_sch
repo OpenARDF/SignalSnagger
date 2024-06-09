@@ -6,8 +6,8 @@
 
   (title_block
     (title "SignalSnagger")
-    (date "2024-06-08")
-    (rev "0.320")
+    (date "2024-06-09")
+    (rev "0.321")
   )
 
   (lib_symbols
@@ -3075,7 +3075,7 @@
     (stroke (width 0) (type default) (color 0 0 0 0))
     (uuid 762fd55f-4e9a-4df1-aaaf-cff431aed2c3)
   )
-  (wire (pts (xy 120.65 158.75) (xy 120.65 165.1))
+  (wire (pts (xy 120.65 158.75) (xy 120.65 162.56))
     (stroke (width 0) (type default) (color 0 0 0 0))
     (uuid 789f19ce-276d-4f69-94bc-f0fc28f18f3e)
   )
@@ -3087,7 +3087,7 @@
     (stroke (width 0) (type default) (color 0 0 0 0))
     (uuid 7e4b96cb-088d-4ea8-a9ce-5c193974bcdf)
   )
-  (wire (pts (xy 120.65 172.72) (xy 120.65 173.99))
+  (wire (pts (xy 120.65 170.18) (xy 120.65 173.99))
     (stroke (width 0) (type default) (color 0 0 0 0))
     (uuid 7e869e0e-d3ca-45e6-ba3e-1f3796698036)
   )
@@ -4573,10 +4573,10 @@
     (property "Reference" "U101" (id 0) (at 128.27 123.19 0)
       (effects (font (size 1.54 1.54) bold) (justify right))
     )
-    (property "Value" "" (id 1) (at 127 125.73 0)
+    (property "Value" "MIC6211" (id 1) (at 127 125.73 0)
       (effects (font (size 1.27 1.27)) (justify right))
     )
-    (property "Footprint" "" (id 2) (at 135.89 132.08 0)
+    (property "Footprint" "Package_TO_SOT_SMD:SOT-23-5" (id 2) (at 135.89 132.08 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "http://www.ti.com/lit/ds/symlink/lm675.pdf" (id 3) (at 135.89 132.08 0)
@@ -6805,34 +6805,34 @@
     (pin "1" (uuid f439c16e-3ea6-4acd-ba9f-e3d29e78cbfe))
   )
 
-  (symbol (lib_id "Device:R_US") (at 120.65 168.91 0) (unit 1)
+  (symbol (lib_id "Device:R_US") (at 120.65 166.37 0) (unit 1)
     (in_bom yes) (on_board yes)
     (uuid e280818a-53ab-4ccb-8099-0199d5ccb5ef)
-    (property "Reference" "R105" (id 0) (at 121.92 166.37 0)
+    (property "Reference" "R105" (id 0) (at 121.92 163.83 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
-    (property "Value" "10k" (id 1) (at 121.92 168.91 0)
+    (property "Value" "10k" (id 1) (at 121.92 166.37 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
-    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (id 2) (at 121.666 169.164 90)
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (id 2) (at 121.666 166.624 90)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Datasheet" "~" (id 3) (at 120.65 168.91 0)
+    (property "Datasheet" "~" (id 3) (at 120.65 166.37 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Digi-Key Part No." "311-10.0KHRCT-ND" (id 4) (at 120.65 168.91 0)
+    (property "Digi-Key Part No." "311-10.0KHRCT-ND" (id 4) (at 120.65 166.37 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Link" "https://www.digikey.com/en/products/detail/yageo/RC0603FR-0710KL/726880" (id 5) (at 120.65 168.91 0)
+    (property "Link" "https://www.digikey.com/en/products/detail/yageo/RC0603FR-0710KL/726880" (id 5) (at 120.65 166.37 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Manufacturer" "YAGEO" (id 6) (at 120.65 168.91 0)
+    (property "Manufacturer" "YAGEO" (id 6) (at 120.65 166.37 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Manufacturer PN" "RC0603FR-0710KL" (id 7) (at 120.65 168.91 0)
+    (property "Manufacturer PN" "RC0603FR-0710KL" (id 7) (at 120.65 166.37 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Description" "RES 10K OHM 1% 1/10W 0603" (id 8) (at 120.65 168.91 0)
+    (property "Description" "RES 10K OHM 1% 1/10W 0603" (id 8) (at 120.65 166.37 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (pin "1" (uuid 52081bd6-ffbc-4a71-8c73-1174bdfd1ac2))
@@ -7652,6 +7652,12 @@
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/0ca87ca6-91a8-4d82-a396-32bc0a525f24"
       (reference "#PWR0272") (unit 1) (value "+5V") (footprint "")
     )
+    (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/4639d1bb-49ea-4e9d-b365-3dd9d4ecf932"
+      (reference "#PWR0301") (unit 1) (value "GND") (footprint "")
+    )
+    (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/ade5e723-92f1-4c55-867f-19b25c1cc8f0"
+      (reference "#PWR0302") (unit 1) (value "GND") (footprint "")
+    )
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/518a24d0-27c5-426e-940c-a357429cad49"
       (reference "#PWR0309") (unit 1) (value "GND") (footprint "")
     )
@@ -8228,6 +8234,12 @@
     (path "/b7e6c0d8-791a-469a-85d5-f8e886443224/b7126ba7-e3c1-4e53-8a67-daa1ada77ec7"
       (reference "R215") (unit 1) (value "10k") (footprint "Resistor_SMD:R_0603_1608Metric")
     )
+    (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/d656bdff-372f-4249-b085-2c1fb1b5886b"
+      (reference "R301") (unit 1) (value "49.9k") (footprint "Resistor_SMD:R_0603_1608Metric")
+    )
+    (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/08517072-9c55-456d-96d3-d3a2e2e3c90d"
+      (reference "R302") (unit 1) (value "10k") (footprint "Resistor_SMD:R_0603_1608Metric")
+    )
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/f1305c6f-08c9-4293-8bd6-acc466d8ee6b"
       (reference "R303") (unit 1) (value "10k") (footprint "Resistor_SMD:R_0603_1608Metric")
     )
@@ -8255,8 +8267,14 @@
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/f5a83f4a-81c8-482a-a92a-cfcf2a3eaa5f"
       (reference "R311") (unit 1) (value "10k") (footprint "Resistor_SMD:R_0603_1608Metric")
     )
+    (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/3920793b-780e-4a1d-a5f1-bb87db0a4342"
+      (reference "R312") (unit 1) (value "49.9k") (footprint "Resistor_SMD:R_0603_1608Metric")
+    )
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/570dfa9a-e758-4617-bdcb-4f6a0d35c119"
       (reference "R313") (unit 1) (value "1k") (footprint "Resistor_SMD:R_0603_1608Metric")
+    )
+    (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/e7f9f427-7839-4223-8d74-8ea336b817f3"
+      (reference "R314") (unit 1) (value "10k") (footprint "Resistor_SMD:R_0603_1608Metric")
     )
     (path "/109e0b43-3dac-4be2-a119-08b278e2e7f5/6609a105-90d3-462d-b036-f4e794481058"
       (reference "R320") (unit 1) (value "10") (footprint "Resistor_SMD:R_0805_2012Metric")
