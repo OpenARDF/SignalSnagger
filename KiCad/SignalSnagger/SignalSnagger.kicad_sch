@@ -3749,7 +3749,7 @@
     (property "Reference" "#FLG0105" (id 0) (at 179.07 130.175 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Value" "" (id 1) (at 179.07 128.5042 0)
+    (property "Value" "PWR_FLAG" (id 1) (at 179.07 128.5042 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Footprint" "" (id 2) (at 179.07 132.08 0)
