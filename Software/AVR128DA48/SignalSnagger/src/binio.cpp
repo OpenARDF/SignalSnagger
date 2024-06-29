@@ -145,10 +145,10 @@ void BINIO_init(void)
 	PORTC_set_pin_pull_mode(SI5351_SCL0, PORT_PULL_UP);
 
 	PORTC_set_pin_dir(LED_GREEN_1, PORT_DIR_OUT);
-	PORTC_set_pin_level(LED_GREEN_1, HIGH);
+	PORTC_set_pin_level(LED_GREEN_1, LOW);
 
 	PORTC_set_pin_dir(LED_RED_1, PORT_DIR_OUT);
-	PORTC_set_pin_level(LED_RED_1, HIGH);
+	PORTC_set_pin_level(LED_RED_1, LOW);
 	
 	/* PORTC.PIN6 = unused */
 	/* PORTC.PIN7 = unused */

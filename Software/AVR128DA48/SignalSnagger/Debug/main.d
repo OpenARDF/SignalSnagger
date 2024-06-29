@@ -28,14 +28,15 @@ main.d main.o: .././main.cpp .././atmel_start.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\lib\gcc\avr\7.3.0\include\stdarg.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\ctype.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\avr\sleep.h \
- ../utils/atomic.h ../include/receiver.h ../defs.h ../include/si5351.h \
- ../include/morse.h ../include/adc.h ../include/Goertzel.h \
+ ../utils/atomic.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\math.h \
- ../include/util.h ../include/binio.h ../include/eeprommanager.h \
+ ../include/receiver.h ../defs.h ../include/si5351.h ../include/morse.h \
+ ../include/adc.h ../include/Goertzel.h ../include/util.h \
+ ../include/binio.h ../include/eeprommanager.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\avr\eeprom.h \
  ../include/leds.h ../include/CircularStringBuff.h ../include/rtc.h \
- ../include/tca.h ../include/display.h ../include/i2c.h ../include/ccp.h \
- ../include/protected_io.h
+ ../include/tca.h ../include/display.h ../include/i2c.h ../include/dac0.h \
+ ../include/ccp.h ../include/protected_io.h
 
 .././atmel_start.h:
 
@@ -113,6 +114,8 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\
 
 ../utils/atomic.h:
 
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\math.h:
+
 ../include/receiver.h:
 
 ../defs.h:
@@ -124,8 +127,6 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\
 ../include/adc.h:
 
 ../include/Goertzel.h:
-
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\math.h:
 
 ../include/util.h:
 
@@ -146,6 +147,8 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\
 ../include/display.h:
 
 ../include/i2c.h:
+
+../include/dac0.h:
 
 ../include/ccp.h:
 

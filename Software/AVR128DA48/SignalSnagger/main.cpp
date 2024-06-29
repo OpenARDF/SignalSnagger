@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <avr/sleep.h>
 #include <atomic.h>
+#include <math.h>
 
 #include "receiver.h"
 #include "morse.h"
@@ -21,7 +22,7 @@
 #include "rtc.h"
 #include "tca.h"
 #include "display.h"
-//#include "dac0.h"
+#include "dac0.h"
 
 #include <cpuint.h>
 #include <ccp.h>
@@ -92,6 +93,7 @@ static volatile bool g_rotary_shaft_pressed = false;
 
 static volatile bool g_leftSense_pressed = false;
 static volatile bool g_rightSense_pressed = false;
+static volatile bool g_bothSense_pressed = false;
 
 static uint8_t g_rf_gain_setting = 50;
 
@@ -117,16 +119,17 @@ static volatile SleepType g_sleepType = SLEEP_FOREVER;
 // static uint16_t g_ADCFilterThreshold[NUMBER_OF_POLLED_ADC_CHANNELS] = { 500, 500, 500, 500 };
 // static volatile bool g_adcUpdated[NUMBER_OF_POLLED_ADC_CHANNELS] = { false, false, false, false };
 // static volatile uint16_t g_lastConversionResult[NUMBER_OF_POLLED_ADC_CHANNELS];
-#define NUMBER_OF_POLLED_ADC_CHANNELS 2
-#define BATT_VOLTAGE_RESULT 1
-#define ASSI_NEAR 0
-static ADC_Active_Channel_t g_adcChannelOrder[NUMBER_OF_POLLED_ADC_CHANNELS] = { ADC_ASSI_NEAR, ADCBatteryVoltage };
-static const uint16_t g_adcChannelConversionPeriod_ticks[NUMBER_OF_POLLED_ADC_CHANNELS] = { TIMER2_20HZ, TIMER2_0_5HZ };
-static volatile uint16_t g_adcCountdownCount[NUMBER_OF_POLLED_ADC_CHANNELS] = { 100, 2000 };
-static volatile bool g_adcUpdated[NUMBER_OF_POLLED_ADC_CHANNELS] = { false, false };
+#define NUMBER_OF_POLLED_ADC_CHANNELS 3
+#define BATT_VOLTAGE_RESULT 2
+#define ASSI_NEAR 1
+static ADC_Active_Channel_t g_adcChannelOrder[NUMBER_OF_POLLED_ADC_CHANNELS] = { ADC_AUDIO_I, ADC_ASSI_NEAR, ADCBatteryVoltage };
+static const uint16_t g_adcChannelConversionPeriod_ticks[NUMBER_OF_POLLED_ADC_CHANNELS] = { 0, 0, 0 };
+static volatile uint16_t g_adcCountdownCount[NUMBER_OF_POLLED_ADC_CHANNELS] = { 1, 40000, 40000 };
+static volatile bool g_adcUpdated[NUMBER_OF_POLLED_ADC_CHANNELS] = { false, false, false };
 static volatile uint16_t g_lastConversionResult[NUMBER_OF_POLLED_ADC_CHANNELS];
 
 extern Goertzel g_goertzel;
+uint16_t g_goertzel_rssi = 0;
 volatile uint16_t g_leftsense_closed_time = 0;
 volatile uint16_t g_rightsense_closed_time = 0;
 volatile uint16_t g_encoder_closed_time = 0;
@@ -139,6 +142,7 @@ volatile uint16_t g_encoder_presses_count = 0;
 volatile bool g_long_leftsense_press = false;
 volatile bool g_long_rightsense_press = false;
 volatile bool g_long_encoder_press = false;
+volatile uint16_t g_audio_gain = 100;
 
 volatile uint16_t g_check_temperature = 0;
 
@@ -149,6 +153,36 @@ leds LEDS = leds();
 CircularStringBuff g_text_buff = CircularStringBuff(TEXT_BUFF_SIZE);
 
 EepromManager g_ee_mgr;
+
+
+#define Goertzel_N 201
+#define SAMPLE_RATE 10000
+const int N = Goertzel_N;
+const float threshold = 500000. * (Goertzel_N / 100);
+const float sampling_freq = SAMPLE_RATE;
+const float pitch_frequencies[3] = { 300., 600., 900. };
+
+/* VREF start-up time */
+#define VREF_STARTUP_TIME       (50)
+/* Mask needed to get the 2 LSb for DAC Data Register */
+#define LSB_MASK                (0x03)
+/* Number of samples for a sine wave period */
+#define SINE_PERIOD_STEPS       (6)
+/* Sine wave amplitude */
+#define SINE_AMPLITUDE          (20) // (511)
+/* Sine wave DC offset */
+#define SINE_DC_OFFSET          (20) //(512)
+/* Frequency of the sine wave */
+#define SINE_FREQ               (200)
+/* Step delay for the loop */
+#define STEP_DELAY_TIME         ((1000000 / SINE_FREQ) / SINE_PERIOD_STEPS)
+
+static void sineWaveInit(void);
+
+/* Buffer to store the sine wave samples */
+uint16_t sineWave[SINE_PERIOD_STEPS];
+static volatile uint16_t g_beep = 0;
+
 
 /***********************************************************************
  * Private Function Prototypes
@@ -189,6 +223,141 @@ void handle_1sec_tasks(void)
 {
 }
 
+/* ADC sampling timer interrupt */
+ISR(TCA1_OVF_vect)
+{
+	static uint16_t top;
+	static uint8_t sineIndex = 0;
+	uint8_t x = TCA1.SINGLE.INTFLAGS;
+	
+	if(x & TCA_SINGLE_OVF_bm)
+	{
+		static bool conversionInProcess = false;
+		static int8_t indexConversionInProcess = 0;
+		
+		for(uint8_t i = 0; i < NUMBER_OF_POLLED_ADC_CHANNELS; i++)
+		{
+			if(g_adcCountdownCount[i] && g_adcChannelConversionPeriod_ticks[i])
+			{
+				g_adcCountdownCount[i]--;
+			}
+		}
+
+		/**
+		 * Handle Periodic ADC Readings
+		 * The following algorithm allows multiple ADC channel readings to be performed at different polling intervals. */
+ 		if(!conversionInProcess)
+ 		{
+			indexConversionInProcess = -1;	
+			
+			for(uint8_t i = 0; i < NUMBER_OF_POLLED_ADC_CHANNELS; i++)
+			{
+				if(g_adcCountdownCount[i] == 0)
+				{
+					indexConversionInProcess = (int8_t)i;
+					break;
+				}
+			}
+
+			if(indexConversionInProcess >= 0)
+			{
+				g_adcCountdownCount[indexConversionInProcess] = g_adcChannelConversionPeriod_ticks[indexConversionInProcess];    /* reset the tick countdown */
+				ADC0_setADCChannel(g_adcChannelOrder[indexConversionInProcess]);
+				ADC0_startConversion();
+				conversionInProcess = true;
+			}
+		}
+		else if(ADC0_conversionDone())   /* wait for conversion to complete */
+		{
+			static uint16_t holdConversionResult;
+			uint16_t hold = ADC0_read(); //ADC;
+			
+			if((hold >= 0) && (hold < 4090))
+			{
+				holdConversionResult = hold; // (uint16_t)(((uint32_t)hold * ADC_REF_VOLTAGE_mV) >> 10);    /* millivolts at ADC pin */
+				uint16_t lastResult = g_lastConversionResult[indexConversionInProcess];
+
+				g_adcUpdated[indexConversionInProcess] = true;
+				
+				if(g_adcChannelOrder[indexConversionInProcess] == ADC_ASSI_NEAR)
+				{
+					if(holdConversionResult > lastResult)
+					{
+						g_lastConversionResult[indexConversionInProcess] = (holdConversionResult + (lastResult<<1)) / 3;
+					}
+					else
+					{
+						g_lastConversionResult[indexConversionInProcess] = (holdConversionResult + (lastResult<<3)) / 9;
+					}
+				}
+				else if(g_adcChannelOrder[indexConversionInProcess] == ADC_AUDIO_I)
+				{
+					DAC0_setVal(holdConversionResult);
+ 					g_lastConversionResult[indexConversionInProcess] = holdConversionResult << 6;
+
+// 					DAC0_setVal(sineWave[sineIndex++]);
+// 					if(sineIndex == SINE_PERIOD_STEPS) sineIndex = 0;
+				}
+				else
+				{
+					g_lastConversionResult[indexConversionInProcess] = holdConversionResult;
+				}
+			}
+
+			conversionInProcess = false;
+		}
+		else
+		{
+			top = TCA1.SINGLE.PER;
+			TCA1.SINGLE.PER = ++top;
+		}
+	}
+
+	TCA1.SINGLE.INTFLAGS = (TCA_SINGLE_OVF_bm | TCA_SINGLE_CMP0_bm | TCA_SINGLE_CMP1_bm | TCA_SINGLE_CMP2_bm); /* clear all interrupt flags */
+}
+
+
+/** 
+ADC Result Ready Interrupt
+*/
+ISR(ADC0_RESRDY_vect)
+{
+	uint8_t x = ADC0.INTFLAGS;
+	
+	if(x & ADC_RESRDY_bm)
+	{
+		static uint8_t sineIndex = 0;
+		uint16_t sample = ADC0.RES;
+		uint16_t result = sample;
+		
+		if(g_beep) 
+		{
+			if(g_audio_gain)
+			{
+				result += sineWave[sineIndex++];
+				result *= g_audio_gain;
+			}
+			else
+			{
+				result = sineWave[sineIndex++];
+			}
+			
+			if(sineIndex == SINE_PERIOD_STEPS) sineIndex = 0;
+			g_beep--;
+		}
+		else
+		{
+			result *= g_audio_gain;
+		}
+		
+		DAC0_setVal(result);
+		g_goertzel.DataPoint(sample);
+//		PORTC_toggle_pin_level(5);
+	}
+	
+	ADC0.INTFLAGS = (ADC_RESRDY_bm | ADC_WCMP_bm);
+}
+
 
 /**
 Periodic tasks not requiring precise timing. Rate = 300 Hz
@@ -201,8 +370,8 @@ ISR(TCB0_INT_vect)
 	
     if(x & TCB_CAPT_bm)
     {
-		static bool conversionInProcess = false;
-		static int8_t indexConversionInProcess = 0;
+// 		static bool conversionInProcess = false;
+// 		static int8_t indexConversionInProcess = 0;
 		static uint16_t leftsense_closures_count_period = 0, rightsense_closures_count_period = 0, encoder_closures_count_period = 0;
 		uint8_t holdSwitch = 0, nowSwitch = 0;
 		static uint8_t leftsenseReleased = false, rightsenseReleased = false, encoderReleased = false;
@@ -222,6 +391,8 @@ ISR(TCB0_INT_vect)
 			int8_t rightSense = holdSwitch & (1 << SENSE_SWITCH_RIGHT);
 			int8_t encoderSwitch = holdSwitch & (1 << ENCODER_SWITCH);
 			
+			g_bothSense_pressed = false;
+			
 			if(!leftSense && rightSense)
 			{
 				PORTA_set_pin_level(CARDIOID_BACK, LOW);
@@ -240,6 +411,7 @@ ISR(TCB0_INT_vect)
 				PORTA_set_pin_level(CARDIOID_BACK, LOW);
 				g_leftSense_pressed = false;
 				g_rightSense_pressed = false;
+				g_bothSense_pressed = !leftSense && !rightSense;
 			}
 			
 			if(!encoderSwitch)
@@ -271,6 +443,7 @@ ISR(TCB0_INT_vect)
 					}
 					else /* left sense switch is now open */
 					{
+						g_beep = 1000;
 						if(!LEDS.active())
 						{
 							LEDS.init();
@@ -301,6 +474,8 @@ ISR(TCB0_INT_vect)
 					}
 					else /* left sense switch is now open */
 					{
+						g_beep = 1000;
+
 						if(!LEDS.active())
 						{
 							LEDS.init();
@@ -331,6 +506,8 @@ ISR(TCB0_INT_vect)
 					}
 					else /* encoder switch is now open */
 					{
+						g_beep = 1000;
+
 						if(!LEDS.active())
 						{
 							LEDS.init();
@@ -502,66 +679,66 @@ ISR(TCB0_INT_vect)
 		}
 
 							
-		/**
-		 * Handle Periodic ADC Readings
-		 * The following algorithm allows multiple ADC channel readings to be performed at different polling intervals. */
- 		if(!conversionInProcess)
- 		{
-			/* Note: countdowns will pause while a conversion is in process. Conversions are so fast that this should not be an issue though. */
-			indexConversionInProcess = -1;
-
-			for(uint8_t i = 0; i < NUMBER_OF_POLLED_ADC_CHANNELS; i++)
-			{
-				if(g_adcCountdownCount[i])
-				{
-					g_adcCountdownCount[i]--;
-				}
-
-				if(g_adcCountdownCount[i] == 0)
-				{
-					indexConversionInProcess = (int8_t)i;
-				}
-			}
-
-			if(indexConversionInProcess >= 0)
-			{
-				g_adcCountdownCount[indexConversionInProcess] = g_adcChannelConversionPeriod_ticks[indexConversionInProcess];    /* reset the tick countdown */
-				ADC0_setADCChannel(g_adcChannelOrder[indexConversionInProcess]);
-				ADC0_startConversion();
-				conversionInProcess = true;
-			}
-		}
-		else if(ADC0_conversionDone())   /* wait for conversion to complete */
-		{
-			static uint16_t holdConversionResult;
-			uint16_t hold = ADC0_read(); //ADC;
-			
-			if((hold >= 0) && (hold < 4090))
-			{
-				holdConversionResult = hold; // (uint16_t)(((uint32_t)hold * ADC_REF_VOLTAGE_mV) >> 10);    /* millivolts at ADC pin */
-				uint16_t lastResult = g_lastConversionResult[indexConversionInProcess];
-
-				g_adcUpdated[indexConversionInProcess] = true;
-				
-				if(g_adcChannelOrder[indexConversionInProcess] == ADC_ASSI_NEAR)
-				{
-					if(holdConversionResult > lastResult)
-					{
-						g_lastConversionResult[indexConversionInProcess] = (holdConversionResult + (lastResult<<1)) / 3;
-					}
-					else
-					{
-						g_lastConversionResult[indexConversionInProcess] = (holdConversionResult + (lastResult<<3)) / 9;
-					}
-				}
-				else
-				{
-					g_lastConversionResult[indexConversionInProcess] = holdConversionResult;
-				}
-			}
-
-			conversionInProcess = false;
-		}
+// 		/**
+// 		 * Handle Periodic ADC Readings
+// 		 * The following algorithm allows multiple ADC channel readings to be performed at different polling intervals. */
+//  		if(!conversionInProcess)
+//  		{
+// 			/* Note: countdowns will pause while a conversion is in process. Conversions are so fast that this should not be an issue though. */
+// 			indexConversionInProcess = -1;
+// 
+// 			for(uint8_t i = 0; i < NUMBER_OF_POLLED_ADC_CHANNELS; i++)
+// 			{
+// 				if(g_adcCountdownCount[i])
+// 				{
+// 					g_adcCountdownCount[i]--;
+// 				}
+// 
+// 				if(g_adcCountdownCount[i] == 0)
+// 				{
+// 					indexConversionInProcess = (int8_t)i;
+// 				}
+// 			}
+// 
+// 			if(indexConversionInProcess >= 0)
+// 			{
+// 				g_adcCountdownCount[indexConversionInProcess] = g_adcChannelConversionPeriod_ticks[indexConversionInProcess];    /* reset the tick countdown */
+// 				ADC0_setADCChannel(g_adcChannelOrder[indexConversionInProcess]);
+// 				ADC0_startConversion();
+// 				conversionInProcess = true;
+// 			}
+// 		}
+// 		else if(ADC0_conversionDone())   /* wait for conversion to complete */
+// 		{
+// 			static uint16_t holdConversionResult;
+// 			uint16_t hold = ADC0_read(); //ADC;
+// 			
+// 			if((hold >= 0) && (hold < 4090))
+// 			{
+// 				holdConversionResult = hold; // (uint16_t)(((uint32_t)hold * ADC_REF_VOLTAGE_mV) >> 10);    /* millivolts at ADC pin */
+// 				uint16_t lastResult = g_lastConversionResult[indexConversionInProcess];
+// 
+// 				g_adcUpdated[indexConversionInProcess] = true;
+// 				
+// 				if(g_adcChannelOrder[indexConversionInProcess] == ADC_ASSI_NEAR)
+// 				{
+// 					if(holdConversionResult > lastResult)
+// 					{
+// 						g_lastConversionResult[indexConversionInProcess] = (holdConversionResult + (lastResult<<1)) / 3;
+// 					}
+// 					else
+// 					{
+// 						g_lastConversionResult[indexConversionInProcess] = (holdConversionResult + (lastResult<<3)) / 9;
+// 					}
+// 				}
+// 				else
+// 				{
+// 					g_lastConversionResult[indexConversionInProcess] = holdConversionResult;
+// 				}
+// 			}
+// 
+// 			conversionInProcess = false;
+// 		}
     }
 
     TCB0.INTFLAGS = (TCB_CAPT_bm | TCB_OVF_bm); /* clear all interrupt flags */
@@ -656,11 +833,25 @@ void powerUp5V(void)
 }
 
 
+static void sineWaveInit(void)
+{
+    uint8_t i;
+    for(i = 0; i < SINE_PERIOD_STEPS; i++)
+    {
+        sineWave[i] = SINE_DC_OFFSET + SINE_AMPLITUDE * sin(2 * M_PI * i / SINE_PERIOD_STEPS);
+    }
+}
+
+
 int main(void)
 {
+	sineWaveInit();
+
 	Frequency_Hz hold_rx_frequency = 0;
 	uint8_t hold_rf_gain_setting = 255;
-	uint16_t hold_assi_result = 0;
+//	uint16_t hold_assi_result = 0;
+	uint16_t hold_audio_gain = 0;
+	uint16_t hold_goertzel_rssi = 0;
 	bool splash_displayed = true;
 	uint8_t x;
 	EC ec;
@@ -691,13 +882,14 @@ int main(void)
 	{
 		g_hardware_error |= (int)HARDWARE_NO_RTC;
  		RTC_init_backup();
- 		LEDS.blink(LEDS_RED_AND_GREEN_BLINK_FAST, true);
 	}
 	
 	display.begin(DOGS104);
 	
 	if(g_hardware_error)
 	{
+ 		LEDS.blink(LEDS_RED_AND_GREEN_BLINK_FAST, true);
+
 		g_text_buff.putString((char*)"00Error:");
 		if(g_hardware_error & (int)HARDWARE_NO_SI5351)
 		{
@@ -711,11 +903,15 @@ int main(void)
 	}
 	else
 	{
+		LEDS.blink(LEDS_OFF);
 		g_text_buff.putString((char*)"00Signal");
 		g_text_buff.putString((char*)"12Snagger!");
 		sprintf(g_tempStr, "30Ver:%s", SW_REVISION);	
 	}
 	g_text_buff.putString((char*)g_tempStr);
+	
+	ADC0_setADCChannel(g_adcChannelOrder[ADC_AUDIO_I]);
+	ADC0_startConversion();
 
 	while (1) {
 		if(g_display_active)
@@ -742,16 +938,31 @@ int main(void)
 			{
 				hold_rf_gain_setting = g_rf_gain_setting;
 			
-				sprintf(g_tempStr, "10Gain:%d  ", 100 - g_rf_gain_setting);
+				sprintf(g_tempStr, "10RF=%d  ", 100 - g_rf_gain_setting);
 				g_text_buff.putString(g_tempStr);
 			}
 			
-			if(hold_assi_result != g_lastConversionResult[0])
+// 			if(hold_assi_result != g_lastConversionResult[ASSI_NEAR])
+// 			{
+// 				hold_assi_result = g_lastConversionResult[ASSI_NEAR];
+// 				sprintf(g_tempStr, "30S=%d  ", hold_assi_result);
+// 				g_text_buff.putString(g_tempStr);
+// 			}
+
+			if(hold_audio_gain != g_audio_gain)
 			{
-				hold_assi_result = g_lastConversionResult[0];
-				sprintf(g_tempStr, "30S=%d  ", hold_assi_result);
+				hold_audio_gain = g_audio_gain;
+				sprintf(g_tempStr, "20A=%d  ", hold_audio_gain/10);
 				g_text_buff.putString(g_tempStr);
 			}
+			
+			if(hold_goertzel_rssi != g_goertzel_rssi)
+			{
+				hold_goertzel_rssi = g_goertzel_rssi;
+				sprintf(g_tempStr, "30%u   ", hold_goertzel_rssi);
+				g_text_buff.putString(g_tempStr);
+			}
+			
 		}
 		
 		if(g_text_buff.size())
@@ -778,11 +989,11 @@ int main(void)
 		{
 			if(g_handle_counted_leftsense_presses == 1)
 			{
-				LEDS.blink(LEDS_RED_BLINK_SLOW, true);
+//				LEDS.blink(LEDS_RED_BLINK_SLOW, true);
 			}
 			else if (g_handle_counted_leftsense_presses == 2)
 			{
-				LEDS.blink(LEDS_RED_OFF);
+//				LEDS.blink(LEDS_RED_OFF);
 			}
 			
 			g_handle_counted_leftsense_presses = 0;
@@ -790,25 +1001,25 @@ int main(void)
 		
 		if(g_leftsense_closed_time >= 1000)
 		{
-			LEDS.blink(LEDS_GREEN_ON_CONSTANT);
-			LEDS.blink(LEDS_RED_ON_CONSTANT);
+// 			LEDS.blink(LEDS_GREEN_ON_CONSTANT);
+// 			LEDS.blink(LEDS_RED_ON_CONSTANT);
 		}
 		
 		if(g_long_leftsense_press)
 		{
 			g_long_leftsense_press = false;
-			LEDS.init(LEDS_RED_THEN_GREEN_BLINK_SLOW);
+// 			LEDS.init(LEDS_RED_THEN_GREEN_BLINK_SLOW);
 		}
 		
 		if(g_handle_counted_rightsense_presses)
 		{
 			if(g_handle_counted_rightsense_presses == 1)
 			{
-				LEDS.blink(LEDS_GREEN_BLINK_SLOW, true);
+// 				LEDS.blink(LEDS_GREEN_BLINK_SLOW, true);
 			}
 			else if (g_handle_counted_rightsense_presses == 2)
 			{
-				LEDS.blink(LEDS_GREEN_OFF);
+// 				LEDS.blink(LEDS_GREEN_OFF);
 			}
 			
 			g_handle_counted_rightsense_presses = 0;
@@ -816,25 +1027,25 @@ int main(void)
 		
 		if(g_rightsense_closed_time >= 1000)
 		{
-			LEDS.blink(LEDS_GREEN_ON_CONSTANT);
-			LEDS.blink(LEDS_RED_ON_CONSTANT);
+// 			LEDS.blink(LEDS_GREEN_ON_CONSTANT);
+// 			LEDS.blink(LEDS_RED_ON_CONSTANT);
 		}
 		
 		if(g_long_rightsense_press)
 		{
 			g_long_rightsense_press = false;
-			LEDS.init(LEDS_RED_THEN_GREEN_BLINK_FAST);
+// 			LEDS.init(LEDS_RED_THEN_GREEN_BLINK_FAST);
 		}
 		
 		if(g_handle_counted_encoder_presses)
 		{
 			if(g_handle_counted_encoder_presses == 1)
 			{
-				LEDS.blink(LEDS_RED_AND_GREEN_BLINK_FAST);
+// 				LEDS.blink(LEDS_RED_AND_GREEN_BLINK_FAST);
 			}
 			else if (g_handle_counted_encoder_presses == 2)
 			{
-				LEDS.blink(LEDS_RED_AND_GREEN_BLINK_SLOW);
+// 				LEDS.blink(LEDS_RED_AND_GREEN_BLINK_SLOW);
 			}
 			
 			g_handle_counted_encoder_presses = 0;
@@ -842,26 +1053,26 @@ int main(void)
 		
 		if(g_encoder_closed_time >= 1000)
 		{
-			LEDS.blink(LEDS_GREEN_ON_CONSTANT);
-			LEDS.blink(LEDS_RED_ON_CONSTANT);
+// 			LEDS.blink(LEDS_GREEN_ON_CONSTANT);
+// 			LEDS.blink(LEDS_RED_ON_CONSTANT);
 		}
 		
 		if(g_long_encoder_press)
 		{
 			g_long_encoder_press = false;
-			LEDS.init(LEDS_GREEN_ON_CONSTANT);
-			LEDS.blink(LEDS_RED_ON_CONSTANT);
+// 			LEDS.init(LEDS_GREEN_ON_CONSTANT);
+// 			LEDS.blink(LEDS_RED_ON_CONSTANT);
 		}
 		
 		if(g_last_error_code)
 		{
-			sprintf(g_tempStr, "%u", g_last_error_code);
+// 			sprintf(g_tempStr, "%u", g_last_error_code);
 			g_last_error_code = ERROR_CODE_NO_ERROR;
 		}
 
 		if(g_last_status_code)
 		{
-			sprintf(g_tempStr, "%u", g_last_status_code);
+// 			sprintf(g_tempStr, "%u", g_last_status_code);
 			g_last_status_code = STATUS_CODE_IDLE;
 		}
 		
@@ -874,14 +1085,15 @@ int main(void)
 			
 			if(g_rotary_count < 0)
 			{
-				LEDS.blink(LEDS_GREEN_BLINK_FAST);
-				LEDS.blink(LEDS_RED_ON_CONSTANT);
+// 				LEDS.blink(LEDS_GREEN_BLINK_FAST);
+// 				LEDS.blink(LEDS_RED_ON_CONSTANT);
 				
 				if(g_rotary_shaft_pressed)
 				{
-					if(pwm) setPWM(--pwm);
+					if(g_audio_gain < 1000) g_audio_gain += 10;
+					g_audio_gain -= g_audio_gain % 10;
 				}
-				else
+				else if(g_bothSense_pressed)
 				{
 					if(g_leftSense_pressed)
 					{
@@ -894,20 +1106,24 @@ int main(void)
 
 					si5351_set_quad_frequency(g_rx_frequency);
 				}
+				else
+				{
+					if(pwm) setPWM(--pwm);
+				}
 				
 				g_rotary_count++;
 			}
 			else
 			{
-				LEDS.blink(LEDS_RED_BLINK_FAST);
-				LEDS.blink(LEDS_GREEN_ON_CONSTANT);
+// 				LEDS.blink(LEDS_RED_BLINK_FAST);
+// 				LEDS.blink(LEDS_GREEN_ON_CONSTANT);
 				
 				if(g_rotary_shaft_pressed)
 				{
-					if(pwm < 100) setPWM(++pwm);
-					
+					if(g_audio_gain) g_audio_gain -= 10;
+					g_audio_gain -= g_audio_gain % 10;					
 				}
-				else
+				else if(g_bothSense_pressed)
 				{
 					if(g_leftSense_pressed)
 					{
@@ -918,7 +1134,11 @@ int main(void)
 						g_rx_frequency -= 100;
 					}
 
-					si5351_set_quad_frequency(g_rx_frequency);					
+					si5351_set_quad_frequency(g_rx_frequency);
+				}
+				else
+				{
+					if(pwm < 100) setPWM(++pwm);
 				}
 
 				g_rotary_count--;
@@ -927,7 +1147,105 @@ int main(void)
 			g_rx_frequency = si5351_get_frequency(SI5351_CLK0);			
 			g_rf_gain_setting = getPWM();
 		}
+				
+//======================================================		
+		if(g_goertzel.SamplesReady())
+		{
+			static float noiseLevel = 99999.;
+			float magnitudes[3];
+			float newNoiseLevel = noiseLevel;
+			int maxPitch = -1;
+			float maxPitchLevel = 0., minPitchLevel = 99999.;
 
+			float largestY = 0;
+
+			bool signalDetected = false;
+			bool noiseDetected = false;
+			int clipCount = 0;
+
+			for(int i = 0; i < 3; i++)
+			{
+				g_goertzel.SetTargetFrequency(pitch_frequencies[i]);    /* Initialize the object with the sampling frequency, # of samples and target freq */
+				magnitudes[i] = g_goertzel.Magnitude2(&clipCount);     /* Check samples for presence of the target frequency */
+
+				if(magnitudes[i] < noiseLevel)
+				{
+					newNoiseLevel = magnitudes[i];
+				}
+					
+				if(magnitudes[i] > maxPitchLevel)
+				{
+					maxPitch = i;
+					maxPitchLevel = magnitudes[i];
+				}
+				
+				if(magnitudes[i] < minPitchLevel)
+				{
+					minPitchLevel = magnitudes[i];
+				}
+			}
+				
+			bool centered = (maxPitch==1);
+			bool tooHigh = false;
+			bool tooLow = false;
+			bool saturation = (clipCount > 50);
+				
+			if(!centered)
+			{
+				tooHigh = maxPitch == 2;
+				tooLow = maxPitch == 0;
+			}
+				
+			noiseLevel = newNoiseLevel;
+				
+			if(centered && !saturation)
+			{
+				signalDetected = true;
+				uint16_t hold = (uint16_t)(maxPitchLevel - minPitchLevel);
+				
+				if(g_goertzel_rssi > hold)
+				{
+					hold = g_goertzel_rssi - hold;
+					
+					if(hold < 200)
+					{
+						g_goertzel_rssi--;
+					}
+					else
+					{
+						g_goertzel_rssi -= hold >> 4;
+					}
+				}
+				else if(g_goertzel_rssi < hold)
+				{
+					hold = hold - g_goertzel_rssi;
+					
+					if(hold < 200)
+					{
+						g_goertzel_rssi++;
+					}
+					else
+					{
+						g_goertzel_rssi += hold >> 4;
+					}
+				}
+			}
+			else
+			{
+				noiseDetected = !saturation;
+			}
+		}
+
+		
+		
+		
+		
+		
+		
+		
+		
+		
+//======================================================= 
 				
 		/********************************
 		 * Handle sleep

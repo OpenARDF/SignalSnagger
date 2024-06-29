@@ -37,7 +37,7 @@ typedef enum {
 	ADCTemperature
 } ADC_Active_Channel_t;
 
-void ADC0_setADCChannel(ADC_Active_Channel_t chan);
+bool ADC0_setADCChannel(ADC_Active_Channel_t chan);
 void ADC0_startConversion(void);
 bool ADC0_conversionDone(void);
 int ADC0_read(void);

@@ -66,12 +66,16 @@ void TIMERA_init(void)
 //	TCA0.SINGLE.PER = 0x0950; /* Set timer period to 10 kHz */
 //	TCA0.SINGLE.PER = 0x03E8; /* Set timer period to 24 kHz */
 //	TCA0.SINGLE.PER = 0x12A0; /* Set timer period to 5 kHz */
-	TCA0.SINGLE.PER = 0x2580; /* Set timer period to 2.5 kHz */
+//	TCA0.SINGLE.PER = 0x2580; /* Set timer period to 2.5 kHz */
 	PORTMUX.TCAROUTEA = PORTMUX_TCA0_PORTE_gc; /* PWM WO2 out on PE2 */
 	TCA0.SINGLE.CTRLB = TCA_SINGLE_CMP2EN_bm | TCA_SINGLE_WGMODE_SINGLESLOPE_gc; /* Set waveform generation mode single-slope, and enable compare channel */
 	setPWM(MAX_PWM_SETTING/2); /* Start at 50% duty cycle */
 	TCA0.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm; /* enable TimerA0 */
 #endif
+
+// 	TCA1.SINGLE.PER = 0x0950; /* Set ADC timer to ~10 kHz */
+// 	TCA1.SINGLE.INTCTRL |= TCA_SINGLE_OVF_bm;
+// 	TCA1.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm; /* enable TimerA1 */
 }
 
 void setPWM(uint16_t duty)

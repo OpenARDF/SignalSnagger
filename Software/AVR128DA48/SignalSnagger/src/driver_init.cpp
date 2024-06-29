@@ -26,7 +26,7 @@
 #include "defs.h"
 #include "driver_init.h"
 #include <system.h>
-#include "dac0.h"
+//#include "dac0.h"
 #include "binio.h"
 #include "tca.h"
 
@@ -46,7 +46,7 @@ void system_init()
 
 	SLPCTRL_init();
 	
-	DAC0_init();
+//	DAC0_init();
 
 	BOD_init();
 }

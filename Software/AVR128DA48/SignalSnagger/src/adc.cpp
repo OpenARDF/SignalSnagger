@@ -30,13 +30,13 @@
 #include <compiler.h>
 #include "Goertzel.h"
 
-#define SAMPLE_RATE 24096
+#define SAMPLE_RATE 13889
 #define Goertzel_N 201
 const int N = Goertzel_N;
-const float threshold = 500000. * (Goertzel_N / 100);
+const float threshold = 500000. * (Goertzel_N / 100.);
 const float sampling_freq = SAMPLE_RATE;
-const float x_frequencies[4] = { 1209., 1336., 1477., 1633. };
-const float y_frequencies[4] = { 697., 770., 852., 941. };
+// const float x_frequencies[4] = { 1209., 1336., 1477., 1633. };
+// const float pitch_frequencies[4] = { 697., 770., 852., 941. };
 	
 #define FREE_RUNNING true
 #define SINGLE_CONVERSION false
@@ -58,8 +58,10 @@ typedef enum {
 	
 static ADC_Init_t g_adc_initialization = ADC_NOT_INITIALIZED;
 
-void ADC0_setADCChannel(ADC_Active_Channel_t chan)
+bool ADC0_setADCChannel(ADC_Active_Channel_t chan)
 {
+	bool freeRunning = false;
+	
 	switch(chan)
 	{
 		case ADC_AUDIO_I:
@@ -67,6 +69,7 @@ void ADC0_setADCChannel(ADC_Active_Channel_t chan)
 			if(g_adc_initialization != ADC_FREE_RUN_INITIALIZED)
 			{
 				ADC0_SYSTEM_init(FREE_RUNNING);
+				freeRunning = true;
 			}
 			
 			ADC0.MUXPOS = ADC_MUXPOS_AIN0_gc;
@@ -75,9 +78,9 @@ void ADC0_setADCChannel(ADC_Active_Channel_t chan)
 		
 		case ADC_AUDIO_Q:
 		{
-			if(g_adc_initialization != ADC_FREE_RUN_INITIALIZED)
+			if(g_adc_initialization != ADC_SINGLE_CONVERSION_INITIALIZED)
 			{
-				ADC0_SYSTEM_init(FREE_RUNNING);
+				ADC0_SYSTEM_init(SINGLE_CONVERSION);
 			}
 			
 			ADC0.MUXPOS = ADC_MUXPOS_AIN1_gc;
@@ -86,9 +89,9 @@ void ADC0_setADCChannel(ADC_Active_Channel_t chan)
 		
 		case ADC_I_AMPED:
 		{
-			if(g_adc_initialization != ADC_FREE_RUN_INITIALIZED)
+			if(g_adc_initialization != ADC_SINGLE_CONVERSION_INITIALIZED)
 			{
-				ADC0_SYSTEM_init(FREE_RUNNING);
+				ADC0_SYSTEM_init(SINGLE_CONVERSION);
 			}
 			
 			ADC0.MUXPOS = ADC_MUXPOS_AIN2_gc;
@@ -97,9 +100,9 @@ void ADC0_setADCChannel(ADC_Active_Channel_t chan)
 		
 		case ADC_Q_AMPED:
 		{
-			if(g_adc_initialization != ADC_FREE_RUN_INITIALIZED)
+			if(g_adc_initialization != ADC_SINGLE_CONVERSION_INITIALIZED)
 			{
-				ADC0_SYSTEM_init(FREE_RUNNING);
+				ADC0_SYSTEM_init(SINGLE_CONVERSION);
 			}
 			
 			ADC0.MUXPOS = ADC_MUXPOS_AIN3_gc;
@@ -156,13 +159,14 @@ void ADC0_setADCChannel(ADC_Active_Channel_t chan)
 		}
 		break;	
 	}
+	
+	return(freeRunning);
 }
 
 void ADC0_startConversion(void)
 {
 	if(g_adc_initialization != ADC_NOT_INITIALIZED)
 	{
-		ADC0.INTCTRL = 0x00; /* Disable interrupt */
 		ADC0.COMMAND = ADC_STCONV_bm; /* Start conversion */
 	}
 }
@@ -239,22 +243,21 @@ static void VREF0_init(void)
 
 static void ADC0_init(bool freerun)
 {
-	ADC0.CTRLC = ADC_PRESC_DIV64_gc;   /* CLK_PER divided by 4 => 24096 sps */
+	ADC0.CTRLC = ADC_PRESC_DIV128_gc;   /* CLK_PER divided by 128 and by 13.5 (10-bit conversion time = 13889 sps */
 	
 	if(freerun)
 	{
 		ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
-		| ADC_RESSEL_12BIT_gc      /* 12-bit mode */
+		| ADC_RESSEL_10BIT_gc      /* 12-bit mode */
 		| ADC_FREERUN_bm;          /* Enable Free-Run mode */
 		
 		ADC0.INTCTRL = 0x01; /* Enable interrupt */
-		
-		ADC0.COMMAND = ADC_STCONV_bm; /* Start conversion */
 		g_adc_initialization = ADC_FREE_RUN_INITIALIZED;
 	}
 	else
 	{
-		ADC0.CTRLA = ADC_ENABLE_bm;  /* ADC Enable: enabled; 12-bit mode is default */
+		ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
+		| ADC_RESSEL_12BIT_gc;      /* 12-bit mode */
 		ADC0.INTCTRL = 0x00; /* Disable interrupt */
 		g_adc_initialization = ADC_SINGLE_CONVERSION_INITIALIZED;
 	}
@@ -274,13 +277,13 @@ static void ADC0_SYSTEM_shutdown(void)
 	g_adc_initialization = ADC_NOT_INITIALIZED;
 }
 
-ISR(ADC0_RESRDY_vect)
-{
-	/* Clear the interrupt flag by reading the result */
-	int val = ADC0_read();
-//	LED_toggle_level();
-	if(g_goertzel.DataPoint(val))
-	{
-		ADC0.INTCTRL = 0x00; /* disable ADC interrupt */
-	}
-}
+// ISR(ADC0_RESRDY_vect)
+// {
+// 	/* Clear the interrupt flag by reading the result */
+// 	int val = ADC0_read();
+// //	LED_toggle_level();
+// 	if(g_goertzel.DataPoint(val))
+// 	{
+// 		ADC0.INTCTRL = 0x00; /* disable ADC interrupt */
+// 	}
+// }
