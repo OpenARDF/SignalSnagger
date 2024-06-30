@@ -122,14 +122,14 @@ static volatile SleepType g_sleepType = SLEEP_FOREVER;
 #define NUMBER_OF_POLLED_ADC_CHANNELS 3
 #define BATT_VOLTAGE_RESULT 2
 #define ASSI_NEAR 1
-static ADC_Active_Channel_t g_adcChannelOrder[NUMBER_OF_POLLED_ADC_CHANNELS] = { ADC_AUDIO_I, ADC_ASSI_NEAR, ADCBatteryVoltage };
+static ADC_Active_Channel_t g_adcChannelOrder[NUMBER_OF_POLLED_ADC_CHANNELS] = { ADC_I_AMPED, ADC_ASSI_NEAR, ADCBatteryVoltage };
 static const uint16_t g_adcChannelConversionPeriod_ticks[NUMBER_OF_POLLED_ADC_CHANNELS] = { 0, 0, 0 };
 static volatile uint16_t g_adcCountdownCount[NUMBER_OF_POLLED_ADC_CHANNELS] = { 1, 40000, 40000 };
 static volatile bool g_adcUpdated[NUMBER_OF_POLLED_ADC_CHANNELS] = { false, false, false };
 static volatile uint16_t g_lastConversionResult[NUMBER_OF_POLLED_ADC_CHANNELS];
 
 extern Goertzel g_goertzel;
-uint16_t g_goertzel_rssi = 0;
+uint32_t g_goertzel_rssi = 0;
 volatile uint16_t g_leftsense_closed_time = 0;
 volatile uint16_t g_rightsense_closed_time = 0;
 volatile uint16_t g_encoder_closed_time = 0;
@@ -142,7 +142,7 @@ volatile uint16_t g_encoder_presses_count = 0;
 volatile bool g_long_leftsense_press = false;
 volatile bool g_long_rightsense_press = false;
 volatile bool g_long_encoder_press = false;
-volatile uint16_t g_audio_gain = 100;
+volatile uint16_t g_audio_gain = 1;
 
 volatile uint16_t g_check_temperature = 0;
 
@@ -160,18 +160,18 @@ EepromManager g_ee_mgr;
 const int N = Goertzel_N;
 const float threshold = 500000. * (Goertzel_N / 100);
 const float sampling_freq = SAMPLE_RATE;
-const float pitch_frequencies[3] = { 300., 600., 900. };
+const float pitch_frequencies[3] = { 345., 622., 898. }; /* should be an integer multiple of SAMPLING_RATE/N (13889 / 201) */
 
 /* VREF start-up time */
 #define VREF_STARTUP_TIME       (50)
 /* Mask needed to get the 2 LSb for DAC Data Register */
 #define LSB_MASK                (0x03)
 /* Number of samples for a sine wave period */
-#define SINE_PERIOD_STEPS       (6)
+#define SINE_PERIOD_STEPS       (25)
 /* Sine wave amplitude */
-#define SINE_AMPLITUDE          (20) // (511)
+#define SINE_AMPLITUDE          (15) // (511)
 /* Sine wave DC offset */
-#define SINE_DC_OFFSET          (20) //(512)
+#define SINE_DC_OFFSET          (15) //(512)
 /* Frequency of the sine wave */
 #define SINE_FREQ               (200)
 /* Step delay for the loop */
@@ -227,7 +227,7 @@ void handle_1sec_tasks(void)
 ISR(TCA1_OVF_vect)
 {
 	static uint16_t top;
-	static uint8_t sineIndex = 0;
+// 	static uint8_t sineIndex = 0;
 	uint8_t x = TCA1.SINGLE.INTFLAGS;
 	
 	if(x & TCA_SINGLE_OVF_bm)
@@ -332,27 +332,22 @@ ISR(ADC0_RESRDY_vect)
 		
 		if(g_beep) 
 		{
-			if(g_audio_gain)
-			{
-				result += sineWave[sineIndex++];
-				result *= g_audio_gain;
-			}
-			else
-			{
-				result = sineWave[sineIndex++];
-			}
-			
+			result += sineWave[sineIndex++];			
 			if(sineIndex == SINE_PERIOD_STEPS) sineIndex = 0;
 			g_beep--;
 		}
+		
+		if(g_audio_gain > 4)
+		{
+			result = result << (g_audio_gain - 4);
+		}
 		else
 		{
-			result *= g_audio_gain;
+			result = result >> abs(g_audio_gain - 4);
 		}
 		
 		DAC0_setVal(result);
 		g_goertzel.DataPoint(sample);
-//		PORTC_toggle_pin_level(5);
 	}
 	
 	ADC0.INTFLAGS = (ADC_RESRDY_bm | ADC_WCMP_bm);
@@ -851,7 +846,7 @@ int main(void)
 	uint8_t hold_rf_gain_setting = 255;
 //	uint16_t hold_assi_result = 0;
 	uint16_t hold_audio_gain = 0;
-	uint16_t hold_goertzel_rssi = 0;
+	uint32_t hold_goertzel_rssi = 0;
 	bool splash_displayed = true;
 	uint8_t x;
 	EC ec;
@@ -910,7 +905,7 @@ int main(void)
 	}
 	g_text_buff.putString((char*)g_tempStr);
 	
-	ADC0_setADCChannel(g_adcChannelOrder[ADC_AUDIO_I]);
+	ADC0_setADCChannel(ADC_I_AMPED);
 	ADC0_startConversion();
 
 	while (1) {
@@ -952,14 +947,14 @@ int main(void)
 			if(hold_audio_gain != g_audio_gain)
 			{
 				hold_audio_gain = g_audio_gain;
-				sprintf(g_tempStr, "20A=%d  ", hold_audio_gain/10);
+				sprintf(g_tempStr, "20A=%d  ", hold_audio_gain);
 				g_text_buff.putString(g_tempStr);
 			}
 			
 			if(hold_goertzel_rssi != g_goertzel_rssi)
 			{
 				hold_goertzel_rssi = g_goertzel_rssi;
-				sprintf(g_tempStr, "30%u   ", hold_goertzel_rssi);
+				snprintf(g_tempStr, 10, "30%lu   ", hold_goertzel_rssi);
 				g_text_buff.putString(g_tempStr);
 			}
 			
@@ -1090,8 +1085,7 @@ int main(void)
 				
 				if(g_rotary_shaft_pressed)
 				{
-					if(g_audio_gain < 1000) g_audio_gain += 10;
-					g_audio_gain -= g_audio_gain % 10;
+					if(g_audio_gain < 10) g_audio_gain++;
 				}
 				else if(g_bothSense_pressed)
 				{
@@ -1120,8 +1114,7 @@ int main(void)
 				
 				if(g_rotary_shaft_pressed)
 				{
-					if(g_audio_gain) g_audio_gain -= 10;
-					g_audio_gain -= g_audio_gain % 10;					
+					if(g_audio_gain > 1) g_audio_gain--;
 				}
 				else if(g_bothSense_pressed)
 				{
@@ -1151,89 +1144,141 @@ int main(void)
 //======================================================		
 		if(g_goertzel.SamplesReady())
 		{
-			static float noiseLevel = 99999.;
-			float magnitudes[3];
-			float newNoiseLevel = noiseLevel;
-			int maxPitch = -1;
-			float maxPitchLevel = 0., minPitchLevel = 99999.;
+			static uint8_t init = 100;
+//			static float noiseLevel = 99999.;
+//			float magnitudes[3];
+			float level;
+// 			float newNoiseLevel = noiseLevel;
+// 			int maxPitch = -1;
+			static float maxPitchLevel = 0.;
+			static float minPitchLevel = 500.;
 
-			float largestY = 0;
-
-			bool signalDetected = false;
-			bool noiseDetected = false;
+// 			bool signalDetected = false;
+// 			bool noiseDetected = false;
 			int clipCount = 0;
 
-			for(int i = 0; i < 3; i++)
-			{
-				g_goertzel.SetTargetFrequency(pitch_frequencies[i]);    /* Initialize the object with the sampling frequency, # of samples and target freq */
-				magnitudes[i] = g_goertzel.Magnitude2(&clipCount);     /* Check samples for presence of the target frequency */
+			g_goertzel.SetTargetFrequency(pitch_frequencies[1]);    /* Initialize the object with the sampling frequency, # of samples and target freq */
+			level = g_goertzel.Magnitude2(&clipCount);     /* Check samples for presence of the target frequency */
+//			maxPitch = 1;
+			
+// 			for(int i = 0; i < 3; i++)
+// 			{
+// 				g_goertzel.SetTargetFrequency(pitch_frequencies[i]);    /* Initialize the object with the sampling frequency, # of samples and target freq */
+// 				magnitudes[i] = g_goertzel.Magnitude2(&clipCount);     /* Check samples for presence of the target frequency */
+// 
+// 				if(magnitudes[i] < noiseLevel)
+// 				{
+// 					newNoiseLevel = magnitudes[i];
+// 				}
+// 					
+// 				if(magnitudes[i] > maxPitchLevel)
+// 				{
+// 					maxPitch = i;
+// 					maxPitchLevel = magnitudes[i];
+// 				}
+// 				
+// 				if(magnitudes[i] < minPitchLevel)
+// 				{
+// 					minPitchLevel = magnitudes[i];
+// 				}
+// 			}
+				
+// 			bool centered = (maxPitch==1);
+// 			bool tooHigh = false;
+// 			bool tooLow = false;
+ 			bool saturation = (clipCount > 50);
+// 				
+// 			if(!centered)
+// 			{
+// 				tooHigh = maxPitch == 2;
+// 				tooLow = maxPitch == 0;
+// 			}
+// 				
+// 			noiseLevel = newNoiseLevel;
+// 				
+			float nominal;
 
-				if(magnitudes[i] < noiseLevel)
+			if(!saturation)
+			{				
+				if(init)
 				{
-					newNoiseLevel = magnitudes[i];
-				}
+					init--;
 					
-				if(magnitudes[i] > maxPitchLevel)
-				{
-					maxPitch = i;
-					maxPitchLevel = magnitudes[i];
-				}
-				
-				if(magnitudes[i] < minPitchLevel)
-				{
-					minPitchLevel = magnitudes[i];
-				}
-			}
-				
-			bool centered = (maxPitch==1);
-			bool tooHigh = false;
-			bool tooLow = false;
-			bool saturation = (clipCount > 50);
-				
-			if(!centered)
-			{
-				tooHigh = maxPitch == 2;
-				tooLow = maxPitch == 0;
-			}
-				
-			noiseLevel = newNoiseLevel;
-				
-			if(centered && !saturation)
-			{
-				signalDetected = true;
-				uint16_t hold = (uint16_t)(maxPitchLevel - minPitchLevel);
-				
-				if(g_goertzel_rssi > hold)
-				{
-					hold = g_goertzel_rssi - hold;
-					
-					if(hold < 200)
+					if(level > maxPitchLevel) 
 					{
-						g_goertzel_rssi--;
+						maxPitchLevel = level;
+					}
+				
+					if(level < minPitchLevel) 
+					{
+						minPitchLevel = level;
+					}			
+				}
+				else
+				{
+					bool newmax = false;
+					bool newmin = false;
+					
+					if(level > maxPitchLevel) 
+					{
+						maxPitchLevel = (5. * maxPitchLevel + level) / 6.;
+						newmax = true;
+					}
+				
+					if(level < minPitchLevel) 
+					{
+						minPitchLevel = (5. * minPitchLevel + level) / 6.;
+						newmin = true;
+					}
+					
+					if(!newmax && !newmin)
+					{
+						maxPitchLevel = (50. * maxPitchLevel + level) / 51.;
+						minPitchLevel = (50. * minPitchLevel + level) / 51.;
 					}
 					else
 					{
-						g_goertzel_rssi -= hold >> 4;
+						nominal = (maxPitchLevel + minPitchLevel) / 2.;
+					}
+										
+					if(level > nominal)
+					{
+						g_goertzel_rssi =  (uint32_t)(10. * log10f(maxPitchLevel));
 					}
 				}
-				else if(g_goertzel_rssi < hold)
-				{
-					hold = hold - g_goertzel_rssi;
-					
-					if(hold < 200)
-					{
-						g_goertzel_rssi++;
-					}
-					else
-					{
-						g_goertzel_rssi += hold >> 4;
-					}
-				}
+				
+				
+// 				if(g_goertzel_rssi > hold)
+// 				{
+// 					hold = g_goertzel_rssi - hold;
+// 					
+// 					if(hold < 200)
+// 					{
+// 						g_goertzel_rssi--;
+// 					}
+// 					else
+// 					{
+// 						g_goertzel_rssi -= hold >> 4;
+// 					}
+// 				}
+// 				else if(g_goertzel_rssi < hold)
+// 				{
+// 					hold = hold - g_goertzel_rssi;
+// 					
+// 					if(hold < 200)
+// 					{
+// 						g_goertzel_rssi++;
+// 					}
+// 					else
+// 					{
+// 						g_goertzel_rssi += hold >> 4;
+// 					}
+// 				}
 			}
-			else
-			{
-				noiseDetected = !saturation;
-			}
+// 			else
+// 			{
+// 				noiseDetected = !saturation;
+// 			}
 		}
 
 		

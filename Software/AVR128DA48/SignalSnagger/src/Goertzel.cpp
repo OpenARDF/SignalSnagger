@@ -68,7 +68,7 @@ void Goertzel::SetTargetFrequency(float target_frequency)
 	ResetGoertzel();
 }
 
-/* Call this routine before every "block" (size=N) of samples. */
+/* Call this routine before every sample "block" (size=N) of data. */
 void Goertzel::ResetGoertzel(void)
 {
 	Q2 = 0;
@@ -81,7 +81,7 @@ void Goertzel::ProcessSample(int sample)
 {
 	float Q0 = g_coeff * Q1 - Q2 + (float)(sample - ADCCENTER);
 
-	if(sample > 230)
+	if(sample > 1000)
 	{
 		highValueCount++;
 	}

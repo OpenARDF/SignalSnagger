@@ -31,7 +31,7 @@
 #include "Goertzel.h"
 
 #define SAMPLE_RATE 13889
-#define Goertzel_N 201
+#define Goertzel_N 101
 const int N = Goertzel_N;
 const float threshold = 500000. * (Goertzel_N / 100.);
 const float sampling_freq = SAMPLE_RATE;
@@ -78,9 +78,10 @@ bool ADC0_setADCChannel(ADC_Active_Channel_t chan)
 		
 		case ADC_AUDIO_Q:
 		{
-			if(g_adc_initialization != ADC_SINGLE_CONVERSION_INITIALIZED)
+			if(g_adc_initialization != ADC_FREE_RUN_INITIALIZED)
 			{
-				ADC0_SYSTEM_init(SINGLE_CONVERSION);
+				ADC0_SYSTEM_init(FREE_RUNNING);
+				freeRunning = true;
 			}
 			
 			ADC0.MUXPOS = ADC_MUXPOS_AIN1_gc;
@@ -89,9 +90,10 @@ bool ADC0_setADCChannel(ADC_Active_Channel_t chan)
 		
 		case ADC_I_AMPED:
 		{
-			if(g_adc_initialization != ADC_SINGLE_CONVERSION_INITIALIZED)
+			if(g_adc_initialization != ADC_FREE_RUN_INITIALIZED)
 			{
-				ADC0_SYSTEM_init(SINGLE_CONVERSION);
+				ADC0_SYSTEM_init(FREE_RUNNING);
+				freeRunning = true;
 			}
 			
 			ADC0.MUXPOS = ADC_MUXPOS_AIN2_gc;
@@ -100,9 +102,10 @@ bool ADC0_setADCChannel(ADC_Active_Channel_t chan)
 		
 		case ADC_Q_AMPED:
 		{
-			if(g_adc_initialization != ADC_SINGLE_CONVERSION_INITIALIZED)
+			if(g_adc_initialization != ADC_FREE_RUN_INITIALIZED)
 			{
-				ADC0_SYSTEM_init(SINGLE_CONVERSION);
+				ADC0_SYSTEM_init(FREE_RUNNING);
+				freeRunning = true;
 			}
 			
 			ADC0.MUXPOS = ADC_MUXPOS_AIN3_gc;
