@@ -74,10 +74,12 @@ static char g_tempStr[TEMPSTR_SIZE] = { '\0' };
 static volatile EC g_last_error_code = ERROR_CODE_NO_ERROR;
 static volatile SC g_last_status_code = STATUS_CODE_IDLE;
 
-static volatile bool g_powering_off = false;
-
 static volatile bool g_battery_measurements_active = false;
 static volatile uint16_t g_maximum_battery = 0;
+
+static volatile uint16_t g_powerdown_seconds = 300;
+static volatile bool g_headphones_detected = false;
+static volatile bool g_powering_off = false;
 
 static volatile int g_sendID_seconds_countdown = 0;
 static volatile uint16_t g_code_throttle = 50;
@@ -104,7 +106,6 @@ volatile bool g_display_active = false;
 
 static volatile bool g_sufficient_power_detected = false;
 static volatile bool g_enableHardwareWDResets = false;
-extern volatile bool g_tx_power_is_zero;
 extern uint16_t g_clock_calibration;
 
 static volatile bool g_go_to_sleep_now = false;
@@ -189,7 +190,6 @@ static volatile uint16_t g_beep = 0;
  *
  * These functions are available only within this file
  ************************************************************************/
-void handle_1sec_tasks(void);
 void wdt_init(WDReset resetType);
 EC hw_init(void);
 void powerDown5V(void);
@@ -207,6 +207,7 @@ ISR(RTC_CNT_vect)
     if (x & RTC_OVF_bm )
     {
         system_tick();
+		if(g_powerdown_seconds) g_powerdown_seconds--;
 		g_seconds_transition = true;
 		g_seconds_since_poweron++;
 		if(g_seconds_since_poweron == 2) g_rotary_enable = true;
@@ -214,13 +215,6 @@ ISR(RTC_CNT_vect)
 	}
  
     RTC.INTFLAGS = (RTC_OVF_bm | RTC_CMP_bm);
-}
-/**
-1-Second Interrupts:
-One-second counter based on RTC.
-*/
-void handle_1sec_tasks(void)
-{
 }
 
 /* ADC sampling timer interrupt */
@@ -377,7 +371,7 @@ ISR(TCB0_INT_vect)
 		fiftyMS++;
 		if(!(fiftyMS % 6))
 		{
-			uint8_t switch_bits = ((1 << SENSE_SWITCH_LEFT) | (1 << SENSE_SWITCH_RIGHT) | (1 << ENCODER_SWITCH));
+			uint8_t switch_bits = ((1 << SENSE_SWITCH_LEFT) | (1 << SENSE_SWITCH_RIGHT) | (1 << ENCODER_SWITCH) | (1 << HEADPHONE_DETECT));
 			holdSwitch = portAdebouncedVals() & switch_bits;
 			debounce();
 			nowSwitch = portAdebouncedVals() & switch_bits;
@@ -385,6 +379,13 @@ ISR(TCB0_INT_vect)
 			int8_t leftSense = holdSwitch & (1 << SENSE_SWITCH_LEFT);
 			int8_t rightSense = holdSwitch & (1 << SENSE_SWITCH_RIGHT);
 			int8_t encoderSwitch = holdSwitch & (1 << ENCODER_SWITCH);
+			int8_t headphones = holdSwitch & (1 << HEADPHONE_DETECT);
+			
+			if((g_headphones_detected = !headphones)) /* Set and check headphones presence */
+			{
+				g_powerdown_seconds = 60;
+			}
+			
 			
 			g_bothSense_pressed = false;
 			
@@ -837,6 +838,16 @@ static void sineWaveInit(void)
     }
 }
 
+void powerdown(void)
+{
+	PORTA_set_pin_level(PWR_5V_ENABLE, LOW);
+	PORTA_set_pin_level(POWER_ENABLE, LOW);
+	while(!g_headphones_detected);
+	
+	/* Should never reach here */
+	PORTA_set_pin_level(PWR_5V_ENABLE, HIGH);
+	PORTA_set_pin_level(POWER_ENABLE, HIGH);
+}
 
 int main(void)
 {
@@ -979,6 +990,13 @@ int main(void)
 				g_text_buff.getString(g_tempStr, &s);
 			}
 		}
+		
+		if(!g_powerdown_seconds)
+		{
+			/* Save EEPROM */
+			powerdown();
+		}
+
 		
 		if(g_handle_counted_leftsense_presses)
 		{
