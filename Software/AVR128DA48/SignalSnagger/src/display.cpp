@@ -11,8 +11,6 @@
 #include "binio.h"
 #include "port.h"
 
-#define DISPLAY_I2C_SLAVE_ADDR  0x78
-
 Display::Display(uint8_t i2cAddr) {
 	this->i2cAddr = i2cAddr;
 }

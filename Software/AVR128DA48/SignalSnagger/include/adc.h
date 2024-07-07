@@ -26,21 +26,27 @@
 #ifndef ADC_H_
 #define ADC_H_
 
+#define ADC12BIT 1
+#define ADC10BIT 0
+
 typedef enum {
-	ADC_AUDIO_I = 0,
-	ADC_AUDIO_Q = 1,
-	ADC_I_AMPED = 2,
-	ADC_Q_AMPED = 3,
-	ADC_ASSI_NEAR = 4,
-	ADC_ASSI_FAR = 5,
-	ADCBatteryVoltage = 7,
-	ADCTemperature
+	ADC_AUDIO_I = ADC_MUXPOS_AIN0_gc,
+	ADC_AUDIO_Q = ADC_MUXPOS_AIN1_gc,
+	ADC_I_AMPED = ADC_MUXPOS_AIN2_gc,
+	ADC_Q_AMPED = ADC_MUXPOS_AIN3_gc,
+	ADC_ASSI_NEAR = ADC_MUXPOS_AIN4_gc,
+	ADC_ASSI_FAR = ADC_MUXPOS_AIN5_gc,
+	ADCBatteryVoltage = ADC_MUXPOS_AIN7_gc,
+	ADCTemperature = ADC_MUXPOS_TEMPSENSE_gc,
+	ADC_NONE = MAX_UINT16
 } ADC_Active_Channel_t;
 
-bool ADC0_setADCChannel(ADC_Active_Channel_t chan);
 void ADC0_startConversion(void);
 bool ADC0_conversionDone(void);
 int ADC0_read(void);
 int16_t temperatureC(void);
+void ADC0_SYSTEM_init(bool twelveBit);
+void ADC0_SYSTEM_shutdown(void);
+
 
 #endif /* ADC_H_ */

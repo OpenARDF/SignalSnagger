@@ -36,6 +36,12 @@ extern volatile AntConnType g_antenna_connect_state;
 
 static volatile bool g_rx_initialized = false;
 volatile Frequency_Hz g_rx_frequency = EEPROM_TX_80M_FREQUENCY_DEFAULT;
+volatile Frequency_Hz g_frequency_low = EEPROM_TX_80M_FREQUENCY_DEFAULT;
+volatile Frequency_Hz g_frequency_med = EEPROM_TX_80M_FREQUENCY_DEFAULT;
+volatile Frequency_Hz g_frequency_hi = EEPROM_TX_80M_FREQUENCY_DEFAULT;
+volatile Frequency_Hz g_frequency_beacon = EEPROM_TX_80M_FREQUENCY_DEFAULT;
+
+Frequency_Hz g_frequency_memory[NUMBER_OF_FREQUENCY_CHANNELS];
 
 /*
  *       This function sets the VFO frequency (CLK0 of the Si5351) based on the intended frequency passed in by the parameter (freq),

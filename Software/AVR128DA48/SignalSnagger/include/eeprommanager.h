@@ -103,6 +103,8 @@ struct EE_prom
 	uint8_t days_to_run;
 	uint32_t guard4_32;
 	uint16_t i2c_failure_count;
+	Frequency_Hz frequency_memory[NUMBER_OF_FREQUENCY_CHANNELS];
+	FrequencyMode_t frequency_mode;
 };
 
 typedef enum
@@ -171,7 +173,9 @@ typedef enum
 	Guard4_31 = Clock_calibration + sizeof(uint16_t),				/**** Guard = 2 bytes ****/
 	Days_to_run = Guard4_31 + GUARDSIZE,   /* 1 byte */
 	Guard4_32 = Days_to_run + sizeof(uint8_t),	                    /**** Guard = 2 bytes ****/
-	I2C_failure_count = Guard4_32 + GUARDSIZE   /* 2 bytes */
+	I2C_failure_count = Guard4_32 + GUARDSIZE,   /* 2 bytes */
+	Frequency_Memory = I2C_failure_count + sizeof(uint16_t),
+	Frequency_Mode = Frequency_Memory + NUMBER_OF_FREQUENCY_CHANNELS * sizeof(Frequency_Hz)
 } EE_var_t;
 
 

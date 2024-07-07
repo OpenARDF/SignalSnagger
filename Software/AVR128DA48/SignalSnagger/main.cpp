@@ -33,24 +33,24 @@
  * Local Typedefs
  ************************************************************************/
 
-typedef enum
+enum WDReset
 {
 	WD_SW_RESETS,
 	WD_HW_RESETS,
 	WD_FORCE_RESET,
 	WD_DISABLE
-} WDReset;
+};
 
-typedef enum
+enum Awakened_t
 {
 	AWAKENED_INIT,
 	POWER_UP_START,
 	AWAKENED_BY_CLOCK,
 	AWAKENED_BY_ANTENNA,
 	AWAKENED_BY_BUTTONPRESS
-} Awakened_t;
+};
 
-typedef enum
+enum HardwareError_t
 {
 	HARDWARE_OK,
 	HARDWARE_NO_RTC = 0x01,
@@ -58,7 +58,15 @@ typedef enum
 	HARDWARE_NO_WIFI = 0x04,
 	HARDWARE_NO_12V = 0x08,
 	HARDWARE_NO_FET_BIAS = 0x10
-} HardwareError_t;
+};
+
+
+enum MenuState_t {
+	MenuOperational,
+	MenuFreqMemories,
+	NumberOfMenuStates
+	};
+
 
 #define QUAD_MASK ((1 << ROTARY_A_IN) | (ROTARY_B_IN))
 
@@ -69,6 +77,7 @@ typedef enum
  * Whenever possible limit globals' scope to this file using "static"
  * Use "volatile" for globals shared between ISRs and foreground
  ************************************************************************/
+
 #define TEMPSTR_SIZE 100
 static char g_tempStr[TEMPSTR_SIZE] = { '\0' };
 static volatile EC g_last_error_code = ERROR_CODE_NO_ERROR;
@@ -91,7 +100,7 @@ static volatile bool g_rotary_enable = false;
 static volatile int g_rotary_count = 0;
 static volatile int g_rotary_edges = 0;
 static volatile bool g_rotary_shaft_pressed = false;
-#define ROTARY_SYNC_DELAY 150
+#define ROTARY_SYNC_DELAY 75
 
 static volatile bool g_leftSense_pressed = false;
 static volatile bool g_rightSense_pressed = false;
@@ -100,6 +109,13 @@ static volatile bool g_bothSense_pressed = false;
 static uint8_t g_rf_gain_setting = 50;
 
 extern volatile Frequency_Hz g_rx_frequency;
+extern volatile Frequency_Hz g_frequency_low;
+extern volatile Frequency_Hz g_frequency_med;
+extern volatile Frequency_Hz g_frequency_hi;
+extern volatile Frequency_Hz g_frequency_beacon;
+extern Frequency_Hz g_frequency_memory[NUMBER_OF_FREQUENCY_CHANNELS];
+extern FrequencyMode_t g_frequency_mode;
+
 volatile bool g_seconds_transition = false;
 volatile time_t g_seconds_since_poweron = 0;
 volatile bool g_display_active = false;
@@ -114,20 +130,14 @@ static volatile time_t g_time_to_wake_up = 0;
 static volatile Awakened_t g_awakenedBy = POWER_UP_START;
 static volatile SleepType g_sleepType = SLEEP_FOREVER;
 
-// #define NUMBER_OF_POLLED_ADC_CHANNELS 4
-// static const uint16_t g_adcChannelConversionPeriod_ticks[NUMBER_OF_POLLED_ADC_CHANNELS] = { TIMER2_0_5HZ, TIMER2_0_5HZ, TIMER2_0_5HZ, TIMER2_5_8HZ };
-// static volatile uint16_t g_adcCountdownCount[NUMBER_OF_POLLED_ADC_CHANNELS] = { TIMER2_0_5HZ, TIMER2_0_5HZ, TIMER2_0_5HZ, TIMER2_5_8HZ };
-// static uint16_t g_ADCFilterThreshold[NUMBER_OF_POLLED_ADC_CHANNELS] = { 500, 500, 500, 500 };
-// static volatile bool g_adcUpdated[NUMBER_OF_POLLED_ADC_CHANNELS] = { false, false, false, false };
-// static volatile uint16_t g_lastConversionResult[NUMBER_OF_POLLED_ADC_CHANNELS];
-#define NUMBER_OF_POLLED_ADC_CHANNELS 3
-#define BATT_VOLTAGE_RESULT 2
-#define ASSI_NEAR 1
-static ADC_Active_Channel_t g_adcChannelOrder[NUMBER_OF_POLLED_ADC_CHANNELS] = { ADC_I_AMPED, ADC_ASSI_NEAR, ADCBatteryVoltage };
-static const uint16_t g_adcChannelConversionPeriod_ticks[NUMBER_OF_POLLED_ADC_CHANNELS] = { 0, 0, 0 };
-static volatile uint16_t g_adcCountdownCount[NUMBER_OF_POLLED_ADC_CHANNELS] = { 1, 40000, 40000 };
-static volatile bool g_adcUpdated[NUMBER_OF_POLLED_ADC_CHANNELS] = { false, false, false };
-static volatile uint16_t g_lastConversionResult[NUMBER_OF_POLLED_ADC_CHANNELS];
+#define NUMBER_OF_POLLED_ADC_CHANNELS 1
+#define TOTAL_OF_ALL_ADC_CHANNELS 8
+static const uint16_t g_adcChannelConversionPeriod_ticks[NUMBER_OF_POLLED_ADC_CHANNELS] = { 3000 };
+static volatile uint16_t g_adcCountdownCount[NUMBER_OF_POLLED_ADC_CHANNELS] = { 3000 };
+static volatile bool g_adcUpdated[NUMBER_OF_POLLED_ADC_CHANNELS] = { false };
+static volatile int16_t g_adcChannel2Slot[TOTAL_OF_ALL_ADC_CHANNELS] = { -1, -1, -1, -1, -1, -1, -1, 0 };
+static volatile uint16_t g_lastConversionResult[NUMBER_OF_POLLED_ADC_CHANNELS] = { 0 };
+static volatile ADC_Active_Channel_t g_active_ADC_sample = ADC_I_AMPED;
 
 extern Goertzel g_goertzel;
 uint32_t g_goertzel_rssi = 0;
@@ -153,8 +163,7 @@ Display display = Display();
 leds LEDS = leds();
 CircularStringBuff g_text_buff = CircularStringBuff(TEXT_BUFF_SIZE);
 
-EepromManager g_ee_mgr;
-
+EepromManager EEPromMgr;
 
 #define Goertzel_N 201
 #define SAMPLE_RATE 10000
@@ -183,6 +192,7 @@ static void sineWaveInit(void);
 /* Buffer to store the sine wave samples */
 uint16_t sineWave[SINE_PERIOD_STEPS];
 static volatile uint16_t g_beep = 0;
+static volatile uint8_t g_tick = 0;
 
 
 /***********************************************************************
@@ -194,6 +204,8 @@ void wdt_init(WDReset resetType);
 EC hw_init(void);
 void powerDown5V(void);
 void powerUp5V(void);
+char* externBatString(bool volts);
+uint8_t nextActiveMemory(uint8_t currentChan, bool up);
 
 Frequency_Hz getFrequencySetting(void);
 
@@ -218,97 +230,14 @@ ISR(RTC_CNT_vect)
 }
 
 /* ADC sampling timer interrupt */
-ISR(TCA1_OVF_vect)
-{
-	static uint16_t top;
-// 	static uint8_t sineIndex = 0;
-	uint8_t x = TCA1.SINGLE.INTFLAGS;
-	
-	if(x & TCA_SINGLE_OVF_bm)
-	{
-		static bool conversionInProcess = false;
-		static int8_t indexConversionInProcess = 0;
-		
-		for(uint8_t i = 0; i < NUMBER_OF_POLLED_ADC_CHANNELS; i++)
-		{
-			if(g_adcCountdownCount[i] && g_adcChannelConversionPeriod_ticks[i])
-			{
-				g_adcCountdownCount[i]--;
-			}
-		}
-
-		/**
-		 * Handle Periodic ADC Readings
-		 * The following algorithm allows multiple ADC channel readings to be performed at different polling intervals. */
- 		if(!conversionInProcess)
- 		{
-			indexConversionInProcess = -1;	
-			
-			for(uint8_t i = 0; i < NUMBER_OF_POLLED_ADC_CHANNELS; i++)
-			{
-				if(g_adcCountdownCount[i] == 0)
-				{
-					indexConversionInProcess = (int8_t)i;
-					break;
-				}
-			}
-
-			if(indexConversionInProcess >= 0)
-			{
-				g_adcCountdownCount[indexConversionInProcess] = g_adcChannelConversionPeriod_ticks[indexConversionInProcess];    /* reset the tick countdown */
-				ADC0_setADCChannel(g_adcChannelOrder[indexConversionInProcess]);
-				ADC0_startConversion();
-				conversionInProcess = true;
-			}
-		}
-		else if(ADC0_conversionDone())   /* wait for conversion to complete */
-		{
-			static uint16_t holdConversionResult;
-			uint16_t hold = ADC0_read(); //ADC;
-			
-			if((hold >= 0) && (hold < 4090))
-			{
-				holdConversionResult = hold; // (uint16_t)(((uint32_t)hold * ADC_REF_VOLTAGE_mV) >> 10);    /* millivolts at ADC pin */
-				uint16_t lastResult = g_lastConversionResult[indexConversionInProcess];
-
-				g_adcUpdated[indexConversionInProcess] = true;
-				
-				if(g_adcChannelOrder[indexConversionInProcess] == ADC_ASSI_NEAR)
-				{
-					if(holdConversionResult > lastResult)
-					{
-						g_lastConversionResult[indexConversionInProcess] = (holdConversionResult + (lastResult<<1)) / 3;
-					}
-					else
-					{
-						g_lastConversionResult[indexConversionInProcess] = (holdConversionResult + (lastResult<<3)) / 9;
-					}
-				}
-				else if(g_adcChannelOrder[indexConversionInProcess] == ADC_AUDIO_I)
-				{
-					DAC0_setVal(holdConversionResult);
- 					g_lastConversionResult[indexConversionInProcess] = holdConversionResult << 6;
-
-// 					DAC0_setVal(sineWave[sineIndex++]);
-// 					if(sineIndex == SINE_PERIOD_STEPS) sineIndex = 0;
-				}
-				else
-				{
-					g_lastConversionResult[indexConversionInProcess] = holdConversionResult;
-				}
-			}
-
-			conversionInProcess = false;
-		}
-		else
-		{
-			top = TCA1.SINGLE.PER;
-			TCA1.SINGLE.PER = ++top;
-		}
-	}
-
-	TCA1.SINGLE.INTFLAGS = (TCA_SINGLE_OVF_bm | TCA_SINGLE_CMP0_bm | TCA_SINGLE_CMP1_bm | TCA_SINGLE_CMP2_bm); /* clear all interrupt flags */
-}
+// ISR(TCA1_OVF_vect)
+// {
+// 	if(x & TCA_SINGLE_OVF_bm)
+// 	{
+// 	}
+// 
+// 	TCA1.SINGLE.INTFLAGS = (TCA_SINGLE_OVF_bm | TCA_SINGLE_CMP0_bm | TCA_SINGLE_CMP1_bm | TCA_SINGLE_CMP2_bm); /* clear all interrupt flags */
+// }
 
 
 /** 
@@ -320,28 +249,65 @@ ISR(ADC0_RESRDY_vect)
 	
 	if(x & ADC_RESRDY_bm)
 	{
+// 		static uint8_t indexSingleConversionInProcess = NO_ADC_SELECTED;
 		static uint8_t sineIndex = 0;
 		uint16_t sample = ADC0.RES;
 		uint16_t result = sample;
+// 		bool passAudio = true;
 		
-		if(g_beep) 
-		{
-			result += sineWave[sineIndex++];			
-			if(sineIndex == SINE_PERIOD_STEPS) sineIndex = 0;
-			g_beep--;
-		}
+// 		if(g_active_ADC_sample != ADC_I_AMPED)
+// 		{			
+// 			if(indexSingleConversionInProcess == NO_ADC_SELECTED) /* set up to take a single sample of another channel */
+// 			{
+// 				ADC0.MUXPOS = indexSingleConversionInProcess;
+// 				indexSingleConversionInProcess = g_active_ADC_sample;
+// 				ADC0.CTRLC = ADC_PRESC_DIV2_gc;
+// 				ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
+// 					| ADC_RESSEL_12BIT_gc      /* 12-bit mode */
+// 					| ADC_FREERUN_bm;          /* Enable Free-Run mode */
+// 			}
+// 			else /* read result of a single sample of another channel */
+// 			{
+// 					int16_t slot = g_adcChannel2Slot[indexSingleConversionInProcess];
+// 					g_lastConversionResult[slot] = result;
+// 					g_adcUpdated[slot] = true;
+// 					ADC0.MUXPOS = ADC_I_AMPED;
+// 					g_active_ADC_sample = ADC_I_AMPED;
+// 					ADC0.CTRLC = ADC_PRESC_DIV128_gc;
+// 					ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
+// 					| ADC_RESSEL_10BIT_gc      /* 10-bit mode */
+// 					| ADC_FREERUN_bm;          /* Enable Free-Run mode */
+//					indexSingleConversionInProcess = NO_ADC_SELECTED;
+// 					passAudio = false;
+// 			}
+// 		}
 		
-		if(g_audio_gain > 4)
+// 		if(passAudio)
 		{
-			result = result << (g_audio_gain - 4);
-		}
-		else
-		{
-			result = result >> abs(g_audio_gain - 4);
-		}
+			if(g_beep)
+			{
+				result += sineWave[sineIndex++];
+				if(sineIndex == SINE_PERIOD_STEPS) sineIndex = 0;
+				g_beep--;
+			}
+			else if(g_tick)
+			{
+				g_tick--;
+				result = 0;
+			}
 		
-		DAC0_setVal(result);
-		g_goertzel.DataPoint(sample);
+			if(g_audio_gain > 4)
+			{
+				result = result << (g_audio_gain - 4);
+			}
+			else
+			{
+				result = result >> abs(g_audio_gain - 4);
+			}
+		
+			DAC0_setVal(result);
+			g_goertzel.DataPoint(sample);
+		}
 	}
 	
 	ADC0.INTFLAGS = (ADC_RESRDY_bm | ADC_WCMP_bm);
@@ -386,7 +352,6 @@ ISR(TCB0_INT_vect)
 				g_powerdown_seconds = 60;
 			}
 			
-			
 			g_bothSense_pressed = false;
 			
 			if(!leftSense && rightSense)
@@ -422,6 +387,9 @@ ISR(TCB0_INT_vect)
 			if(holdSwitch != nowSwitch) /* Change detected */
 			{
 				int8_t changed = nowSwitch ^ holdSwitch;
+				
+				g_active_ADC_sample = ADCBatteryVoltage;
+				g_powerdown_seconds = 60;
 				
 				if(changed & (1 << SENSE_SWITCH_LEFT)) // left sense button changed
 				{
@@ -615,7 +583,7 @@ ISR(TCB0_INT_vect)
 			
 				if(!encoder_closures_count_period)
 				{
-					if(g_encoder_presses_count && (g_encoder_presses_count < 3))
+					if(g_encoder_presses_count && (g_encoder_presses_count < 4))
 					{
 						g_handle_counted_encoder_presses = g_encoder_presses_count;
 					}
@@ -650,7 +618,14 @@ ISR(TCB0_INT_vect)
 
 				if(!rotaryNoMotionCountdown)
 				{
-					val = ((val + 3) >> 2) << 2; // Round up and make divisible by 4
+					if(val>1)
+					{
+						val = 4;
+					}
+					else
+					{
+						val = 0; 
+					}
 				}
 			}
 			else
@@ -673,67 +648,21 @@ ISR(TCB0_INT_vect)
 			
 			g_rotary_edges = neg ? -val : val;
 		}
-
-							
-// 		/**
-// 		 * Handle Periodic ADC Readings
-// 		 * The following algorithm allows multiple ADC channel readings to be performed at different polling intervals. */
-//  		if(!conversionInProcess)
-//  		{
-// 			/* Note: countdowns will pause while a conversion is in process. Conversions are so fast that this should not be an issue though. */
-// 			indexConversionInProcess = -1;
-// 
-// 			for(uint8_t i = 0; i < NUMBER_OF_POLLED_ADC_CHANNELS; i++)
-// 			{
-// 				if(g_adcCountdownCount[i])
-// 				{
-// 					g_adcCountdownCount[i]--;
-// 				}
-// 
-// 				if(g_adcCountdownCount[i] == 0)
-// 				{
-// 					indexConversionInProcess = (int8_t)i;
-// 				}
-// 			}
-// 
-// 			if(indexConversionInProcess >= 0)
-// 			{
-// 				g_adcCountdownCount[indexConversionInProcess] = g_adcChannelConversionPeriod_ticks[indexConversionInProcess];    /* reset the tick countdown */
-// 				ADC0_setADCChannel(g_adcChannelOrder[indexConversionInProcess]);
-// 				ADC0_startConversion();
-// 				conversionInProcess = true;
-// 			}
-// 		}
-// 		else if(ADC0_conversionDone())   /* wait for conversion to complete */
+		
+		/* Non-continuous ADC conversions */
+// 		for(int i=0; i<NUMBER_OF_POLLED_ADC_CHANNELS; i++)
 // 		{
-// 			static uint16_t holdConversionResult;
-// 			uint16_t hold = ADC0_read(); //ADC;
-// 			
-// 			if((hold >= 0) && (hold < 4090))
+// 			if(g_adcCountdownCount[i])
 // 			{
-// 				holdConversionResult = hold; // (uint16_t)(((uint32_t)hold * ADC_REF_VOLTAGE_mV) >> 10);    /* millivolts at ADC pin */
-// 				uint16_t lastResult = g_lastConversionResult[indexConversionInProcess];
-// 
-// 				g_adcUpdated[indexConversionInProcess] = true;
+// 				g_adcCountdownCount[i]--;
 // 				
-// 				if(g_adcChannelOrder[indexConversionInProcess] == ADC_ASSI_NEAR)
+// 				if(!g_adcCountdownCount[i])
 // 				{
-// 					if(holdConversionResult > lastResult)
-// 					{
-// 						g_lastConversionResult[indexConversionInProcess] = (holdConversionResult + (lastResult<<1)) / 3;
-// 					}
-// 					else
-// 					{
-// 						g_lastConversionResult[indexConversionInProcess] = (holdConversionResult + (lastResult<<3)) / 9;
-// 					}
-// 				}
-// 				else
-// 				{
-// 					g_lastConversionResult[indexConversionInProcess] = holdConversionResult;
+// 					g_adcCountdownCount[i] = g_adcChannelConversionPeriod_ticks[i];
+// 					g_adcUpdated[i] = false;
+// 					g_active_ADC_sample = g_adcChannelSlot[i];
 // 				}
 // 			}
-// 
-// 			conversionInProcess = false;
 // 		}
     }
 
@@ -840,9 +769,11 @@ static void sineWaveInit(void)
 
 void powerdown(void)
 {
-	PORTA_set_pin_level(PWR_5V_ENABLE, LOW);
+	EEPromMgr.saveAllEEPROM();
+	powerDown5V();
 	PORTA_set_pin_level(POWER_ENABLE, LOW);
-	while(!g_headphones_detected);
+//	while(!g_headphones_detected);
+	while(1);
 	
 	/* Should never reach here */
 	PORTA_set_pin_level(PWR_5V_ENABLE, HIGH);
@@ -852,15 +783,22 @@ void powerdown(void)
 int main(void)
 {
 	sineWaveInit();
+	
+	MenuState_t menuState = MenuOperational;
+	uint8_t activeMemory = 0;
+	uint8_t hold_activeMemory = 0;
+	Frequency_Hz hold_activeMemoryFreq = 0;
+	
 
 	Frequency_Hz hold_rx_frequency = 0;
 	uint8_t hold_rf_gain_setting = 255;
 //	uint16_t hold_assi_result = 0;
 	uint16_t hold_audio_gain = 0;
 	uint32_t hold_goertzel_rssi = 0;
-	bool splash_displayed = true;
+	bool refresh_display = true;
 	uint8_t x;
 	EC ec;
+	bool inhibit_long_encoder_press = false;
 	
 	atmel_start_init();
 
@@ -870,7 +808,10 @@ int main(void)
 		x = si5351_get_status() & 0x80;
 	}
 	
-	ec = init_receiver((Frequency_Hz)3570500);
+	EEPromMgr.initializeEEPROMVars();
+	EEPromMgr.readNonVols();
+	
+	ec = init_receiver(g_rx_frequency);
 	
 	if(ec != ERROR_CODE_NO_ERROR)
 	{
@@ -916,61 +857,144 @@ int main(void)
 	}
 	g_text_buff.putString((char*)g_tempStr);
 	
-	ADC0_setADCChannel(ADC_I_AMPED);
+	/* Start audio flow */
+	ADC0.MUXPOS = ADC_I_AMPED; 
+	ADC0_SYSTEM_init(ADC10BIT);
 	ADC0_startConversion();
 
-	while (1) {
+	while (1) 
+	{
 		if(g_display_active)
 		{
-			if(splash_displayed)
+			if(refresh_display)
 			{
-				splash_displayed = false;
+				refresh_display = false;
 				display.cls();
 				hold_rx_frequency = 0; /* force update */
 				hold_rf_gain_setting = 0xff; /* force update */
+				hold_audio_gain = 0xff; /* force update */
+				hold_activeMemory = 0xff; /* force update */
+				hold_goertzel_rssi = 0; /* force update */
 			}
 			
-			if(hold_rx_frequency != g_rx_frequency)
+			switch(menuState)
 			{
-				char str[11];
-				hold_rx_frequency = g_rx_frequency;
+				case MenuOperational:
+				{
+					char str[11];
+					if(g_frequency_mode == MODE_FREQUENCY)
+					{	
+						if(hold_rx_frequency != g_rx_frequency)
+						{
+							hold_rx_frequency = g_rx_frequency;
+				
+							frequencyString(str, hold_rx_frequency);
+							sprintf(g_tempStr, "00%s", str);
+							g_text_buff.putString(g_tempStr);
+						}
+					}
+					else
+					{
+						if(hold_activeMemory != activeMemory)
+						{
+							hold_activeMemory = activeMemory;
+							hold_rx_frequency = g_rx_frequency;
+						
+							frequencyString(str, hold_rx_frequency);
+							snprintf(g_tempStr, 13, "00M%02d %s", hold_activeMemory + 1, str);
+							g_text_buff.putString(g_tempStr);
+						}
+					}
 			
-				frequencyString(str, hold_rx_frequency);
-				sprintf(g_tempStr, "00%s", str);
-				g_text_buff.putString(g_tempStr);
-			}
-		
-			if(hold_rf_gain_setting != g_rf_gain_setting)
-			{
-				hold_rf_gain_setting = g_rf_gain_setting;
+					if(hold_rf_gain_setting != g_rf_gain_setting)
+					{
+						hold_rf_gain_setting = g_rf_gain_setting;
+				
+						sprintf(g_tempStr, "10RF=%d  ", 100 - g_rf_gain_setting);
+						g_text_buff.putString(g_tempStr);
+					}
 			
-				sprintf(g_tempStr, "10RF=%d  ", 100 - g_rf_gain_setting);
-				g_text_buff.putString(g_tempStr);
-			}
-			
-// 			if(hold_assi_result != g_lastConversionResult[ASSI_NEAR])
-// 			{
-// 				hold_assi_result = g_lastConversionResult[ASSI_NEAR];
-// 				sprintf(g_tempStr, "30S=%d  ", hold_assi_result);
-// 				g_text_buff.putString(g_tempStr);
-// 			}
+					// 			if(hold_assi_result != g_lastConversionResult[ASSI_NEAR])
+					// 			{
+					// 				hold_assi_result = g_lastConversionResult[ASSI_NEAR];
+					// 				sprintf(g_tempStr, "30S=%d  ", hold_assi_result);
+					// 				g_text_buff.putString(g_tempStr);
+					// 			}
 
-			if(hold_audio_gain != g_audio_gain)
-			{
-				hold_audio_gain = g_audio_gain;
-				sprintf(g_tempStr, "20A=%d  ", hold_audio_gain);
-				g_text_buff.putString(g_tempStr);
-			}
+					if(hold_audio_gain != g_audio_gain)
+					{
+						hold_audio_gain = g_audio_gain;
+						sprintf(g_tempStr, "20A=%d  ", hold_audio_gain);
+						g_text_buff.putString(g_tempStr);
+					}
 			
-			if(hold_goertzel_rssi != g_goertzel_rssi)
-			{
-				hold_goertzel_rssi = g_goertzel_rssi;
-				snprintf(g_tempStr, 10, "30%lu   ", hold_goertzel_rssi);
-				g_text_buff.putString(g_tempStr);
-			}
+					if(hold_goertzel_rssi != g_goertzel_rssi)
+					{
+						hold_goertzel_rssi = g_goertzel_rssi;
+						snprintf(g_tempStr, 7, "30%lu ", hold_goertzel_rssi);
+						g_text_buff.putString(g_tempStr);
+					}
 			
+					// 			int16_t slot = g_adcChannel2Slot[ADCBatteryVoltage];
+					// 			ADC0_startConversion();
+					// 			while(!ADC0_conversionDone());
+					// 			g_lastConversionResult[slot] = ADC0.RES;
+					// 			g_adcUpdated[slot] = true;
+					// 			if(g_adcUpdated[slot])
+					// 			{
+					// // 				uint16_t volts = g_lastConversionResult[slot];
+					// 				g_adcUpdated[slot] = false;
+					// 				snprintf(g_tempStr, 7, "25%sV", externBatString(true));
+					// 				g_text_buff.putString(g_tempStr);
+					// 			}
+				}
+				break;
+				
+				case MenuFreqMemories:
+				{
+					Frequency_Hz chanF = g_frequency_memory[activeMemory];
+										
+					/* Reset any corrupted memory locations */
+					if((chanF > 4000000) || (chanF < 3500000))
+					{
+						g_frequency_memory[activeMemory] = 0;
+						chanF = 0;
+					}
+
+					if((hold_activeMemory != activeMemory) || (hold_activeMemoryFreq != chanF))
+					{
+						hold_activeMemory = activeMemory;
+						hold_activeMemoryFreq = chanF;
+						
+						snprintf(g_tempStr, 13, "00Memory %02d", hold_activeMemory + 1);
+						g_text_buff.putString(g_tempStr);
+						
+						char str[11];
+						chanF = g_frequency_memory[hold_activeMemory];
+						
+						if(chanF)
+						{
+							frequencyString(str, chanF);
+							snprintf(g_tempStr, 13, "20  %s  ", str);
+							g_text_buff.putString(g_tempStr);
+						}
+						else
+						{
+							snprintf(g_tempStr, 13, "20* EMPTY **");
+							g_text_buff.putString(g_tempStr);
+						}
+					}
+				}
+				break;
+				
+				default:
+				{
+					menuState = MenuOperational;
+				}
+			}
 		}
-		
+			
+				
 		if(g_text_buff.size())
 		{
 			size_t s;
@@ -1060,6 +1084,21 @@ int main(void)
 			{
 // 				LEDS.blink(LEDS_RED_AND_GREEN_BLINK_SLOW);
 			}
+			else if (g_handle_counted_encoder_presses == 3)
+			{
+				if((g_frequency_mode == MODE_FREQUENCY) && (nextActiveMemory(activeMemory, UP) != 0xFF))
+				{
+					g_frequency_mode = MODE_MEMORY;
+					g_rx_frequency = g_frequency_memory[activeMemory];
+					si5351_set_quad_frequency(g_rx_frequency);					
+				}
+				else
+				{
+					g_frequency_mode = MODE_FREQUENCY;
+				}
+				
+				refresh_display = true;
+			}
 			
 			g_handle_counted_encoder_presses = 0;
 		}
@@ -1073,8 +1112,41 @@ int main(void)
 		if(g_long_encoder_press)
 		{
 			g_long_encoder_press = false;
-// 			LEDS.init(LEDS_GREEN_ON_CONSTANT);
-// 			LEDS.blink(LEDS_RED_ON_CONSTANT);
+
+			if(!inhibit_long_encoder_press)
+			{
+				EEPromMgr.saveAllEEPROM();
+			
+				if(menuState == MenuOperational)
+				{
+					menuState = MenuFreqMemories;
+					LEDS.blink(LEDS_RED_AND_GREEN_BLINK_SLOW);
+					activeMemory = 0;
+				
+					Frequency_Hz f = g_frequency_memory[activeMemory];
+				
+					if((f > 4000000) || (f < 3500000))
+					{
+						g_frequency_memory[activeMemory] = 0;
+						f = 0;
+					}
+
+					if(f)
+					{
+						g_rx_frequency = f;
+						si5351_set_quad_frequency(g_rx_frequency);
+					}
+				}
+				else
+				{
+					g_rx_frequency = g_frequency_memory[activeMemory];
+					si5351_set_quad_frequency(g_rx_frequency);
+					menuState = MenuOperational;
+					LEDS.blink(LEDS_OFF);
+				}
+			
+				refresh_display = true;
+			}
 		}
 		
 		if(g_last_error_code)
@@ -1092,71 +1164,165 @@ int main(void)
 		/*********************************
 		* Handle Rotary Encoder Turns
 		*********************************/
+		if(!g_rotary_shaft_pressed) inhibit_long_encoder_press = false;
+		
 		if(g_rotary_count)
 		{
 			uint8_t pwm = g_rf_gain_setting;
 			
+			g_powerdown_seconds = 60;
+			inhibit_long_encoder_press = g_rotary_shaft_pressed;
+			
 			if(g_rotary_count < 0)
 			{
-// 				LEDS.blink(LEDS_GREEN_BLINK_FAST);
-// 				LEDS.blink(LEDS_RED_ON_CONSTANT);
-				
-				if(g_rotary_shaft_pressed)
+				switch(menuState)
 				{
-					if(g_audio_gain < 10) g_audio_gain++;
-				}
-				else if(g_bothSense_pressed)
-				{
-					if(g_leftSense_pressed)
+					case MenuOperational:
 					{
-						g_rx_frequency += 1000;
-					}
-					else
-					{
-						g_rx_frequency += 100;
-					}
+						if(g_rotary_shaft_pressed)
+						{
+							if(g_audio_gain < 10) 
+							{
+								g_audio_gain++;
+								g_tick++;
+							}
+						}
+						else if(g_bothSense_pressed)
+						{
+							if(g_frequency_mode == MODE_FREQUENCY)
+							{
+								g_rx_frequency += 100;
+							}
+							else
+							{
+								activeMemory = nextActiveMemory(activeMemory, UP);
+								g_rx_frequency = g_frequency_memory[activeMemory];
+							}
 
-					si5351_set_quad_frequency(g_rx_frequency);
-				}
-				else
-				{
-					if(pwm) setPWM(--pwm);
+							si5351_set_quad_frequency(g_rx_frequency);
+						}
+						else
+						{
+							if(pwm)
+							{
+								setPWM(--pwm);
+								g_tick++;
+							}
+						}
+						
+						g_rx_frequency = si5351_get_frequency(SI5351_CLK0);			
+						g_rf_gain_setting = getPWM();
+					}
+					break;
+					
+					case MenuFreqMemories:
+					{
+						if(g_rotary_shaft_pressed)
+						{
+							g_rx_frequency += 100;
+							g_frequency_memory[activeMemory] = g_rx_frequency;
+						}
+						else
+						{
+							activeMemory++;
+							if(activeMemory >= NUMBER_OF_FREQUENCY_CHANNELS) activeMemory = 0;
+							
+							Frequency_Hz f = g_frequency_memory[activeMemory];
+							
+							if((f < MAX_RX_FREQUENCY) && (f > MIN_RX_FREQUENCY))
+							{
+								g_rx_frequency = g_frequency_memory[activeMemory];
+							}
+						}
+						
+						si5351_set_quad_frequency(g_rx_frequency);							
+					}
+					break;
+					
+					default:
+					break;
 				}
 				
 				g_rotary_count++;
 			}
 			else
 			{
-// 				LEDS.blink(LEDS_RED_BLINK_FAST);
-// 				LEDS.blink(LEDS_GREEN_ON_CONSTANT);
-				
-				if(g_rotary_shaft_pressed)
+				switch(menuState)
 				{
-					if(g_audio_gain > 1) g_audio_gain--;
-				}
-				else if(g_bothSense_pressed)
-				{
-					if(g_leftSense_pressed)
+					case MenuOperational:
 					{
-						g_rx_frequency -= 1000;
-					}
-					else
-					{
-						g_rx_frequency -= 100;
-					}
+						if(g_rotary_shaft_pressed)
+						{
+							if(g_audio_gain > 1) 
+							{
+								g_audio_gain--;
+								g_tick++;
+							}
+						}
+						else if(g_bothSense_pressed)
+						{
+							if(g_frequency_mode == MODE_FREQUENCY)
+							{
+								g_rx_frequency -= 100;
+							}
+							else
+							{
+								activeMemory = nextActiveMemory(activeMemory, !UP);
+								g_rx_frequency = g_frequency_memory[activeMemory];
+							}
 
-					si5351_set_quad_frequency(g_rx_frequency);
-				}
-				else
-				{
-					if(pwm < 100) setPWM(++pwm);
+							si5351_set_quad_frequency(g_rx_frequency);
+						}
+						else
+						{
+							if(pwm < 100) 
+							{
+								setPWM(++pwm);
+								g_tick++;
+							}
+						}
+						
+						g_rx_frequency = si5351_get_frequency(SI5351_CLK0);			
+						g_rf_gain_setting = getPWM();
+					}
+					break;
+					
+					case MenuFreqMemories:
+					{
+						if(g_rotary_shaft_pressed)
+						{
+							g_rx_frequency -= 100;
+							g_frequency_memory[activeMemory] = g_rx_frequency;
+						}
+						else
+						{
+							if(activeMemory == 0) 
+							{
+								activeMemory = NUMBER_OF_FREQUENCY_CHANNELS-1;
+							}
+							else
+							{
+								activeMemory--;
+							}
+							
+							Frequency_Hz f = g_frequency_memory[activeMemory];
+							
+							if((f < MAX_RX_FREQUENCY) && (f > MIN_RX_FREQUENCY))
+							{
+								g_rx_frequency = g_frequency_memory[activeMemory];
+							}
+						}
+						
+						si5351_set_quad_frequency(g_rx_frequency);							
+					}
+					break;
+					
+					default:
+					break;
 				}
 
 				g_rotary_count--;
-			}
-			
-			g_rx_frequency = si5351_get_frequency(SI5351_CLK0);			
-			g_rf_gain_setting = getPWM();
+			}		
 		}
 				
 //======================================================		
@@ -1379,25 +1545,28 @@ Frequency_Hz getFrequencySetting(void)
 // Caller must provide a pointer to a string of length 6 or greater.
 char* externBatString(bool volts)
 {
+	static float filtered = 78.0;
 	static char str[7] = "?";
 	char* pstr = str;
-	float bat = (float)g_lastConversionResult[BATT_VOLTAGE_RESULT];
-	bat *= 172.;
-	bat *= 0.0005;
-	bat += 1.;
+	float bat = (float)g_lastConversionResult[g_adcChannel2Slot[ADCBatteryVoltage]];
+	bat *= 288.;
+	bat /= 4096.;
+	bat += 2.;
+	
+	filtered = (bat + 9*filtered) / 10.;
 	
 	if((bat >= 0.) && (bat <= 180.))
 	{
 		if(volts)
 		{
-			dtostrf(bat/10., 5, 1, str);
+			dtostrf(filtered/10., 5, 1, str);
 			str[6] = '\0';
 			pstr = trimwhitespace(str);
 			return pstr;
 		}
 		else
 		{
-			dtostrf(bat, 4, 0, str);		
+			dtostrf(filtered, 4, 0, str);		
 			str[5] = '\0';
 			return str;
 		}
@@ -1441,4 +1610,51 @@ char *trimwhitespace(char *str)
   end[1] = '\0';
 
   return str;
+}
+
+uint8_t nextActiveMemory(uint8_t currentChan, bool up)
+{
+	uint8_t i = currentChan;
+	uint8_t count = 0;
+	bool done = false;
+	
+	if(up)
+	{	
+		while(!done && (count < NUMBER_OF_FREQUENCY_CHANNELS))
+		{
+			i++;
+			if(i >= NUMBER_OF_FREQUENCY_CHANNELS)
+			{
+				i = 0;
+			}
+			
+			if(g_frequency_memory[i])
+			{
+				done = true;
+			}
+		}
+	}
+	else
+	{
+		while(!done && (count < NUMBER_OF_FREQUENCY_CHANNELS))
+		{
+			if(i)
+			{
+				i--;
+			}
+			else
+			{
+				i = NUMBER_OF_FREQUENCY_CHANNELS -1;
+			}
+			
+			if(g_frequency_memory[i])
+			{
+				done = true;
+			}
+		}
+	}
+	
+	if(!done) i = 0xFF;
+	
+	return(i);
 }

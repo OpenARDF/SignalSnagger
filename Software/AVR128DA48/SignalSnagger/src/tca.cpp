@@ -53,29 +53,11 @@ void TIMERA_init(void)
 	PORTE_set_pin_dir(3, PORT_DIR_IN);
 	PORTE_set_pin_pull_mode(3, PORT_PULL_OFF);
 	
-#ifdef TCA0_USE_SPLIT
-	TCA0.SPLIT.CTRLD |= TCA_SINGLE_SPLITM_bm;
-	TCA0.SPLIT.HPER = 0xFF; /* Set timer period to 10 kHz */
-	PORTMUX.TCAROUTEA = PORTMUX_TCA0_PORTE_gc; /* Port multiplexer PWM WO3 out on PE3 */ 
-	TCA0.SPLIT.CTRLB |= TCA_SPLIT_HCMP0EN_bm; /* Set waveform generation mode single-slope, and enable compare channel */
-	TCA0.SPLIT.HCMP0 = TCA0.SPLIT.HPER >> 1; /* Start at 50% duty cycle */
-	g_pwm_setting = 50;
-	TCA0.SPLIT.CTRLB |= (TCA_SPLIT_HCMP0EN_bm); /* enable high compare channel 0 */
-	TCA0.SPLIT.CTRLA |= (TCA_SPLIT_CLKSEL_DIV8_gc | TCA_SPLIT_ENABLE_bm); /* enable TimerA0 */
-#else
-//	TCA0.SINGLE.PER = 0x0950; /* Set timer period to 10 kHz */
-//	TCA0.SINGLE.PER = 0x03E8; /* Set timer period to 24 kHz */
-//	TCA0.SINGLE.PER = 0x12A0; /* Set timer period to 5 kHz */
-//	TCA0.SINGLE.PER = 0x2580; /* Set timer period to 2.5 kHz */
+	TCA0.SINGLE.PER = 0x2580; /* Set timer period to 2.5 kHz */
 	PORTMUX.TCAROUTEA = PORTMUX_TCA0_PORTE_gc; /* PWM WO2 out on PE2 */
 	TCA0.SINGLE.CTRLB = TCA_SINGLE_CMP2EN_bm | TCA_SINGLE_WGMODE_SINGLESLOPE_gc; /* Set waveform generation mode single-slope, and enable compare channel */
 	setPWM(MAX_PWM_SETTING/2); /* Start at 50% duty cycle */
 	TCA0.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm; /* enable TimerA0 */
-#endif
-
-// 	TCA1.SINGLE.PER = 0x0950; /* Set ADC timer to ~10 kHz */
-// 	TCA1.SINGLE.INTCTRL |= TCA_SINGLE_OVF_bm;
-// 	TCA1.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm; /* enable TimerA1 */
 }
 
 void setPWM(uint16_t duty)

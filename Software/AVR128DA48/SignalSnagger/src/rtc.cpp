@@ -30,7 +30,7 @@
 #include "tcb.h"
 #include "eeprommanager.h"
 
-extern EepromManager g_ee_mgr;
+extern EepromManager EEPromMgr;
 static bool use_backup_clock = false;
 uint16_t g_clock_calibration = EEPROM_CLOCK_CALIBRATION_DEFAULT;
 
@@ -142,5 +142,5 @@ void RTC_set_calibration(uint16_t cal)
 	}
 	
 	g_clock_calibration = cal;
-	g_ee_mgr.updateEEPROMVar(Clock_calibration, (void*)&g_clock_calibration);
+	EEPromMgr.updateEEPROMVar(Clock_calibration, (void*)&g_clock_calibration);
 }

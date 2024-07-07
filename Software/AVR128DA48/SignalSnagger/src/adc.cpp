@@ -45,10 +45,8 @@ volatile int16_t g_adcVal;
 Goertzel g_goertzel(N, sampling_freq);
 
 static void PORT_init(void);
-static void VREF0_init(void);
-static void ADC0_init(bool freerun);
-static void ADC0_SYSTEM_init(bool freerun);
-static void ADC0_SYSTEM_shutdown(void);
+static void ADC0_Freerun_Init(bool twelveBit);
+// static void ADC0_Single_Init(bool twelveBit);
 
 typedef enum {
 	ADC_NOT_INITIALIZED,
@@ -58,113 +56,6 @@ typedef enum {
 	
 static ADC_Init_t g_adc_initialization = ADC_NOT_INITIALIZED;
 
-bool ADC0_setADCChannel(ADC_Active_Channel_t chan)
-{
-	bool freeRunning = false;
-	
-	switch(chan)
-	{
-		case ADC_AUDIO_I:
-		{
-			if(g_adc_initialization != ADC_FREE_RUN_INITIALIZED)
-			{
-				ADC0_SYSTEM_init(FREE_RUNNING);
-				freeRunning = true;
-			}
-			
-			ADC0.MUXPOS = ADC_MUXPOS_AIN0_gc;
-		}
-		break;
-		
-		case ADC_AUDIO_Q:
-		{
-			if(g_adc_initialization != ADC_FREE_RUN_INITIALIZED)
-			{
-				ADC0_SYSTEM_init(FREE_RUNNING);
-				freeRunning = true;
-			}
-			
-			ADC0.MUXPOS = ADC_MUXPOS_AIN1_gc;
-		}
-		break;
-		
-		case ADC_I_AMPED:
-		{
-			if(g_adc_initialization != ADC_FREE_RUN_INITIALIZED)
-			{
-				ADC0_SYSTEM_init(FREE_RUNNING);
-				freeRunning = true;
-			}
-			
-			ADC0.MUXPOS = ADC_MUXPOS_AIN2_gc;
-		}
-		break;
-		
-		case ADC_Q_AMPED:
-		{
-			if(g_adc_initialization != ADC_FREE_RUN_INITIALIZED)
-			{
-				ADC0_SYSTEM_init(FREE_RUNNING);
-				freeRunning = true;
-			}
-			
-			ADC0.MUXPOS = ADC_MUXPOS_AIN3_gc;
-		}
-		break;
-		
-		case ADC_ASSI_NEAR:
-		{
-			if(g_adc_initialization != ADC_SINGLE_CONVERSION_INITIALIZED)
-			{
-				ADC0_SYSTEM_init(SINGLE_CONVERSION);
-			}
-			
-			ADC0.MUXPOS = ADC_MUXPOS_AIN4_gc;
-		}
-		break;
-		
-		case ADC_ASSI_FAR:
-		{
-			if(g_adc_initialization != ADC_SINGLE_CONVERSION_INITIALIZED)
-			{
-				ADC0_SYSTEM_init(SINGLE_CONVERSION);
-			}
-			
-			ADC0.MUXPOS = ADC_MUXPOS_AIN5_gc;
-		}
-		break;
-		
-		case ADCBatteryVoltage:
-		{
-			if(g_adc_initialization != ADC_SINGLE_CONVERSION_INITIALIZED)
-			{
-				ADC0_SYSTEM_init(SINGLE_CONVERSION);
-			}
-			
-			ADC0.MUXPOS = ADC_MUXPOS_AIN7_gc;
-		}
-		break;
-		
-		case ADCTemperature:
-		{
-			if(g_adc_initialization != ADC_SINGLE_CONVERSION_INITIALIZED)
-			{
-				ADC0_SYSTEM_init(SINGLE_CONVERSION);
-			}
-			
-			ADC0.MUXPOS = ADC_MUXPOS_TEMPSENSE_gc;
-		}
-		break;
-		
-		default:
-		{
-			ADC0_SYSTEM_shutdown();
-		}
-		break;	
-	}
-	
-	return(freeRunning);
-}
 
 void ADC0_startConversion(void)
 {
@@ -195,7 +86,8 @@ int16_t temperatureC(void)
 	uint8_t holdMux;
 	
 	holdMux = ADC0.MUXPOS;
-	ADC0_SYSTEM_init(SINGLE_CONVERSION);
+	ADC0.CTRLA |= ADC_ENABLE_bm /* ADC Enable: enabled */
+	| ADC_RESSEL_12BIT_gc;      /* 12-bit mode */
 	ADC0.MUXPOS = ADC_MUXPOS_TEMPSENSE_gc;
 	ADC0_startConversion();
 	
@@ -219,6 +111,12 @@ int16_t temperatureC(void)
 
 static void PORT_init(void)
 {
+	/* Disable interrupt and digital input buffer on PD0 */
+	PORTD.PIN0CTRL &= ~PORT_ISC_gm;
+	PORTD.PIN0CTRL |= PORT_ISC_INPUT_DISABLE_gc;
+	/* Disable interrupt and digital input buffer on PD1 */
+	PORTD.PIN1CTRL &= ~PORT_ISC_gm;
+	PORTD.PIN1CTRL |= PORT_ISC_INPUT_DISABLE_gc;
 	/* Disable interrupt and digital input buffer on PD2 */
 	PORTD.PIN2CTRL &= ~PORT_ISC_gm;
 	PORTD.PIN2CTRL |= PORT_ISC_INPUT_DISABLE_gc;
@@ -231,49 +129,74 @@ static void PORT_init(void)
 	/* Disable interrupt and digital input buffer on PD5 */
 	PORTD.PIN5CTRL &= ~PORT_ISC_gm;
 	PORTD.PIN5CTRL |= PORT_ISC_INPUT_DISABLE_gc;
+	/* Disable interrupt and digital input buffer on PD7 */
+	PORTD.PIN7CTRL &= ~PORT_ISC_gm;
+	PORTD.PIN7CTRL |= PORT_ISC_INPUT_DISABLE_gc;
 	
 	/* Disable pull-up resistor */
+	PORTD.PIN0CTRL &= ~PORT_PULLUPEN_bm;
+	PORTD.PIN1CTRL &= ~PORT_PULLUPEN_bm;
 	PORTD.PIN2CTRL &= ~PORT_PULLUPEN_bm;
 	PORTD.PIN3CTRL &= ~PORT_PULLUPEN_bm;
 	PORTD.PIN4CTRL &= ~PORT_PULLUPEN_bm;
 	PORTD.PIN5CTRL &= ~PORT_PULLUPEN_bm;
+	PORTD.PIN7CTRL &= ~PORT_PULLUPEN_bm;
 }
 
-static void VREF0_init(void)
+static void ADC0_Freerun_Init(bool twelveBit)
 {
-	VREF.ADC0REF = VREF_REFSEL_2V048_gc;  /* Internal 2.048V reference */
-}
-
-static void ADC0_init(bool freerun)
-{
-	ADC0.CTRLC = ADC_PRESC_DIV128_gc;   /* CLK_PER divided by 128 and by 13.5 (10-bit conversion time = 13889 sps */
-	
-	if(freerun)
+	if(twelveBit)
 	{
+		VREF.ADC0REF = 0x80 |VREF_REFSEL_2V048_gc;  /* Internal 2.048V reference */
+		ADC0.CTRLC = ADC_PRESC_DIV128_gc;   /* CLK_PER divided by 128 and by 13.5 (10-bit conversion time = 13889 sps */
 		ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
-		| ADC_RESSEL_10BIT_gc      /* 12-bit mode */
+		| ADC_RESSEL_12BIT_gc      /* 12-bit mode */
 		| ADC_FREERUN_bm;          /* Enable Free-Run mode */
-		
 		ADC0.INTCTRL = 0x01; /* Enable interrupt */
 		g_adc_initialization = ADC_FREE_RUN_INITIALIZED;
 	}
 	else
 	{
+		VREF.ADC0REF = 0x80 | VREF_REFSEL_2V048_gc;  /* Internal 2.048V reference */
+		ADC0.CTRLC = ADC_PRESC_DIV128_gc;   /* CLK_PER divided by 128 and by 13.5 (10-bit conversion time = 13889 sps */
 		ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
-		| ADC_RESSEL_12BIT_gc;      /* 12-bit mode */
-		ADC0.INTCTRL = 0x00; /* Disable interrupt */
-		g_adc_initialization = ADC_SINGLE_CONVERSION_INITIALIZED;
+		| ADC_RESSEL_10BIT_gc      /* 10-bit mode */
+		| ADC_FREERUN_bm;          /* Enable Free-Run mode */
+		ADC0.INTCTRL = 0x01; /* Enable interrupt */
+		g_adc_initialization = ADC_FREE_RUN_INITIALIZED;
 	}
 }
 
-static void ADC0_SYSTEM_init(bool freerun)
+// static void ADC0_Single_Init(bool twelveBit)
+// {
+// 	if(twelveBit)
+// 	{
+// 		VREF.ADC0REF = VREF_REFSEL_2V048_gc;  /* Internal 2.048V reference */
+// 		ADC0.CTRLC = ADC_PRESC_DIV2_gc;   /* CLK_PER divided by 128 and by 13.5 (10-bit conversion time = 13889 sps */
+// 		ADC0.CTRLA |= ADC_ENABLE_bm /* ADC Enable: enabled */
+// 		| ADC_RESSEL_12BIT_gc;      /* 12-bit mode */
+// 		ADC0.INTCTRL &= 0xFE; /* Disable interrupt */
+// 		g_adc_initialization = ADC_SINGLE_CONVERSION_INITIALIZED;
+// 	}
+// 	else
+// 	{
+// 		VREF.ADC0REF = VREF_REFSEL_2V048_gc;  /* Internal 2.048V reference */
+// 		ADC0.CTRLC = ADC_PRESC_DIV2_gc;   /* CLK_PER divided by 128 and by 13.5 (10-bit conversion time = 13889 sps */
+// 		ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
+// 		| ADC_RESSEL_10BIT_gc;      /* 10-bit mode */
+// 		ADC0.INTCTRL &= 0xFE; /* Disable interrupt */
+// 		g_adc_initialization = ADC_SINGLE_CONVERSION_INITIALIZED;
+// 	}
+// }
+
+void ADC0_SYSTEM_init(bool twelveBit)
 {
 	PORT_init();
-	VREF0_init();
-	ADC0_init(freerun);
+	ADC0_Freerun_Init(twelveBit);
+// 	ADC0_Single_Init(twelveBit);
 }
 
-static void ADC0_SYSTEM_shutdown(void)
+void ADC0_SYSTEM_shutdown(void)
 {
 	ADC0.INTCTRL = 0x00; /* Disable interrupt */
 	ADC0.CTRLA = ADC_RESSEL_12BIT_gc; /* Turn off ADC leaving 12-bit resolution set */

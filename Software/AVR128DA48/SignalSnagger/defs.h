@@ -32,8 +32,8 @@
 #include <avr/interrupt.h>
 
 /******************************************************
- * Set the text that gets displayed to the user */
-#define SW_REVISION "0.22"
+ * Set the text that gets displayed to the user       */
+#define SW_REVISION "0.23"
 
 //#define TRANQUILIZE_WATCHDOG
 
@@ -42,23 +42,21 @@
 
 /*******************************************************/
 
+/*******************************************************
+ * I2C Slave Addresses                                 */
+#define SI5351_I2C_SLAVE_ADDR			0xC0   
+#define DISPLAY_I2C_SLAVE_ADDR			0x78
+#define DIGITAL_POT_I_I2C_SLAVE_ADDR	0x2F
+#define DIGITAL_POT_Q_I2C_SLAVE_ADDR	0x2F
+#define RF_GAIN_DAC_I2C_SLAVE_ADDR		0x61
+/*******************************************************/
+
 /******************************************************
  * Include only the necessary hardware support */
-   #define INCLUDE_SI5351_SUPPORT true // Silicon Labs Programmable Clock
-   #define INCLUDE_DS3231_SUPPORT true // Maxim RTC
-//   #define INCLUDE_DAC081C085_SUPPORT
-//   #define ENABLE_PIN_CHANGE_INTERRUPT_0
-//   #define ENABLE_PIN_CHANGE_INTERRUPT_1
-//   #define ENABLE_PIN_CHANGE_INTERRUPT_2
+#define INCLUDE_SI5351_SUPPORT true // Silicon Labs Programmable Clock
+#define INCLUDE_DS3231_SUPPORT true // Maxim RTC
 
-// #ifdef INCLUDE_DAC081C085_SUPPORT
-//    #define PA_DAC DAC081C_I2C_SLAVE_ADDR_A0
-// #endif
-
-//   #define AM_DAC DAC081C_I2C_SLAVE_ADDR_A1
-//   #define BIAS_POT MCP4552_I2C_SLAVE_ADDR_A0
-
-	#define DATE_STRING_SUPPORT_ENABLED
+#define DATE_STRING_SUPPORT_ENABLED
 
 /*******************************************************/
 /* Error Codes                                                                   */
@@ -133,6 +131,8 @@ typedef enum {
 
 /*******************************************************/
 
+#define NO_ADC_SELECTED 255
+
 #ifndef uint16_t_defined
 #define uint16_t_defined
 typedef unsigned int uint16_t;
@@ -189,11 +189,8 @@ typedef unsigned char uint8_t;
 #define VBAT(x) (BATTERY_DROP + (x * ADC_MAX_VOLTAGE_MV) / 1023L)
 #define BATTERY_PERCENTAGE(x, y) ( ( 100L * ((x * ADC_MAX_VOLTAGE_MV + BATTERY_DROP_OFFSET) - (1023L * y)) )  / ((BATTERY_VOLTAGE_MAX_MV - y) * 1023L))
 
-#define SUPPLY_VOLTAGE_MAX_MV 14100L
-#define VSUPPLY(x)((x * SUPPLY_VOLTAGE_MAX_MV) / 1023L)
-
-#define PA_VOLTAGE_MAX_MV 14100L
-#define VPA(x)((x * PA_VOLTAGE_MAX_MV) / 1023L)
+#define SUPPLY_VOLTAGE_MAX_MV 14423L
+#define VSUPPLY(x) (600 + ((x * SUPPLY_VOLTAGE_MAX_MV) / 1023L))
 
 typedef uint16_t BatteryLevel;  /* in milliVolts */
 
@@ -221,11 +218,13 @@ typedef uint16_t BatteryLevel;  /* in milliVolts */
 
 /******************************************************
  * EEPROM definitions */
-#define EEPROM_INITIALIZED_FLAG (uint16_t)0x0108
+#define EEPROM_INITIALIZED_FLAG (uint16_t)0x0109
 #define EEPROM_UNINITIALIZED 0x00
 
 #define EEPROM_STATION_ID_DEFAULT "FOXBOX"
 #define EEPROM_PATTERN_TEXT_DEFAULT "PARIS|"
+
+#define NUMBER_OF_FREQUENCY_CHANNELS 20
 
 #define EEPROM_MASTER_SETTING_DEFAULT false
 #define EEPROM_START_TIME_DEFAULT 0
@@ -246,6 +245,9 @@ typedef uint16_t BatteryLevel;  /* in milliVolts */
 #define EEPROM_CLK0_ONOFF_DEFAULT OFF
 #define EEPROM_CLK1_ONOFF_DEFAULT OFF
 #define EEPROM_CLK2_ONOFF_DEFAULT OFF
+
+#define MAX_RX_FREQUENCY 4000000
+#define MIN_RX_FREQUENCY 3500000
 
 #define EEPROM_CLOCK_CALIBRATION_DEFAULT 32767
 #define EEPROM_BATTERY_THRESHOLD_V (3.800)
@@ -388,6 +390,13 @@ typedef enum
 	EVENT_BLIND_ARDF,
 	EVENT_NUMBER_OF_EVENTS
 } Event_t;
+
+typedef enum
+{
+	MODE_FREQUENCY,
+	MODE_MEMORY,
+	MODE_NUMBER_OF_MODES
+} FrequencyMode_t;
 
 /* Periodic TIMER2 interrupt timing definitions */
 #define OCR2A_OVF_FREQ_300 0x0C

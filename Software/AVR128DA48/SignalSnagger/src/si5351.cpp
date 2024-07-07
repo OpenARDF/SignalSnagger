@@ -39,7 +39,6 @@
 #include "include/i2c.h"
 #include "include/si5351.h"
 
-#define SI5351_I2C_SLAVE_ADDR                            0xC0    /* I2C slave address */
 #define SI5351_EVEN_INTEGER_FEEDBACK					 126
 
 /*******************************

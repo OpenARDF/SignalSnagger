@@ -204,10 +204,10 @@ bool frequencyString(char* result, uint32_t freq)
 	
 	if((freq > 3200000) && (freq < 8000000)) // Accept only a Hz value to be expressed in kHz
 	{
-		uint32_t k = (freq % 1000000) / 1000;
+//		uint32_t k = (freq % 1000000) / 1000;
 		uint32_t c = (freq % 1000);
-		sprintf(result, "%lu.%03lu.%03lu", freq/1000000, k, c);
-//		sprintf(result, "%lu.%03lu kHz", freq/1000000, k);
+//		sprintf(result, "%lu.%03lu.%03lu", freq/1000000, k, c);
+		sprintf(result, "%lu.%1lu", freq/1000, c/100);
 		
 		failure = false;
 	}
