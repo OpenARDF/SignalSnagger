@@ -118,6 +118,7 @@ extern FrequencyMode_t g_frequency_mode;
 
 volatile bool g_seconds_transition = false;
 volatile time_t g_seconds_since_poweron = 0;
+volatile time_t g_inactivity_power_off = 900; /* 15 minutes */
 volatile bool g_display_active = false;
 
 static volatile bool g_sufficient_power_detected = false;
@@ -154,6 +155,7 @@ volatile bool g_long_leftsense_press = false;
 volatile bool g_long_rightsense_press = false;
 volatile bool g_long_encoder_press = false;
 volatile uint16_t g_audio_gain = 1;
+volatile bool g_enable_audio_feedthrough = true;
 
 volatile uint16_t g_check_temperature = 0;
 
@@ -212,6 +214,7 @@ Frequency_Hz getFrequencySetting(void);
 int repChar(char *str, char orig, char rep);
 char *trimwhitespace(char *str);
 
+/* One-second interrupts */
 ISR(RTC_CNT_vect)
 {
 	uint8_t x = RTC.INTFLAGS;
@@ -220,6 +223,7 @@ ISR(RTC_CNT_vect)
     {
         system_tick();
 		if(g_powerdown_seconds) g_powerdown_seconds--;
+		if(g_inactivity_power_off) g_inactivity_power_off--;
 		g_seconds_transition = true;
 		g_seconds_since_poweron++;
 		if(g_seconds_since_poweron == 2) g_rotary_enable = true;
@@ -252,9 +256,14 @@ ISR(ADC0_RESRDY_vect)
 // 		static uint8_t indexSingleConversionInProcess = NO_ADC_SELECTED;
 		static uint8_t sineIndex = 0;
 		uint16_t sample = ADC0.RES;
-		uint16_t result = sample;
+		uint16_t result = 0;
 // 		bool passAudio = true;
-		
+
+		if(g_enable_audio_feedthrough)
+		{
+			result = sample;
+		}
+				
 // 		if(g_active_ADC_sample != ADC_I_AMPED)
 // 		{			
 // 			if(indexSingleConversionInProcess == NO_ADC_SELECTED) /* set up to take a single sample of another channel */
@@ -390,6 +399,7 @@ ISR(TCB0_INT_vect)
 				
 				g_active_ADC_sample = ADCBatteryVoltage;
 				g_powerdown_seconds = 60;
+				g_inactivity_power_off = 900;
 				
 				if(changed & (1 << SENSE_SWITCH_LEFT)) // left sense button changed
 				{
@@ -618,6 +628,8 @@ ISR(TCB0_INT_vect)
 
 				if(!rotaryNoMotionCountdown)
 				{
+					g_inactivity_power_off = 900;
+					
 					if(val>1)
 					{
 						val = 4;
@@ -1015,7 +1027,7 @@ int main(void)
 			}
 		}
 		
-		if(!g_powerdown_seconds)
+		if(!g_powerdown_seconds || !g_inactivity_power_off)
 		{
 			/* Save EEPROM */
 			powerdown();
@@ -1056,6 +1068,7 @@ int main(void)
 			}
 			else if (g_handle_counted_rightsense_presses == 2)
 			{
+				g_enable_audio_feedthrough = !g_enable_audio_feedthrough;
 // 				LEDS.blink(LEDS_GREEN_OFF);
 			}
 			
