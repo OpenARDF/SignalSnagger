@@ -33,7 +33,7 @@
 
 /******************************************************
  * Set the text that gets displayed to the user       */
-#define SW_REVISION "0.24"
+#define SW_REVISION "0.25"
 
 //#define TRANQUILIZE_WATCHDOG
 
@@ -245,9 +245,6 @@ typedef uint16_t BatteryLevel;  /* in milliVolts */
 #define EEPROM_CLK0_ONOFF_DEFAULT OFF
 #define EEPROM_CLK1_ONOFF_DEFAULT OFF
 #define EEPROM_CLK2_ONOFF_DEFAULT OFF
-
-#define MAX_RX_FREQUENCY 4000000
-#define MIN_RX_FREQUENCY 3500000
 
 #define EEPROM_CLOCK_CALIBRATION_DEFAULT 32767
 #define EEPROM_BATTERY_THRESHOLD_V (3.800)

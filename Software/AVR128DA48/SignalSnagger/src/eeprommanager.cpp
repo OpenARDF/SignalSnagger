@@ -771,7 +771,7 @@ bool EepromManager::readNonVols(void)
 		{
 			f = eeprom_read_dword(&(EepromManager::ee_vars.frequency_memory[i]));
 			if(f==0xFFFFFFFF) f=0;
-			if((f==0) || ((f <= MAX_RX_FREQUENCY) && (f >= RX_MINIMUM_80M_FREQUENCY)))
+			if((f==0) || ((f <= RX_MAXIMUM_80M_FREQUENCY) && (f >= RX_MINIMUM_80M_FREQUENCY)))
 			{
 				g_frequency_memory[i] = f;
 			}

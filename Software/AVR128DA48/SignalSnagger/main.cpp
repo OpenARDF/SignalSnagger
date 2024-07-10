@@ -64,8 +64,23 @@ enum HardwareError_t
 enum MenuState_t {
 	MenuOperational,
 	MenuFreqMemories,
+	MenuSetMemory,
+	MenuMain,
+	MenuInactivityPoweroff,
 	NumberOfMenuStates
 	};
+	
+enum SwitchAction_t {
+	SwitchClosure,
+	SwitchRelease,
+	SwitchUnchanged
+	};
+	
+
+#define NUMBER_OF_MENUS 5
+const char menuTitle[NUMBER_OF_MENUS][10] = {"MEMORIES", "EVENT", "SOUNDS", "SETTINGS", "UTILITY"};
+#define MEMORIES 0
+const char clearRow[11] = "          ";
 
 
 #define QUAD_MASK ((1 << ROTARY_A_IN) | (ROTARY_B_IN))
@@ -99,11 +114,9 @@ static volatile uint16_t g_hardware_error = (uint16_t)HARDWARE_OK;
 static volatile bool g_rotary_enable = false;
 static volatile int g_rotary_count = 0;
 static volatile int g_rotary_edges = 0;
-static volatile bool g_rotary_shaft_pressed = false;
+static volatile bool g_encoderSwitch_pressed = false;
 #define ROTARY_SYNC_DELAY 75
 
-static volatile bool g_leftSense_pressed = false;
-static volatile bool g_rightSense_pressed = false;
 static volatile bool g_bothSense_pressed = false;
 
 static uint8_t g_rf_gain_setting = 50;
@@ -142,18 +155,27 @@ static volatile ADC_Active_Channel_t g_active_ADC_sample = ADC_I_AMPED;
 
 extern Goertzel g_goertzel;
 uint32_t g_goertzel_rssi = 0;
+
 volatile uint16_t g_leftsense_closed_time = 0;
 volatile uint16_t g_rightsense_closed_time = 0;
 volatile uint16_t g_encoder_closed_time = 0;
+volatile uint16_t g_doublesense_closed_time = 0;
+
 volatile uint16_t g_handle_counted_leftsense_presses = 0;
 volatile uint16_t g_handle_counted_rightsense_presses = 0;
 volatile uint16_t g_handle_counted_encoder_presses = 0;
+volatile uint16_t g_handle_counted_doublesense_presses = 0;
+
 volatile uint16_t g_leftsense_presses_count = 0;
 volatile uint16_t g_rightsense_presses_count = 0;
 volatile uint16_t g_encoder_presses_count = 0;
+volatile uint16_t g_doublesense_presses_count = 0;
+
 volatile bool g_long_leftsense_press = false;
 volatile bool g_long_rightsense_press = false;
+volatile bool g_long_doublesense_press = false;
 volatile bool g_long_encoder_press = false;
+
 volatile uint16_t g_audio_gain = 1;
 volatile bool g_enable_audio_feedthrough = true;
 
@@ -334,27 +356,28 @@ ISR(TCB0_INT_vect)
 	
     if(x & TCB_CAPT_bm)
     {
-// 		static bool conversionInProcess = false;
-// 		static int8_t indexConversionInProcess = 0;
-		static uint16_t leftsense_closures_count_period = 0, rightsense_closures_count_period = 0, encoder_closures_count_period = 0;
+		static uint16_t doublesense_closures_count_period = 0, leftsense_closures_count_period = 0, rightsense_closures_count_period = 0, encoder_closures_count_period = 0;
 		uint8_t holdSwitch = 0, nowSwitch = 0;
-		static uint8_t leftsenseReleased = false, rightsenseReleased = false, encoderReleased = false;
-		static uint8_t leftsenseLongPressEnabled = true, rightsenseLongPressEnabled = true, encoderLongPressEnabled = true;
+		static SwitchAction_t doublesenseAction = SwitchUnchanged, leftsenseAction = SwitchUnchanged, rightsenseAction = SwitchUnchanged, encoderswitchAction = SwitchUnchanged;
+		static uint8_t leftsenseLongPressEnabled = true, rightsenseLongPressEnabled = true, encoderLongPressEnabled = true, doublesenseLongPressEnabled = true;
+
 		static int holdRotaryEdges = 0;
 		static uint16_t rotaryNoMotionCountdown = 0;
 		
 		fiftyMS++;
 		if(!(fiftyMS % 6))
 		{
+			static volatile bool leftSense_pressed = false;
+			static volatile bool rightSense_pressed = false;
 			uint8_t switch_bits = ((1 << SENSE_SWITCH_LEFT) | (1 << SENSE_SWITCH_RIGHT) | (1 << ENCODER_SWITCH) | (1 << HEADPHONE_DETECT));
 			holdSwitch = portAdebouncedVals() & switch_bits;
 			debounce();
 			nowSwitch = portAdebouncedVals() & switch_bits;
 		
-			int8_t leftSense = holdSwitch & (1 << SENSE_SWITCH_LEFT);
-			int8_t rightSense = holdSwitch & (1 << SENSE_SWITCH_RIGHT);
-			int8_t encoderSwitch = holdSwitch & (1 << ENCODER_SWITCH);
-			int8_t headphones = holdSwitch & (1 << HEADPHONE_DETECT);
+			int8_t leftSense = nowSwitch & (1 << SENSE_SWITCH_LEFT);
+			int8_t rightSense = nowSwitch & (1 << SENSE_SWITCH_RIGHT);
+			int8_t encoderSwitch = nowSwitch & (1 << ENCODER_SWITCH);
+			int8_t headphones = nowSwitch & (1 << HEADPHONE_DETECT);
 			
 			if((g_headphones_detected = !headphones)) /* Set and check headphones presence */
 			{
@@ -367,31 +390,24 @@ ISR(TCB0_INT_vect)
 			{
 				PORTA_set_pin_level(CARDIOID_BACK, LOW);
 				PORTA_set_pin_level(CARDIOID_FRONT, HIGH);
-				g_leftSense_pressed = true;
+				leftSense_pressed = true;
 			}
 			else if(!rightSense && leftSense)
 			{
 				PORTA_set_pin_level(CARDIOID_FRONT, LOW);
 				PORTA_set_pin_level(CARDIOID_BACK, HIGH);
-				g_rightSense_pressed = true;
+				rightSense_pressed = true;
 			}
 			else
 			{
 				PORTA_set_pin_level(CARDIOID_FRONT, LOW);
 				PORTA_set_pin_level(CARDIOID_BACK, LOW);
-				g_leftSense_pressed = false;
-				g_rightSense_pressed = false;
+				leftSense_pressed = false;
+				rightSense_pressed = false;
 				g_bothSense_pressed = !leftSense && !rightSense;
 			}
 			
-			if(!encoderSwitch)
-			{
-				g_rotary_shaft_pressed = true;
-			}
-			else
-			{
-				g_rotary_shaft_pressed = false;
-			}
+			g_encoderSwitch_pressed = !encoderSwitch;
 			
 			if(holdSwitch != nowSwitch) /* Change detected */
 			{
@@ -403,134 +419,156 @@ ISR(TCB0_INT_vect)
 				
 				if(changed & (1 << SENSE_SWITCH_LEFT)) // left sense button changed
 				{
-					if(leftSense) /* Switch was open, so now it must be closed */
+					if(leftSense) /* Pin in high, so switch must be open */
 					{
-						if(LEDS.active())
-						{
-							g_leftsense_presses_count++;
-							leftsenseReleased = false;
-						}
-						else
-						{
-							leftsenseLongPressEnabled = false;
-						}
+						leftsenseAction = SwitchRelease;
 					}
-					else /* left sense switch is now open */
+					else
 					{
-						g_beep = 1000;
-						if(!LEDS.active())
-						{
-							LEDS.init();
-						}
-						else
-						{
-							g_leftsense_closed_time = 0;
-							leftsenseReleased = true;
-						}
-					
-						leftsenseLongPressEnabled = true;
+						leftsenseAction = SwitchClosure;
 					}
+				}
+				else
+				{
+					leftsenseAction = SwitchUnchanged;
 				}
 				
 				if(changed & (1 << SENSE_SWITCH_RIGHT))
 				{
-					if(rightSense) /* Switch was open, so now it must be closed */
+					if(rightSense) /* Pin in high, so switch must be open */
 					{
-						if(LEDS.active())
-						{
-							g_rightsense_presses_count++;
-							rightsenseReleased = false;
-						}
-						else
-						{
-							rightsenseLongPressEnabled = false;
-						}
+						rightsenseAction = SwitchRelease;
 					}
-					else /* left sense switch is now open */
+					else 
+					{
+						rightsenseAction = SwitchClosure;						
+					}
+				}
+				else
+				{
+					rightsenseAction = SwitchUnchanged;
+				}
+				
+				if(g_bothSense_pressed) /* Both sense switches are closed */
+				{
+					g_doublesense_presses_count++;
+					g_leftsense_closed_time = 0;
+					g_leftsense_presses_count = 0;
+					g_rightsense_closed_time = 0;
+					g_rightsense_presses_count = 0;
+					doublesenseAction = SwitchClosure;
+				}
+				else if(g_doublesense_closed_time)
+				{
+					g_beep = 1000;
+					g_doublesense_closed_time = 0;
+					doublesenseAction = SwitchRelease;
+				}
+				else
+				{
+					doublesenseLongPressEnabled = true;
+
+					if(leftsenseAction == SwitchRelease)
 					{
 						g_beep = 1000;
-
-						if(!LEDS.active())
-						{
-							LEDS.init();
-						}
-						else
-						{
-							g_rightsense_closed_time = 0;
-							rightsenseReleased = true;
-						}
-						
+						g_leftsense_closed_time = 0;
+						leftsenseLongPressEnabled = true;
+					}
+					else if(leftsenseAction == SwitchClosure)
+					{
+						g_leftsense_presses_count++;
+					}
+					
+					if(rightsenseAction == SwitchRelease)
+					{
+						g_beep = 1000;
+						g_rightsense_closed_time = 0;
 						rightsenseLongPressEnabled = true;
+					}
+					else if(rightsenseAction == SwitchClosure)
+					{
+						g_rightsense_presses_count++;
 					}
 				}
 				
 				if(changed & (1 << ENCODER_SWITCH))
 				{
-					if(encoderSwitch) /* Switch was open, so now it must be closed */
+					if(g_encoderSwitch_pressed) 
 					{
-						if(LEDS.active())
-						{
-							g_encoder_presses_count++;
-							encoderReleased = false;
-						}
-						else
-						{
-							encoderLongPressEnabled = false;
-						}
+						g_encoder_presses_count++;
+						encoderswitchAction = SwitchClosure;
 					}
-					else /* encoder switch is now open */
+					else
 					{
 						g_beep = 1000;
-
-						if(!LEDS.active())
-						{
-							LEDS.init();
-						}
-						else
-						{
-							g_encoder_closed_time = 0;
-							encoderReleased = true;
-						}
-						
-						encoderLongPressEnabled = true;
+						g_encoder_closed_time = 0;
+ 						encoderLongPressEnabled = true;
+						encoderswitchAction = SwitchRelease;
 					}
 				}
 			}
 			else // no switches have changed
 			{
-				if(!leftSense) /* Switch closed and unchanged */
+				if(g_bothSense_pressed) /* Both sense switches closed and unchanged */
 				{
-					if(!g_long_leftsense_press && leftsenseLongPressEnabled)
+					if(!g_long_doublesense_press && doublesenseLongPressEnabled)
 					{
-						if(++g_leftsense_closed_time >= 200)
+						if(g_doublesense_closed_time < MAX_UINT16) g_doublesense_closed_time++;
+						
+						if(g_doublesense_closed_time >= 100)
 						{
-							g_long_leftsense_press = true;
-							g_leftsense_closed_time = 0;
-							g_leftsense_presses_count = 0;
+							g_long_doublesense_press = true;
+							g_doublesense_closed_time = 0;
+							g_doublesense_presses_count = 0;
+							doublesenseLongPressEnabled = false;
+							
 							leftsenseLongPressEnabled = false;
-						}
-					}
-				}
-
-				if(!rightSense) /* Switch closed and unchanged */
-				{
-					if(!g_long_rightsense_press && rightsenseLongPressEnabled)
-					{
-						if(++g_rightsense_closed_time >= 200)
-						{
-							g_long_rightsense_press = true;
-							g_rightsense_closed_time = 0;
-							g_rightsense_presses_count = 0;
 							rightsenseLongPressEnabled = false;
 						}
 					}
 				}
+				else
+				{
+					if(leftSense_pressed) /* Switch closed and unchanged */
+					{
+						if(!g_long_leftsense_press && leftsenseLongPressEnabled)
+						{
+							if(g_leftsense_closed_time < MAX_UINT16) g_leftsense_closed_time++;
+							
+							if(g_leftsense_closed_time >= 200)
+							{
+								g_long_leftsense_press = true;
+								g_leftsense_closed_time = 0;
+								g_leftsense_presses_count = 0;
+								leftsenseLongPressEnabled = false;
+							}
+						}
+					}
 
-				if(!encoderSwitch) /* Switch closed and unchanged */
+					if(rightSense_pressed) /* Switch closed and unchanged */
+					{
+						if(!g_long_rightsense_press && rightsenseLongPressEnabled)
+						{
+							if(g_rightsense_closed_time < MAX_UINT16) g_rightsense_closed_time++;
+							
+							if(g_rightsense_closed_time >= 200)
+							{
+								g_long_rightsense_press = true;
+								g_rightsense_closed_time = 0;
+								g_rightsense_presses_count = 0;
+								rightsenseLongPressEnabled = false;
+							}
+						}
+					}
+				}
+				
+				if(g_encoderSwitch_pressed) /* Switch closed and unchanged */
 				{
 					if(!g_long_encoder_press && encoderLongPressEnabled)
 					{
-						if(++g_encoder_closed_time >= 200)
+						if(g_encoder_closed_time < MAX_UINT16) g_encoder_closed_time++;
+						
+						if(g_encoder_closed_time >= 200)
 						{
 							g_long_encoder_press = true;
 							g_encoder_closed_time = 0;
@@ -540,6 +578,30 @@ ISR(TCB0_INT_vect)
 					}
 				}
 			}
+			
+			if(doublesense_closures_count_period)
+			{
+				doublesense_closures_count_period--;
+				
+				if(!doublesense_closures_count_period)
+				{
+					if(g_doublesense_presses_count && (g_doublesense_presses_count < 3))
+					{
+						g_handle_counted_doublesense_presses = g_doublesense_presses_count;
+					}
+					
+					g_doublesense_presses_count = 0;
+				}
+			}
+			else if(g_doublesense_presses_count == 1 && (doublesenseAction == SwitchRelease))
+			{
+				doublesense_closures_count_period = 50;
+			}
+			else if(g_doublesense_presses_count > 2)
+			{
+				g_doublesense_presses_count = 0;
+			}
+			
 		
 			if(leftsense_closures_count_period)
 			{
@@ -555,7 +617,7 @@ ISR(TCB0_INT_vect)
 					g_leftsense_presses_count = 0;
 				}
 			}
-			else if(g_leftsense_presses_count == 1 && leftsenseReleased)
+			else if(g_leftsense_presses_count == 1 && (leftsenseAction == SwitchRelease))
 			{
 				leftsense_closures_count_period = 50;
 			}
@@ -578,7 +640,7 @@ ISR(TCB0_INT_vect)
 					g_rightsense_presses_count = 0;
 				}
 			}
-			else if(g_rightsense_presses_count == 1 && rightsenseReleased)
+			else if(g_rightsense_presses_count == 1 && (rightsenseAction == SwitchRelease))
 			{
 				rightsense_closures_count_period = 50;
 			}
@@ -601,7 +663,7 @@ ISR(TCB0_INT_vect)
 					g_encoder_presses_count = 0;
 				}
 			}
-			else if(g_encoder_presses_count == 1 && encoderReleased)
+			else if(g_encoder_presses_count == 1 && (encoderswitchAction == SwitchRelease))
 			{
 				encoder_closures_count_period = 50;
 			}
@@ -642,40 +704,26 @@ ISR(TCB0_INT_vect)
 			}
 			else
 			{
-				int temp = val >> 2;
-				if(neg)
+				if(val > 3)
 				{
-					g_rotary_count -= temp;
-				}
-				else
-				{
-					g_rotary_count += temp;
-				}
+					if(neg)
+					{
+						g_rotary_count--;
+					}
+					else
+					{
+						g_rotary_count++;
+					}
 				
-				val -= (temp << 2);		
+					val -= 4;		
+				}
 			
 				rotaryNoMotionCountdown = ROTARY_SYNC_DELAY;
-				holdRotaryEdges = g_rotary_edges;
 			}
 			
 			g_rotary_edges = neg ? -val : val;
+			holdRotaryEdges = g_rotary_edges;
 		}
-		
-		/* Non-continuous ADC conversions */
-// 		for(int i=0; i<NUMBER_OF_POLLED_ADC_CHANNELS; i++)
-// 		{
-// 			if(g_adcCountdownCount[i])
-// 			{
-// 				g_adcCountdownCount[i]--;
-// 				
-// 				if(!g_adcCountdownCount[i])
-// 				{
-// 					g_adcCountdownCount[i] = g_adcChannelConversionPeriod_ticks[i];
-// 					g_adcUpdated[i] = false;
-// 					g_active_ADC_sample = g_adcChannelSlot[i];
-// 				}
-// 			}
-// 		}
     }
 
     TCB0.INTFLAGS = (TCB_CAPT_bm | TCB_OVF_bm); /* clear all interrupt flags */
@@ -784,12 +832,24 @@ void powerdown(void)
 	EEPromMgr.saveAllEEPROM();
 	powerDown5V();
 	PORTA_set_pin_level(POWER_ENABLE, LOW);
-//	while(!g_headphones_detected);
-	while(1);
+	
+	int poweroff = 100;
+	
+	while(poweroff)
+	{
+		if(g_headphones_detected)
+		{
+			poweroff--;
+		}
+		else
+		{
+			poweroff = 100;
+		}
+	}
 	
 	/* Should never reach here */
-	PORTA_set_pin_level(PWR_5V_ENABLE, HIGH);
 	PORTA_set_pin_level(POWER_ENABLE, HIGH);
+	PORTA_set_pin_level(PWR_5V_ENABLE, HIGH);
 }
 
 int main(void)
@@ -797,10 +857,13 @@ int main(void)
 	sineWaveInit();
 	
 	MenuState_t menuState = MenuOperational;
+	MenuState_t hold_menuState = MenuOperational;
 	uint8_t activeMemory = 0;
 	uint8_t hold_activeMemory = 0;
 	Frequency_Hz hold_activeMemoryFreq = 0;
 	
+	uint8_t hold_menuRow = 0;
+	uint8_t menuRow = 0;
 
 	Frequency_Hz hold_rx_frequency = 0;
 	uint8_t hold_rf_gain_setting = 255;
@@ -878,15 +941,17 @@ int main(void)
 	{
 		if(g_display_active)
 		{
-			if(refresh_display)
+			if(refresh_display || (menuState != hold_menuState))
 			{
 				refresh_display = false;
+				hold_menuState = menuState;
 				display.cls();
 				hold_rx_frequency = 0; /* force update */
 				hold_rf_gain_setting = 0xff; /* force update */
 				hold_audio_gain = 0xff; /* force update */
 				hold_activeMemory = 0xff; /* force update */
 				hold_goertzel_rssi = 0; /* force update */
+				hold_menuRow = 0xff; /* force update */
 			}
 			
 			switch(menuState)
@@ -962,12 +1027,32 @@ int main(void)
 				}
 				break;
 				
+				case MenuMain:
+				{
+					if(hold_menuRow != menuRow)
+					{
+						hold_menuRow = menuRow;
+						sprintf(g_tempStr, "00Main Menu");
+						g_text_buff.putString(g_tempStr);
+						sprintf(g_tempStr, "20%s", clearRow);
+						g_text_buff.putString(g_tempStr);
+						sprintf(g_tempStr, "20%s", menuTitle[menuRow]);
+						g_text_buff.putString(g_tempStr);
+// 						sprintf(g_tempStr, "20%s", menuTitle[menuRow+1]);
+// 						g_text_buff.putString(g_tempStr);
+// 						sprintf(g_tempStr, "30%s", menuTitle[menuRow+2]);
+// 						g_text_buff.putString(g_tempStr);
+					}									
+				}
+				break;
+				
+				case MenuSetMemory:
 				case MenuFreqMemories:
 				{
 					Frequency_Hz chanF = g_frequency_memory[activeMemory];
 										
 					/* Reset any corrupted memory locations */
-					if((chanF > 4000000) || (chanF < 3500000))
+					if((chanF > RX_MAXIMUM_80M_FREQUENCY) || (chanF < RX_MINIMUM_80M_FREQUENCY))
 					{
 						g_frequency_memory[activeMemory] = 0;
 						chanF = 0;
@@ -987,7 +1072,15 @@ int main(void)
 						if(chanF)
 						{
 							frequencyString(str, chanF);
-							snprintf(g_tempStr, 13, "20  %s  ", str);
+							if(menuState == MenuFreqMemories)
+							{
+								snprintf(g_tempStr, 13, "20  %s  ", str);
+							}
+							else
+							{
+								snprintf(g_tempStr, 13, "20> %s  ", str);
+							}
+					
 							g_text_buff.putString(g_tempStr);
 						}
 						else
@@ -999,10 +1092,20 @@ int main(void)
 				}
 				break;
 				
+				case MenuInactivityPoweroff:
+				{
+					sprintf(g_tempStr, "12UNPLUG");
+					g_text_buff.putString(g_tempStr);
+					sprintf(g_tempStr, "20HEADPHONES");
+					g_text_buff.putString(g_tempStr);
+				}
+				break;
+				
 				default:
 				{
 					menuState = MenuOperational;
 				}
+				break;
 			}
 		}
 			
@@ -1026,11 +1129,43 @@ int main(void)
 				g_text_buff.getString(g_tempStr, &s);
 			}
 		}
+		else if(!g_inactivity_power_off)
+		{
+			if(menuState != MenuInactivityPoweroff)
+			{
+				menuState = MenuInactivityPoweroff;
+			}
+			else
+			{
+				powerdown();
+				while(1); /* wait for processor reset */
+			}
+		}
 		
-		if(!g_powerdown_seconds || !g_inactivity_power_off)
+		if(!g_powerdown_seconds)
 		{
 			/* Save EEPROM */
 			powerdown();
+		}
+		
+		if(g_handle_counted_doublesense_presses)
+		{
+			if(g_handle_counted_doublesense_presses == 1)
+			{
+				LEDS.blink(LEDS_RED_BLINK_SLOW, true);
+			}
+			else if(g_handle_counted_doublesense_presses == 2)
+			{
+				LEDS.blink(LEDS_RED_BLINK_FAST, true);
+			}
+			
+			g_handle_counted_doublesense_presses = 0;
+		}
+		
+		if(g_long_doublesense_press)
+		{
+			g_long_doublesense_press = false;
+			menuState = MenuMain;
 		}
 
 		
@@ -1038,7 +1173,7 @@ int main(void)
 		{
 			if(g_handle_counted_leftsense_presses == 1)
 			{
-//				LEDS.blink(LEDS_RED_BLINK_SLOW, true);
+				LEDS.blink(LEDS_OFF, true);
 			}
 			else if (g_handle_counted_leftsense_presses == 2)
 			{
@@ -1050,26 +1185,22 @@ int main(void)
 		
 		if(g_leftsense_closed_time >= 1000)
 		{
-// 			LEDS.blink(LEDS_GREEN_ON_CONSTANT);
-// 			LEDS.blink(LEDS_RED_ON_CONSTANT);
 		}
 		
 		if(g_long_leftsense_press)
 		{
 			g_long_leftsense_press = false;
-// 			LEDS.init(LEDS_RED_THEN_GREEN_BLINK_SLOW);
 		}
 		
 		if(g_handle_counted_rightsense_presses)
 		{
 			if(g_handle_counted_rightsense_presses == 1)
 			{
-// 				LEDS.blink(LEDS_GREEN_BLINK_SLOW, true);
+				LEDS.blink(LEDS_OFF, true);
 			}
 			else if (g_handle_counted_rightsense_presses == 2)
 			{
 				g_enable_audio_feedthrough = !g_enable_audio_feedthrough;
-// 				LEDS.blink(LEDS_GREEN_OFF);
 			}
 			
 			g_handle_counted_rightsense_presses = 0;
@@ -1077,25 +1208,46 @@ int main(void)
 		
 		if(g_rightsense_closed_time >= 1000)
 		{
-// 			LEDS.blink(LEDS_GREEN_ON_CONSTANT);
-// 			LEDS.blink(LEDS_RED_ON_CONSTANT);
 		}
 		
 		if(g_long_rightsense_press)
 		{
 			g_long_rightsense_press = false;
-// 			LEDS.init(LEDS_RED_THEN_GREEN_BLINK_FAST);
 		}
 		
 		if(g_handle_counted_encoder_presses)
 		{
 			if(g_handle_counted_encoder_presses == 1)
 			{
-// 				LEDS.blink(LEDS_RED_AND_GREEN_BLINK_FAST);
 			}
 			else if (g_handle_counted_encoder_presses == 2)
 			{
-// 				LEDS.blink(LEDS_RED_AND_GREEN_BLINK_SLOW);
+				switch(menuState)
+				{
+					case MenuMain:
+					{
+						if(menuRow == MEMORIES)
+						{
+							menuState = MenuFreqMemories;
+						}
+					}
+					break;
+					
+					case MenuFreqMemories:
+					{
+						menuState = MenuSetMemory;
+					}
+					break;
+					
+					case MenuSetMemory:
+					{
+						menuState = MenuFreqMemories;
+					}
+					break;
+					
+					default:
+					break;
+				}
 			}
 			else if (g_handle_counted_encoder_presses == 3)
 			{
@@ -1118,8 +1270,6 @@ int main(void)
 		
 		if(g_encoder_closed_time >= 1000)
 		{
-// 			LEDS.blink(LEDS_GREEN_ON_CONSTANT);
-// 			LEDS.blink(LEDS_RED_ON_CONSTANT);
 		}
 		
 		if(g_long_encoder_press)
@@ -1138,7 +1288,7 @@ int main(void)
 				
 					Frequency_Hz f = g_frequency_memory[activeMemory];
 				
-					if((f > 4000000) || (f < 3500000))
+					if((f > RX_MAXIMUM_80M_FREQUENCY) || (f < RX_MINIMUM_80M_FREQUENCY))
 					{
 						g_frequency_memory[activeMemory] = 0;
 						f = 0;
@@ -1157,8 +1307,6 @@ int main(void)
 					menuState = MenuOperational;
 					LEDS.blink(LEDS_OFF);
 				}
-			
-				refresh_display = true;
 			}
 		}
 		
@@ -1177,14 +1325,14 @@ int main(void)
 		/*********************************
 		* Handle Rotary Encoder Turns
 		*********************************/
-		if(!g_rotary_shaft_pressed) inhibit_long_encoder_press = false;
+		if(!g_encoderSwitch_pressed) inhibit_long_encoder_press = false;
 		
 		if(g_rotary_count)
 		{
 			uint8_t pwm = g_rf_gain_setting;
 			
 			g_powerdown_seconds = 60;
-			inhibit_long_encoder_press = g_rotary_shaft_pressed;
+			inhibit_long_encoder_press = g_encoderSwitch_pressed;
 			
 			if(g_rotary_count < 0)
 			{
@@ -1192,7 +1340,7 @@ int main(void)
 				{
 					case MenuOperational:
 					{
-						if(g_rotary_shaft_pressed)
+						if(g_encoderSwitch_pressed)
 						{
 							if(g_audio_gain < 10) 
 							{
@@ -1230,25 +1378,31 @@ int main(void)
 					
 					case MenuFreqMemories:
 					{
-						if(g_rotary_shaft_pressed)
-						{
-							g_rx_frequency += 100;
-							g_frequency_memory[activeMemory] = g_rx_frequency;
-						}
-						else
-						{
-							activeMemory++;
-							if(activeMemory >= NUMBER_OF_FREQUENCY_CHANNELS) activeMemory = 0;
+						activeMemory++;
+						if(activeMemory >= NUMBER_OF_FREQUENCY_CHANNELS) activeMemory = 0;
 							
-							Frequency_Hz f = g_frequency_memory[activeMemory];
+						Frequency_Hz f = g_frequency_memory[activeMemory];
 							
-							if((f < MAX_RX_FREQUENCY) && (f > MIN_RX_FREQUENCY))
-							{
-								g_rx_frequency = g_frequency_memory[activeMemory];
-							}
+						if((f < RX_MAXIMUM_80M_FREQUENCY) && (f > RX_MINIMUM_80M_FREQUENCY))
+						{
+							g_rx_frequency = g_frequency_memory[activeMemory];
 						}
 						
 						si5351_set_quad_frequency(g_rx_frequency);							
+					}
+					break;
+					
+					case MenuSetMemory:
+					{
+						g_rx_frequency += 100;
+						g_frequency_memory[activeMemory] = g_rx_frequency;
+					}
+					break;
+					
+					case MenuMain:
+					{
+						menuRow++;
+						if(menuRow == NUMBER_OF_MENUS) menuRow = 0;
 					}
 					break;
 					
@@ -1264,7 +1418,7 @@ int main(void)
 				{
 					case MenuOperational:
 					{
-						if(g_rotary_shaft_pressed)
+						if(g_encoderSwitch_pressed)
 						{
 							if(g_audio_gain > 1) 
 							{
@@ -1302,34 +1456,46 @@ int main(void)
 					
 					case MenuFreqMemories:
 					{
-						if(g_rotary_shaft_pressed)
+						if(activeMemory == 0) 
 						{
-							g_rx_frequency -= 100;
-							g_frequency_memory[activeMemory] = g_rx_frequency;
+							activeMemory = NUMBER_OF_FREQUENCY_CHANNELS-1;
 						}
 						else
 						{
-							if(activeMemory == 0) 
-							{
-								activeMemory = NUMBER_OF_FREQUENCY_CHANNELS-1;
-							}
-							else
-							{
-								activeMemory--;
-							}
+							activeMemory--;
+						}
 							
-							Frequency_Hz f = g_frequency_memory[activeMemory];
+						Frequency_Hz f = g_frequency_memory[activeMemory];
 							
-							if((f < MAX_RX_FREQUENCY) && (f > MIN_RX_FREQUENCY))
-							{
-								g_rx_frequency = g_frequency_memory[activeMemory];
-							}
+						if((f < RX_MAXIMUM_80M_FREQUENCY) && (f > RX_MINIMUM_80M_FREQUENCY))
+						{
+							g_rx_frequency = g_frequency_memory[activeMemory];
 						}
 						
 						si5351_set_quad_frequency(g_rx_frequency);							
 					}
+					break;				
+					
+					case MenuSetMemory:
+					{
+						g_rx_frequency -= 100;
+						g_frequency_memory[activeMemory] = g_rx_frequency;
+					}
 					break;
 					
+					case MenuMain:
+					{
+						if(menuRow) 
+						{
+							menuRow--;
+						}
+						else
+						{
+							menuRow = NUMBER_OF_MENUS - 1;
+						}
+					}
+					break;
+
 					default:
 					break;
 				}

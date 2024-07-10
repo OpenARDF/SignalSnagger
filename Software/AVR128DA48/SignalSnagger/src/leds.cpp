@@ -263,7 +263,7 @@ void leds::blink(Blink_t blinkMode, bool resetTimeout)
 	isGreen = ((blinkMode == LEDS_GREEN_OFF) || (blinkMode == LEDS_GREEN_BLINK_FAST) || (blinkMode == LEDS_GREEN_BLINK_SLOW) || (blinkMode == LEDS_GREEN_ON_CONSTANT));
 	isBoth = !isRed && !isGreen;	
 		
-	if((isRed && (blinkMode != lastRedBlinkSetting)) || (isGreen && (blinkMode != lastGreenBlinkSetting)) || (isBoth && (blinkMode != lastBothBlinkSetting)))
+	if((blinkMode == LEDS_OFF) || (isRed && (blinkMode != lastRedBlinkSetting)) || (isGreen && (blinkMode != lastGreenBlinkSetting)) || (isBoth && (blinkMode != lastBothBlinkSetting)))
 	{
 		TCB3.INTCTRL &= ~TCB_CAPT_bm;   /* Capture or Timeout: disabled */
 
@@ -422,16 +422,23 @@ void leds::blink(Blink_t blinkMode, bool resetTimeout)
 		TCB3.INTCTRL |= TCB_CAPT_bm;   /* Capture or Timeout: enabled */
 	}
 	
-	if(isRed)
+	if(blinkMode == LEDS_OFF)
 	{
-		lastRedBlinkSetting = blinkMode;
-	}
-	else if(isGreen)
-	{
-		lastGreenBlinkSetting = blinkMode;
+		lastBothBlinkSetting = lastGreenBlinkSetting = lastRedBlinkSetting = blinkMode;
 	}
 	else
 	{
-		lastBothBlinkSetting = blinkMode;
+		if(isRed)
+		{
+			lastRedBlinkSetting = blinkMode;
+		}
+		else if(isGreen)
+		{
+			lastGreenBlinkSetting = blinkMode;
+		}
+		else
+		{
+			lastBothBlinkSetting = blinkMode;
+		}
 	}
 }
