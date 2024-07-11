@@ -235,7 +235,7 @@ void BINIO_sleep()
 	PORTA_set_pin_level(CARDIOID_BACK, LOW);
 	
 	PORTA_set_pin_dir(POWER_ENABLE, PORT_DIR_OUT);
-	PORTA_set_pin_level(POWER_ENABLE, HIGH);
+	PORTA_set_pin_level(POWER_ENABLE, LOW); /* Ensure all power is removed when headphones are removed */
 	
 	/* PORTB *************************************************************************************/
 

@@ -233,8 +233,6 @@ static volatile uint8_t g_tick = 0;
  ************************************************************************/
 void wdt_init(WDReset resetType);
 EC hw_init(void);
-void powerDown5V(void);
-void powerUp5V(void);
 char* externBatString(bool volts);
 uint8_t nextActiveMemory(uint8_t currentChan, bool up);
 MenuState_t setMenu(MenuState_t menu);
@@ -701,19 +699,19 @@ ISR(TCB0_INT_vect)
 			{
 				if(rotaryNoMotionCountdown) rotaryNoMotionCountdown--;
 
-				if(!rotaryNoMotionCountdown)
-				{
-					g_inactivity_power_off = 900;
-					
-					if(val>1)
-					{
-						val = 4;
-					}
-					else
-					{
-						val = 0; 
-					}
-				}
+// 				if(!rotaryNoMotionCountdown)
+// 				{
+// 					g_inactivity_power_off = 900;
+// 					
+// 					if(val>1)
+// 					{
+// 						val = 4;
+// 					}
+// 					else
+// 					{
+// 						val = 0; 
+// 					}
+// 				}
 			}
 			else
 			{
@@ -818,19 +816,6 @@ ISR(PORTF_PORT_vect)
 }
 
 
-void powerDown5V(void)
-{
-	PORTA_set_pin_level(PWR_5V_ENABLE, LOW);	
-//	PORTB_set_pin_level(LCD_RESET, LOW);
-}
-
-void powerUp5V(void)
-{
-//	PORTB_set_pin_level(LCD_RESET, HIGH);  /* Put LCD into reset */
-	PORTA_set_pin_level(PWR_5V_ENABLE, HIGH);  /* Enable 5V power regulator */
-}
-
-
 static void sineWaveInit(void)
 {
     uint8_t i;
@@ -843,7 +828,7 @@ static void sineWaveInit(void)
 void powerdown(void)
 {
 	EEPromMgr.saveAllEEPROM();
-	powerDown5V();
+	PORTA_set_pin_level(PWR_5V_ENABLE, LOW);	
 	PORTA_set_pin_level(POWER_ENABLE, LOW);
 	
 	int poweroff = 100;
@@ -859,10 +844,6 @@ void powerdown(void)
 			poweroff = 100;
 		}
 	}
-	
-	/* Should never reach here */
-	PORTA_set_pin_level(POWER_ENABLE, HIGH);
-	PORTA_set_pin_level(PWR_5V_ENABLE, HIGH);
 }
 
 MenuState_t setMenu(MenuState_t menu)
@@ -1106,6 +1087,11 @@ int main(void)
 				case MenuSetMemory:
 				case MenuFreqMemories:
 				{
+					if(activeMemory > NUMBER_OF_FREQUENCY_CHANNELS)
+					{
+						activeMemory = 0;
+					}
+					
 					Frequency_Hz chanF = g_frequency_memory[activeMemory];
 										
 					/* Reset any corrupted memory locations */
@@ -1185,22 +1171,27 @@ int main(void)
 				g_text_buff.getString(g_tempStr, &s);
 			}
 		}
-		else if(!g_inactivity_power_off)
+		
+		
+		if(!g_inactivity_power_off)
 		{
 			if(setMenu(MenuGetCurrent) != MenuInactivityPoweroff)
 			{
 				setMenu(MenuInactivityPoweroff);
 			}
-			else
+			else if(!g_text_buff.size())
 			{
 				powerdown();
-				while(1); /* wait for processor reset */
+				g_go_to_sleep_now = true; /* wait for processor reset */
 			}
 		}
 		
 		if(!g_powerdown_seconds)
 		{
 			powerdown();
+			/* Reach here if headphones are plugged back in */
+			PORTA_set_pin_level(PWR_5V_ENABLE, HIGH);  /* Enable 5V power regulator */
+			PORTA_set_pin_level(POWER_ENABLE, HIGH);
 		}
 		
 		if(g_handle_counted_doublesense_presses)
@@ -1839,7 +1830,8 @@ int main(void)
 		if(g_go_to_sleep_now)
 		{
 			LEDS.deactivate();
-			powerDown5V();
+			shutdown_receiver();
+			PORTA_set_pin_level(PWR_5V_ENABLE, LOW);	
 			system_sleep_settings();
 			
 			SLPCTRL_set_sleep_mode(SLPCTRL_SMODE_STDBY_gc);		
@@ -1863,7 +1855,7 @@ int main(void)
 			
 			g_sleeping = false;
 			atmel_start_init();
-			powerUp5V();
+			PORTA_set_pin_level(PWR_5V_ENABLE, HIGH);  /* Enable 5V power regulator */
 			init_receiver();
 			
 			if(g_awakenedBy == AWAKENED_BY_BUTTONPRESS)
@@ -1979,7 +1971,9 @@ uint8_t nextActiveMemory(uint8_t currentChan, bool up)
 	{	
 		while(!done && (count < NUMBER_OF_FREQUENCY_CHANNELS))
 		{
+			count++;
 			i++;
+			
 			if(i >= NUMBER_OF_FREQUENCY_CHANNELS)
 			{
 				i = 0;
@@ -1995,6 +1989,7 @@ uint8_t nextActiveMemory(uint8_t currentChan, bool up)
 	{
 		while(!done && (count < NUMBER_OF_FREQUENCY_CHANNELS))
 		{
+			count++;
 			if(i)
 			{
 				i--;
@@ -2011,7 +2006,7 @@ uint8_t nextActiveMemory(uint8_t currentChan, bool up)
 		}
 	}
 	
-	if(!done) i = 0xFF;
+	if(!done) i = INVALID_CHANNEL;
 	
 	return(i);
 }

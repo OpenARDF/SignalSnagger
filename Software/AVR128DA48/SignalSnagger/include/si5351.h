@@ -399,6 +399,11 @@ void si5351_shutdown_comms(void);
 
 /**
  */
+EC si5351_shutdown(void);
+
+
+/**
+ */
 void si5351_start_comms(void);
 
 /**

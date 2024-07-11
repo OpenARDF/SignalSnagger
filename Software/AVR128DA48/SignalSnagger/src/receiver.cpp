@@ -81,6 +81,7 @@ Frequency_Hz g_frequency_memory[NUMBER_OF_FREQUENCY_CHANNELS];
 
 	void shutdown_receiver(void)
 	{
+		si5351_shutdown();
 		si5351_shutdown_comms();	
 	}
 	

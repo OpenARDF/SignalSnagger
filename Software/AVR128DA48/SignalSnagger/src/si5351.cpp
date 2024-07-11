@@ -193,6 +193,31 @@
 
 bool g_si5351_initialized = false;
 
+EC si5351_shutdown(void)
+{
+	uint8_t data[2];
+
+	/* Block 1: Disable Outputs */
+	/* Set CLKx_DIS high; Reg. 3 = 0xFF */
+	data[0] = 0xFF; // ~enabledClocksMask | 0xF9;
+	si5351_write_bulk(SI5351_OUTPUT_ENABLE_CTRL, data, 1); /*  disable all clock outputs */
+
+	/* Block 2: */
+	/* Power down all output drivers */
+	/* Reg. 16, 17, 18, 19, 20, 21, 22, 23 = 0x8C */
+	data[0] = 0x8C;
+	si5351_write_bulk(SI5351_CLK0_CTRL, data, 1); // power down all clocks */
+	si5351_write_bulk(SI5351_CLK1_CTRL, data, 1);
+	si5351_write_bulk(SI5351_CLK2_CTRL, data, 1);
+	si5351_write_bulk(SI5351_CLK3_CTRL, data, 1);
+	si5351_write_bulk(SI5351_CLK4_CTRL, data, 1);
+	si5351_write_bulk(SI5351_CLK5_CTRL, data, 1);
+	si5351_write_bulk(SI5351_CLK6_CTRL, data, 1);
+	si5351_write_bulk(SI5351_CLK7_CTRL, data, 1);
+	
+	return(ERROR_CODE_NO_ERROR);
+}
+
 	
 /*
  * bool si5351_init_for_quad(Frequency_Hz freq_Fout, Si5351_clock clk, bool clocksOff)
