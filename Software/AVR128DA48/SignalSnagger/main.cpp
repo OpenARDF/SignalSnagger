@@ -1243,6 +1243,7 @@ int main(void)
 		if(g_long_leftsense_press)
 		{
 			setMenu(MenuOperational);
+			frequency_updates_enabled = false;
 			g_long_leftsense_press = false;
 		}
 		
@@ -1270,6 +1271,7 @@ int main(void)
 		if(g_long_rightsense_press)
 		{
 			setMenu(MenuOperational);
+			frequency_updates_enabled = false;
 			g_long_rightsense_press = false;
 		}
 		
