@@ -67,7 +67,9 @@ enum MenuState_t {
 	MenuSetMemory,
 	MenuMain,
 	MenuInactivityPoweroff,
-	NumberOfMenuStates
+	NumberOfMenuStates,
+	MenuBackOne,
+	MenuGetCurrent
 	};
 	
 enum SwitchAction_t {
@@ -114,10 +116,7 @@ static volatile uint16_t g_hardware_error = (uint16_t)HARDWARE_OK;
 static volatile bool g_rotary_enable = false;
 static volatile int g_rotary_count = 0;
 static volatile int g_rotary_edges = 0;
-static volatile bool g_encoderSwitch_pressed = false;
 #define ROTARY_SYNC_DELAY 75
-
-static volatile bool g_bothSense_pressed = false;
 
 static uint8_t g_rf_gain_setting = 50;
 
@@ -156,25 +155,30 @@ static volatile ADC_Active_Channel_t g_active_ADC_sample = ADC_I_AMPED;
 extern Goertzel g_goertzel;
 uint32_t g_goertzel_rssi = 0;
 
-volatile uint16_t g_leftsense_closed_time = 0;
-volatile uint16_t g_rightsense_closed_time = 0;
-volatile uint16_t g_encoder_closed_time = 0;
-volatile uint16_t g_doublesense_closed_time = 0;
+static volatile uint16_t g_leftsense_closed_time = 0;
+static volatile uint16_t g_rightsense_closed_time = 0;
+static volatile uint16_t g_encoder_closed_time = 0;
+static volatile uint16_t g_doublesense_closed_time = 0;
 
-volatile uint16_t g_handle_counted_leftsense_presses = 0;
-volatile uint16_t g_handle_counted_rightsense_presses = 0;
-volatile uint16_t g_handle_counted_encoder_presses = 0;
-volatile uint16_t g_handle_counted_doublesense_presses = 0;
+static volatile uint16_t g_handle_counted_leftsense_presses = 0;
+static volatile uint16_t g_handle_counted_rightsense_presses = 0;
+static volatile uint16_t g_handle_counted_encoder_presses = 0;
+static volatile uint16_t g_handle_counted_doublesense_presses = 0;
 
-volatile uint16_t g_leftsense_presses_count = 0;
-volatile uint16_t g_rightsense_presses_count = 0;
-volatile uint16_t g_encoder_presses_count = 0;
-volatile uint16_t g_doublesense_presses_count = 0;
+static volatile uint16_t g_leftsense_presses_count = 0;
+static volatile uint16_t g_rightsense_presses_count = 0;
+static volatile uint16_t g_encoder_presses_count = 0;
+static volatile uint16_t g_doublesense_presses_count = 0;
 
-volatile bool g_long_leftsense_press = false;
-volatile bool g_long_rightsense_press = false;
-volatile bool g_long_doublesense_press = false;
-volatile bool g_long_encoder_press = false;
+static volatile bool g_long_leftsense_press = false;
+static volatile bool g_long_rightsense_press = false;
+static volatile bool g_long_doublesense_press = false;
+static volatile bool g_long_encoder_press = false;
+
+static volatile bool g_leftsense_pressed = false;
+static volatile bool g_rightsense_pressed = false;
+static volatile bool g_doublesense_pressed = false;
+static volatile bool g_encoderswitch_pressed = false;
 
 volatile uint16_t g_audio_gain = 1;
 volatile bool g_enable_audio_feedthrough = true;
@@ -230,6 +234,7 @@ void powerDown5V(void);
 void powerUp5V(void);
 char* externBatString(bool volts);
 uint8_t nextActiveMemory(uint8_t currentChan, bool up);
+MenuState_t setMenu(MenuState_t menu);
 
 Frequency_Hz getFrequencySetting(void);
 
@@ -367,9 +372,11 @@ ISR(TCB0_INT_vect)
 		fiftyMS++;
 		if(!(fiftyMS % 6))
 		{
-			static volatile bool leftSense_pressed = false;
-			static volatile bool rightSense_pressed = false;
+			bool leftSense_pressed = false;
+			bool rightSense_pressed = false;
+			bool bothSense_pressed = false;
 			uint8_t switch_bits = ((1 << SENSE_SWITCH_LEFT) | (1 << SENSE_SWITCH_RIGHT) | (1 << ENCODER_SWITCH) | (1 << HEADPHONE_DETECT));
+
 			holdSwitch = portAdebouncedVals() & switch_bits;
 			debounce();
 			nowSwitch = portAdebouncedVals() & switch_bits;
@@ -384,7 +391,7 @@ ISR(TCB0_INT_vect)
 				g_powerdown_seconds = 60;
 			}
 			
-			g_bothSense_pressed = false;
+			bothSense_pressed = false;
 			
 			if(!leftSense && rightSense)
 			{
@@ -404,10 +411,13 @@ ISR(TCB0_INT_vect)
 				PORTA_set_pin_level(CARDIOID_BACK, LOW);
 				leftSense_pressed = false;
 				rightSense_pressed = false;
-				g_bothSense_pressed = !leftSense && !rightSense;
+				bothSense_pressed = !leftSense && !rightSense;
 			}
 			
-			g_encoderSwitch_pressed = !encoderSwitch;
+			g_encoderswitch_pressed = !encoderSwitch;
+			g_leftsense_pressed = leftSense_pressed;
+			g_rightsense_pressed = rightSense_pressed;
+			g_doublesense_pressed = bothSense_pressed;
 			
 			if(holdSwitch != nowSwitch) /* Change detected */
 			{
@@ -449,7 +459,7 @@ ISR(TCB0_INT_vect)
 					rightsenseAction = SwitchUnchanged;
 				}
 				
-				if(g_bothSense_pressed) /* Both sense switches are closed */
+				if(bothSense_pressed) /* Both sense switches are closed */
 				{
 					g_doublesense_presses_count++;
 					g_leftsense_closed_time = 0;
@@ -493,7 +503,7 @@ ISR(TCB0_INT_vect)
 				
 				if(changed & (1 << ENCODER_SWITCH))
 				{
-					if(g_encoderSwitch_pressed) 
+					if(g_encoderswitch_pressed) 
 					{
 						g_encoder_presses_count++;
 						encoderswitchAction = SwitchClosure;
@@ -509,7 +519,7 @@ ISR(TCB0_INT_vect)
 			}
 			else // no switches have changed
 			{
-				if(g_bothSense_pressed) /* Both sense switches closed and unchanged */
+				if(bothSense_pressed) /* Both sense switches closed and unchanged */
 				{
 					if(!g_long_doublesense_press && doublesenseLongPressEnabled)
 					{
@@ -562,7 +572,7 @@ ISR(TCB0_INT_vect)
 					}
 				}
 				
-				if(g_encoderSwitch_pressed) /* Switch closed and unchanged */
+				if(g_encoderswitch_pressed) /* Switch closed and unchanged */
 				{
 					if(!g_long_encoder_press && encoderLongPressEnabled)
 					{
@@ -852,12 +862,54 @@ void powerdown(void)
 	PORTA_set_pin_level(PWR_5V_ENABLE, HIGH);
 }
 
+MenuState_t setMenu(MenuState_t menu)
+{
+	static int menuIndex = 0;
+	static	MenuState_t menuStateTrace[20];
+	
+	menuStateTrace[0] = MenuOperational;
+	
+	if(menu == MenuGetCurrent)
+	{
+		return(menuStateTrace[menuIndex]);
+	}
+			
+	if(menu == MenuOperational)
+	{
+		menuIndex = 0;
+	}
+	else
+	{
+		if(menu == MenuBackOne)
+		{
+			if(menuIndex)
+			{
+				menuIndex--;
+			}
+			
+			if(!menuIndex) 
+			{		
+				EEPromMgr.saveAllEEPROM();
+			}
+		}
+		else if(menu != menuStateTrace[menuIndex])
+		{
+			if(menuIndex < 19)
+			{
+				menuStateTrace[++menuIndex] = menu;
+			}
+		}
+	}
+
+	return(menuStateTrace[menuIndex]);
+}
+
 int main(void)
 {
 	sineWaveInit();
 	
-	MenuState_t menuState = MenuOperational;
 	MenuState_t hold_menuState = MenuOperational;
+	bool frequency_updates_enabled = false;
 	uint8_t activeMemory = 0;
 	uint8_t hold_activeMemory = 0;
 	Frequency_Hz hold_activeMemoryFreq = 0;
@@ -941,10 +993,12 @@ int main(void)
 	{
 		if(g_display_active)
 		{
-			if(refresh_display || (menuState != hold_menuState))
+			MenuState_t currentMenu = setMenu(MenuGetCurrent);
+			
+			if(refresh_display || (currentMenu != hold_menuState))
 			{
 				refresh_display = false;
-				hold_menuState = menuState;
+				hold_menuState = currentMenu;
 				display.cls();
 				hold_rx_frequency = 0; /* force update */
 				hold_rf_gain_setting = 0xff; /* force update */
@@ -954,7 +1008,7 @@ int main(void)
 				hold_menuRow = 0xff; /* force update */
 			}
 			
-			switch(menuState)
+			switch(currentMenu)
 			{
 				case MenuOperational:
 				{
@@ -1072,7 +1126,7 @@ int main(void)
 						if(chanF)
 						{
 							frequencyString(str, chanF);
-							if(menuState == MenuFreqMemories)
+							if(currentMenu == MenuFreqMemories)
 							{
 								snprintf(g_tempStr, 13, "20  %s  ", str);
 							}
@@ -1103,13 +1157,12 @@ int main(void)
 				
 				default:
 				{
-					menuState = MenuOperational;
 				}
 				break;
 			}
 		}
 			
-				
+		/* Send text to the display */
 		if(g_text_buff.size())
 		{
 			size_t s;
@@ -1131,9 +1184,9 @@ int main(void)
 		}
 		else if(!g_inactivity_power_off)
 		{
-			if(menuState != MenuInactivityPoweroff)
+			if(setMenu(MenuGetCurrent) != MenuInactivityPoweroff)
 			{
-				menuState = MenuInactivityPoweroff;
+				setMenu(MenuInactivityPoweroff);
 			}
 			else
 			{
@@ -1152,11 +1205,9 @@ int main(void)
 		{
 			if(g_handle_counted_doublesense_presses == 1)
 			{
-				LEDS.blink(LEDS_RED_BLINK_SLOW, true);
 			}
 			else if(g_handle_counted_doublesense_presses == 2)
 			{
-				LEDS.blink(LEDS_RED_BLINK_FAST, true);
 			}
 			
 			g_handle_counted_doublesense_presses = 0;
@@ -1165,7 +1216,7 @@ int main(void)
 		if(g_long_doublesense_press)
 		{
 			g_long_doublesense_press = false;
-			menuState = MenuMain;
+			if(setMenu(MenuGetCurrent) == MenuOperational) setMenu(MenuMain);
 		}
 
 		
@@ -1177,8 +1228,10 @@ int main(void)
 			}
 			else if (g_handle_counted_leftsense_presses == 2)
 			{
-//				LEDS.blink(LEDS_RED_OFF);
 			}
+			
+			setMenu(MenuBackOne);
+			frequency_updates_enabled = false;
 			
 			g_handle_counted_leftsense_presses = 0;
 		}
@@ -1189,6 +1242,7 @@ int main(void)
 		
 		if(g_long_leftsense_press)
 		{
+			setMenu(MenuOperational);
 			g_long_leftsense_press = false;
 		}
 		
@@ -1203,6 +1257,9 @@ int main(void)
 				g_enable_audio_feedthrough = !g_enable_audio_feedthrough;
 			}
 			
+			setMenu(MenuBackOne);
+			frequency_updates_enabled = false;
+			
 			g_handle_counted_rightsense_presses = 0;
 		}
 		
@@ -1212,44 +1269,13 @@ int main(void)
 		
 		if(g_long_rightsense_press)
 		{
+			setMenu(MenuOperational);
 			g_long_rightsense_press = false;
 		}
 		
 		if(g_handle_counted_encoder_presses)
 		{
 			if(g_handle_counted_encoder_presses == 1)
-			{
-			}
-			else if (g_handle_counted_encoder_presses == 2)
-			{
-				switch(menuState)
-				{
-					case MenuMain:
-					{
-						if(menuRow == MEMORIES)
-						{
-							menuState = MenuFreqMemories;
-						}
-					}
-					break;
-					
-					case MenuFreqMemories:
-					{
-						menuState = MenuSetMemory;
-					}
-					break;
-					
-					case MenuSetMemory:
-					{
-						menuState = MenuFreqMemories;
-					}
-					break;
-					
-					default:
-					break;
-				}
-			}
-			else if (g_handle_counted_encoder_presses == 3)
 			{
 				if((g_frequency_mode == MODE_FREQUENCY) && (nextActiveMemory(activeMemory, UP) != 0xFF))
 				{
@@ -1263,6 +1289,44 @@ int main(void)
 				}
 				
 				refresh_display = true;
+			}
+			else if (g_handle_counted_encoder_presses == 2)
+			{
+				switch(setMenu(MenuGetCurrent))
+				{
+					case MenuOperational:
+					{
+						frequency_updates_enabled = true;
+					}
+					break;
+					
+					case MenuMain:
+					{
+						if(menuRow == MEMORIES)
+						{
+							setMenu(MenuFreqMemories);
+						}
+					}
+					break;
+					
+					case MenuFreqMemories:
+					{
+						setMenu(MenuSetMemory);
+					}
+					break;
+					
+					case MenuSetMemory:
+					{
+// 						setMenu(MenuFreqMemories);
+					}
+					break;
+					
+					default:
+					break;
+				}
+			}
+			else if (g_handle_counted_encoder_presses == 3)
+			{
 			}
 			
 			g_handle_counted_encoder_presses = 0;
@@ -1278,35 +1342,6 @@ int main(void)
 
 			if(!inhibit_long_encoder_press)
 			{
-				EEPromMgr.saveAllEEPROM();
-			
-				if(menuState == MenuOperational)
-				{
-					menuState = MenuFreqMemories;
-					LEDS.blink(LEDS_RED_AND_GREEN_BLINK_SLOW);
-					activeMemory = 0;
-				
-					Frequency_Hz f = g_frequency_memory[activeMemory];
-				
-					if((f > RX_MAXIMUM_80M_FREQUENCY) || (f < RX_MINIMUM_80M_FREQUENCY))
-					{
-						g_frequency_memory[activeMemory] = 0;
-						f = 0;
-					}
-
-					if(f)
-					{
-						g_rx_frequency = f;
-						si5351_set_quad_frequency(g_rx_frequency);
-					}
-				}
-				else
-				{
-					g_rx_frequency = g_frequency_memory[activeMemory];
-					si5351_set_quad_frequency(g_rx_frequency);
-					menuState = MenuOperational;
-					LEDS.blink(LEDS_OFF);
-				}
 			}
 		}
 		
@@ -1325,30 +1360,22 @@ int main(void)
 		/*********************************
 		* Handle Rotary Encoder Turns
 		*********************************/
-		if(!g_encoderSwitch_pressed) inhibit_long_encoder_press = false;
+		if(!g_encoderswitch_pressed) inhibit_long_encoder_press = false;
 		
 		if(g_rotary_count)
 		{
 			uint8_t pwm = g_rf_gain_setting;
 			
 			g_powerdown_seconds = 60;
-			inhibit_long_encoder_press = g_encoderSwitch_pressed;
+			inhibit_long_encoder_press = g_encoderswitch_pressed;
 			
 			if(g_rotary_count < 0)
 			{
-				switch(menuState)
+				switch(setMenu(MenuGetCurrent))
 				{
 					case MenuOperational:
 					{
-						if(g_encoderSwitch_pressed)
-						{
-							if(g_audio_gain < 10) 
-							{
-								g_audio_gain++;
-								g_tick++;
-							}
-						}
-						else if(g_bothSense_pressed)
+						if(frequency_updates_enabled)
 						{
 							if(g_frequency_mode == MODE_FREQUENCY)
 							{
@@ -1361,6 +1388,16 @@ int main(void)
 							}
 
 							si5351_set_quad_frequency(g_rx_frequency);
+							
+							g_tick++;
+						}
+						else if(g_leftsense_pressed)
+						{
+							if(g_audio_gain < 10) 
+							{
+								g_audio_gain++;
+								g_tick++;
+							}
 						}
 						else
 						{
@@ -1394,7 +1431,18 @@ int main(void)
 					
 					case MenuSetMemory:
 					{
-						g_rx_frequency += 100;
+						if(g_rx_frequency < RX_MAXIMUM_80M_FREQUENCY)
+						{
+							if(g_encoderswitch_pressed)
+							{
+								g_rx_frequency += 1000;
+							}
+							else
+							{
+								g_rx_frequency += 100;
+							}
+						}
+
 						g_frequency_memory[activeMemory] = g_rx_frequency;
 					}
 					break;
@@ -1414,19 +1462,11 @@ int main(void)
 			}
 			else
 			{
-				switch(menuState)
+				switch(setMenu(MenuGetCurrent))
 				{
 					case MenuOperational:
 					{
-						if(g_encoderSwitch_pressed)
-						{
-							if(g_audio_gain > 1) 
-							{
-								g_audio_gain--;
-								g_tick++;
-							}
-						}
-						else if(g_bothSense_pressed)
+						if(frequency_updates_enabled)
 						{
 							if(g_frequency_mode == MODE_FREQUENCY)
 							{
@@ -1439,6 +1479,16 @@ int main(void)
 							}
 
 							si5351_set_quad_frequency(g_rx_frequency);
+							
+							g_tick++;
+						}
+						else if(g_leftsense_pressed)
+						{
+							if(g_audio_gain > 1) 
+							{
+								g_audio_gain--;
+								g_tick++;
+							}
 						}
 						else
 						{
@@ -1478,8 +1528,19 @@ int main(void)
 					
 					case MenuSetMemory:
 					{
-						g_rx_frequency -= 100;
-						g_frequency_memory[activeMemory] = g_rx_frequency;
+						if(g_rx_frequency > RX_MINIMUM_80M_FREQUENCY)
+						{
+							if(g_encoderswitch_pressed)
+							{
+								g_rx_frequency -= 1000;
+							}
+							else
+							{
+								g_rx_frequency -= 100;
+							}
+						
+							g_frequency_memory[activeMemory] = g_rx_frequency;
+						}
 					}
 					break;
 					
