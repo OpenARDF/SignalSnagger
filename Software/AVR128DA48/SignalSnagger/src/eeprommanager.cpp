@@ -147,7 +147,7 @@ extern volatile Frequency_Hz g_frequency_med;
 extern volatile Frequency_Hz g_frequency_hi;
 extern volatile Frequency_Hz g_frequency_beacon;
 extern Frequency_Hz g_frequency_memory[NUMBER_OF_FREQUENCY_CHANNELS];
-volatile FrequencyMode_t g_frequency_mode = MODE_FREQUENCY;
+volatile FrequencyMode_t g_frequency_mode = MODE_VFO;
 
 char g_messages_text[STATION_ID+1][MAX_PATTERN_TEXT_LENGTH + 1];
 volatile time_t g_event_start_epoch;
@@ -778,7 +778,7 @@ bool EepromManager::readNonVols(void)
 		}
 		
 		g_frequency_mode = (FrequencyMode_t)eeprom_read_byte((const uint8_t*)&(EepromManager::ee_vars.frequency_mode));
-		if(g_frequency_mode != MODE_MEMORY) g_frequency_mode = MODE_FREQUENCY;
+		if(g_frequency_mode != MODE_MEMORY) g_frequency_mode = MODE_VFO;
 
 		failure = false;
 	}
@@ -925,7 +925,7 @@ bool EepromManager::readNonVols(void)
 				avr_eeprom_write_dword(i++, 0);
 			}
 			
-			g_frequency_mode = MODE_FREQUENCY;
+			g_frequency_mode = MODE_VFO;
 			avr_eeprom_write_byte(Frequency_Mode, g_frequency_mode);
 			
 			/* Done */

@@ -33,7 +33,7 @@
 
 /******************************************************
  * Set the text that gets displayed to the user       */
-#define SW_REVISION "0.26"
+#define SW_REVISION "0.27"
 
 //#define TRANQUILIZE_WATCHDOG
 
@@ -390,7 +390,7 @@ typedef enum
 
 typedef enum
 {
-	MODE_FREQUENCY,
+	MODE_VFO,
 	MODE_MEMORY,
 	MODE_NUMBER_OF_MODES
 } FrequencyMode_t;

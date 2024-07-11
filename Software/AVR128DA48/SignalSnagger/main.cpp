@@ -82,6 +82,9 @@ enum SwitchAction_t {
 #define NUMBER_OF_MENUS 5
 const char menuTitle[NUMBER_OF_MENUS][10] = {"MEMORIES", "EVENT", "SOUNDS", "SETTINGS", "UTILITY"};
 #define MEMORIES 0
+#define EMPTY_MEMORY 0
+#define INVALID_CHANNEL 0xFF
+#define MEMORY_DEFAULT_FREQUENCY 3550000
 const char clearRow[11] = "          ";
 
 
@@ -545,7 +548,7 @@ ISR(TCB0_INT_vect)
 						{
 							if(g_leftsense_closed_time < MAX_UINT16) g_leftsense_closed_time++;
 							
-							if(g_leftsense_closed_time >= 200)
+							if(g_leftsense_closed_time >= 100)
 							{
 								g_long_leftsense_press = true;
 								g_leftsense_closed_time = 0;
@@ -561,7 +564,7 @@ ISR(TCB0_INT_vect)
 						{
 							if(g_rightsense_closed_time < MAX_UINT16) g_rightsense_closed_time++;
 							
-							if(g_rightsense_closed_time >= 200)
+							if(g_rightsense_closed_time >= 100)
 							{
 								g_long_rightsense_press = true;
 								g_rightsense_closed_time = 0;
@@ -578,7 +581,7 @@ ISR(TCB0_INT_vect)
 					{
 						if(g_encoder_closed_time < MAX_UINT16) g_encoder_closed_time++;
 						
-						if(g_encoder_closed_time >= 200)
+						if(g_encoder_closed_time >= 100)
 						{
 							g_long_encoder_press = true;
 							g_encoder_closed_time = 0;
@@ -886,11 +889,6 @@ MenuState_t setMenu(MenuState_t menu)
 			{
 				menuIndex--;
 			}
-			
-			if(!menuIndex) 
-			{		
-				EEPromMgr.saveAllEEPROM();
-			}
 		}
 		else if(menu != menuStateTrace[menuIndex])
 		{
@@ -1006,6 +1004,11 @@ int main(void)
 				hold_activeMemory = 0xff; /* force update */
 				hold_goertzel_rssi = 0; /* force update */
 				hold_menuRow = 0xff; /* force update */
+				
+				if(currentMenu == MenuOperational)
+				{
+					EEPromMgr.saveAllEEPROM();
+				}
 			}
 			
 			switch(currentMenu)
@@ -1013,7 +1016,7 @@ int main(void)
 				case MenuOperational:
 				{
 					char str[11];
-					if(g_frequency_mode == MODE_FREQUENCY)
+					if(g_frequency_mode == MODE_VFO)
 					{	
 						if(hold_rx_frequency != g_rx_frequency)
 						{
@@ -1197,7 +1200,6 @@ int main(void)
 		
 		if(!g_powerdown_seconds)
 		{
-			/* Save EEPROM */
 			powerdown();
 		}
 		
@@ -1216,7 +1218,14 @@ int main(void)
 		if(g_long_doublesense_press)
 		{
 			g_long_doublesense_press = false;
-			if(setMenu(MenuGetCurrent) == MenuOperational) setMenu(MenuMain);
+			if(setMenu(MenuGetCurrent) == MenuOperational) 
+			{
+				setMenu(MenuMain);
+			}
+			else
+			{
+				setMenu(MenuOperational);
+			}
 		}
 
 		
@@ -1224,14 +1233,35 @@ int main(void)
 		{
 			if(g_handle_counted_leftsense_presses == 1)
 			{
-				LEDS.blink(LEDS_OFF, true);
 			}
 			else if (g_handle_counted_leftsense_presses == 2)
 			{
 			}
 			
-			setMenu(MenuBackOne);
-			frequency_updates_enabled = false;
+			if(setMenu(MenuGetCurrent) != MenuOperational)
+			{
+				frequency_updates_enabled = false;
+				if(g_frequency_memory[activeMemory] == EMPTY_MEMORY)
+				{
+					activeMemory = nextActiveMemory(activeMemory, UP);
+				
+					if(activeMemory == INVALID_CHANNEL)
+					{
+						g_frequency_mode = MODE_VFO;
+					}
+					else if(g_frequency_mode == MODE_MEMORY)
+					{
+						g_rx_frequency = g_frequency_memory[activeMemory];
+						si5351_set_quad_frequency(g_rx_frequency);					
+					}
+				}
+				
+				setMenu(MenuBackOne);
+			}
+			else
+			{
+				frequency_updates_enabled = false;
+			}
 			
 			g_handle_counted_leftsense_presses = 0;
 		}
@@ -1242,8 +1272,31 @@ int main(void)
 		
 		if(g_long_leftsense_press)
 		{
-			setMenu(MenuOperational);
-			frequency_updates_enabled = false;
+			if(setMenu(MenuGetCurrent) != MenuOperational)
+			{
+				frequency_updates_enabled = false;
+				if(g_frequency_memory[activeMemory] == EMPTY_MEMORY)
+				{
+					activeMemory = nextActiveMemory(activeMemory, UP);
+				
+					if(activeMemory == INVALID_CHANNEL)
+					{
+						g_frequency_mode = MODE_VFO;
+					}
+					else if(g_frequency_mode == MODE_MEMORY)
+					{
+						g_rx_frequency = g_frequency_memory[activeMemory];
+						si5351_set_quad_frequency(g_rx_frequency);					
+					}
+				}
+				
+				setMenu(MenuOperational);
+			}
+			else
+			{
+				frequency_updates_enabled = false;
+			}
+			
 			g_long_leftsense_press = false;
 		}
 		
@@ -1255,11 +1308,36 @@ int main(void)
 			}
 			else if (g_handle_counted_rightsense_presses == 2)
 			{
-				g_enable_audio_feedthrough = !g_enable_audio_feedthrough;
+				if(g_encoderswitch_pressed)
+				{
+					g_enable_audio_feedthrough = !g_enable_audio_feedthrough;
+				}
 			}
 			
-			setMenu(MenuBackOne);
-			frequency_updates_enabled = false;
+			if(setMenu(MenuGetCurrent) != MenuOperational)
+			{
+				frequency_updates_enabled = false;
+				if(g_frequency_memory[activeMemory] == EMPTY_MEMORY)
+				{
+					activeMemory = nextActiveMemory(activeMemory, UP);
+				
+					if(activeMemory == INVALID_CHANNEL)
+					{
+						g_frequency_mode = MODE_VFO;
+					}
+					else if(g_frequency_mode == MODE_MEMORY)
+					{
+						g_rx_frequency = g_frequency_memory[activeMemory];
+						si5351_set_quad_frequency(g_rx_frequency);					
+					}
+				}
+				
+				setMenu(MenuBackOne);
+			}
+			else
+			{
+				frequency_updates_enabled = false;
+			}
 			
 			g_handle_counted_rightsense_presses = 0;
 		}
@@ -1270,8 +1348,31 @@ int main(void)
 		
 		if(g_long_rightsense_press)
 		{
-			setMenu(MenuOperational);
-			frequency_updates_enabled = false;
+			if(setMenu(MenuGetCurrent) != MenuOperational)
+			{
+				frequency_updates_enabled = false;
+				if(g_frequency_memory[activeMemory] == EMPTY_MEMORY)
+				{
+					activeMemory = nextActiveMemory(activeMemory, UP);
+				
+					if(activeMemory == INVALID_CHANNEL)
+					{
+						g_frequency_mode = MODE_VFO;
+					}
+					else if(g_frequency_mode == MODE_MEMORY)
+					{
+						g_rx_frequency = g_frequency_memory[activeMemory];
+						si5351_set_quad_frequency(g_rx_frequency);					
+					}
+				}
+				
+				setMenu(MenuOperational);
+			}
+			else
+			{
+				frequency_updates_enabled = false;
+			}
+			
 			g_long_rightsense_press = false;
 		}
 		
@@ -1279,7 +1380,7 @@ int main(void)
 		{
 			if(g_handle_counted_encoder_presses == 1)
 			{
-				if((g_frequency_mode == MODE_FREQUENCY) && (nextActiveMemory(activeMemory, UP) != 0xFF))
+				if((g_frequency_mode == MODE_VFO) && (nextActiveMemory(activeMemory, UP) != 0xFF))
 				{
 					g_frequency_mode = MODE_MEMORY;
 					g_rx_frequency = g_frequency_memory[activeMemory];
@@ -1287,7 +1388,7 @@ int main(void)
 				}
 				else
 				{
-					g_frequency_mode = MODE_FREQUENCY;
+					g_frequency_mode = MODE_VFO;
 				}
 				
 				refresh_display = true;
@@ -1314,12 +1415,21 @@ int main(void)
 					case MenuFreqMemories:
 					{
 						setMenu(MenuSetMemory);
+						
+						if(g_frequency_memory[activeMemory] == EMPTY_MEMORY)
+						{
+							if((g_rx_frequency > RX_MAXIMUM_80M_FREQUENCY) || (g_rx_frequency < RX_MINIMUM_80M_FREQUENCY))
+							{
+								g_rx_frequency = MEMORY_DEFAULT_FREQUENCY;
+							}
+							
+							g_frequency_memory[activeMemory] = g_rx_frequency;
+						}
 					}
 					break;
 					
 					case MenuSetMemory:
 					{
-// 						setMenu(MenuFreqMemories);
 					}
 					break;
 					
@@ -1329,6 +1439,11 @@ int main(void)
 			}
 			else if (g_handle_counted_encoder_presses == 3)
 			{
+				if(setMenu(MenuGetCurrent) == MenuSetMemory)
+				{
+					g_frequency_memory[activeMemory] = 0;
+					setMenu(MenuBackOne);
+				}
 			}
 			
 			g_handle_counted_encoder_presses = 0;
@@ -1379,7 +1494,7 @@ int main(void)
 					{
 						if(frequency_updates_enabled)
 						{
-							if(g_frequency_mode == MODE_FREQUENCY)
+							if(g_frequency_mode == MODE_VFO)
 							{
 								g_rx_frequency += 100;
 							}
@@ -1470,7 +1585,7 @@ int main(void)
 					{
 						if(frequency_updates_enabled)
 						{
-							if(g_frequency_mode == MODE_FREQUENCY)
+							if(g_frequency_mode == MODE_VFO)
 							{
 								g_rx_frequency -= 100;
 							}
