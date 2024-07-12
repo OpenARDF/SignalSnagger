@@ -46,7 +46,7 @@ Goertzel g_goertzel(N, sampling_freq);
 
 static void PORT_init(void);
 static void ADC0_Freerun_Init(bool twelveBit);
-// static void ADC0_Single_Init(bool twelveBit);
+static void ADC0_Single_Init(bool twelveBit);
 
 typedef enum {
 	ADC_NOT_INITIALIZED,
@@ -167,33 +167,40 @@ static void ADC0_Freerun_Init(bool twelveBit)
 	}
 }
 
-// static void ADC0_Single_Init(bool twelveBit)
-// {
-// 	if(twelveBit)
-// 	{
-// 		VREF.ADC0REF = VREF_REFSEL_2V048_gc;  /* Internal 2.048V reference */
-// 		ADC0.CTRLC = ADC_PRESC_DIV2_gc;   /* CLK_PER divided by 128 and by 13.5 (10-bit conversion time = 13889 sps */
-// 		ADC0.CTRLA |= ADC_ENABLE_bm /* ADC Enable: enabled */
-// 		| ADC_RESSEL_12BIT_gc;      /* 12-bit mode */
-// 		ADC0.INTCTRL &= 0xFE; /* Disable interrupt */
-// 		g_adc_initialization = ADC_SINGLE_CONVERSION_INITIALIZED;
-// 	}
-// 	else
-// 	{
-// 		VREF.ADC0REF = VREF_REFSEL_2V048_gc;  /* Internal 2.048V reference */
-// 		ADC0.CTRLC = ADC_PRESC_DIV2_gc;   /* CLK_PER divided by 128 and by 13.5 (10-bit conversion time = 13889 sps */
-// 		ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
-// 		| ADC_RESSEL_10BIT_gc;      /* 10-bit mode */
-// 		ADC0.INTCTRL &= 0xFE; /* Disable interrupt */
-// 		g_adc_initialization = ADC_SINGLE_CONVERSION_INITIALIZED;
-// 	}
-// }
+static void ADC0_Single_Init(bool twelveBit)
+{
+	if(twelveBit)
+	{
+		VREF.ADC0REF = VREF_REFSEL_2V048_gc;  /* Internal 2.048V reference */
+		ADC0.CTRLC = ADC_PRESC_DIV2_gc;   /* CLK_PER divided by 128 and by 13.5 (10-bit conversion time = 13889 sps */
+		ADC0.CTRLA |= ADC_ENABLE_bm /* ADC Enable: enabled */
+		| ADC_RESSEL_12BIT_gc;      /* 12-bit mode */
+		ADC0.INTCTRL &= 0xFE; /* Disable interrupt */
+		g_adc_initialization = ADC_SINGLE_CONVERSION_INITIALIZED;
+	}
+	else
+	{
+		VREF.ADC0REF = VREF_REFSEL_2V048_gc;  /* Internal 2.048V reference */
+		ADC0.CTRLC = ADC_PRESC_DIV2_gc;   /* CLK_PER divided by 128 and by 13.5 (10-bit conversion time = 13889 sps */
+		ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
+		| ADC_RESSEL_10BIT_gc;      /* 10-bit mode */
+		ADC0.INTCTRL &= 0xFE; /* Disable interrupt */
+		g_adc_initialization = ADC_SINGLE_CONVERSION_INITIALIZED;
+	}
+}
 
-void ADC0_SYSTEM_init(bool twelveBit)
+void ADC0_SYSTEM_init(bool twelveBit, bool freerun)
 {
 	PORT_init();
-	ADC0_Freerun_Init(twelveBit);
-// 	ADC0_Single_Init(twelveBit);
+	if(freerun)
+	{
+		ADC0_Freerun_Init(twelveBit);
+	}
+	else
+	{
+		ADC0_Single_Init(twelveBit);
+	}
+	
 }
 
 void ADC0_SYSTEM_shutdown(void)

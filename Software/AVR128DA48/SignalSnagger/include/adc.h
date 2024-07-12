@@ -45,7 +45,7 @@ void ADC0_startConversion(void);
 bool ADC0_conversionDone(void);
 int ADC0_read(void);
 int16_t temperatureC(void);
-void ADC0_SYSTEM_init(bool twelveBit);
+void ADC0_SYSTEM_init(bool twelveBit, bool freerun);
 void ADC0_SYSTEM_shutdown(void);
 
 

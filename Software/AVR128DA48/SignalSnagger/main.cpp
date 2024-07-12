@@ -100,8 +100,6 @@ const char clearRow[11] = "          ";
 
 #define TEMPSTR_SIZE 100
 static char g_tempStr[TEMPSTR_SIZE] = { '\0' };
-static volatile EC g_last_error_code = ERROR_CODE_NO_ERROR;
-static volatile SC g_last_status_code = STATUS_CODE_IDLE;
 
 static volatile bool g_battery_measurements_active = false;
 static volatile uint16_t g_maximum_battery = 0;
@@ -233,7 +231,7 @@ static volatile uint8_t g_tick = 0;
  ************************************************************************/
 void wdt_init(WDReset resetType);
 EC hw_init(void);
-char* externBatString(bool volts);
+char* externBatString(bool volts, float* value);
 uint8_t nextActiveMemory(uint8_t currentChan, bool up);
 MenuState_t setMenu(MenuState_t menu);
 
@@ -963,16 +961,34 @@ int main(void)
 	}
 	else
 	{
+		ADC0.MUXPOS = ADCBatteryVoltage;
+		uint16_t result = 0;
+		float fresult = 0.;
+		
+		ADC0_SYSTEM_init(ADC12BIT, false);
+		
+		for(int i=0; i<100; i++)
+		{
+			ADC0_startConversion();
+			while(!ADC0_conversionDone());
+			result = ADC0.RES;
+			fresult += result;
+		}
+		
+		fresult /= 100.;
+
 		LEDS.blink(LEDS_OFF);
 		g_text_buff.putString((char*)"00Signal");
 		g_text_buff.putString((char*)"12Snagger!");
+		snprintf(g_tempStr, 13, "20BAT %sV", externBatString(true, &fresult));
+		g_text_buff.putString(g_tempStr);
 		sprintf(g_tempStr, "30Ver:%s", SW_REVISION);	
 	}
 	g_text_buff.putString((char*)g_tempStr);
 	
 	/* Start audio flow */
 	ADC0.MUXPOS = ADC_I_AMPED; 
-	ADC0_SYSTEM_init(ADC10BIT);
+	ADC0_SYSTEM_init(ADC10BIT, true);
 	ADC0_startConversion();
 
 	while (1) 
@@ -1011,7 +1027,7 @@ int main(void)
 							hold_rx_frequency = g_rx_frequency;
 				
 							frequencyString(str, hold_rx_frequency);
-							sprintf(g_tempStr, "00%s", str);
+							sprintf(g_tempStr, "00VFO %s", str);
 							g_text_buff.putString(g_tempStr);
 						}
 					}
@@ -1196,11 +1212,16 @@ int main(void)
 		if(!g_powerdown_seconds)
 		{
 			powerdown();
-			/* Reach here if headphones are plugged back in */
+			/* Reach here if headphones are plugged back in before total power off occurs */
 			PORTA_set_pin_level(PWR_5V_ENABLE, HIGH);  /* Enable 5V power regulator */
 			PORTA_set_pin_level(POWER_ENABLE, HIGH);
 		}
 		
+		/*************************************************************************************
+		USER INPUT - Handing button presses and rotary encoder turns
+		**************************************************************************************/
+		
+		/* Both sense switches pressed simultaneously */
 		if(g_handle_counted_doublesense_presses)
 		{
 			if(g_handle_counted_doublesense_presses == 1)
@@ -1226,7 +1247,10 @@ int main(void)
 			}
 		}
 
-		
+
+		/*********************************
+		* Left sense switch pressed 
+		*********************************/
 		if(g_handle_counted_leftsense_presses)
 		{
 			if(g_handle_counted_leftsense_presses == 1)
@@ -1298,6 +1322,9 @@ int main(void)
 			g_long_leftsense_press = false;
 		}
 		
+		/*********************************
+		* Right sense switch pressed 
+		*********************************/
 		if(g_handle_counted_rightsense_presses)
 		{
 			if(g_handle_counted_rightsense_presses == 1)
@@ -1374,6 +1401,9 @@ int main(void)
 			g_long_rightsense_press = false;
 		}
 		
+		/*********************************
+		* Encoder switch pressed 
+		*********************************/
 		if(g_handle_counted_encoder_presses)
 		{
 			if(g_handle_counted_encoder_presses == 1)
@@ -1458,18 +1488,6 @@ int main(void)
 			if(!inhibit_long_encoder_press)
 			{
 			}
-		}
-		
-		if(g_last_error_code)
-		{
-// 			sprintf(g_tempStr, "%u", g_last_error_code);
-			g_last_error_code = ERROR_CODE_NO_ERROR;
-		}
-
-		if(g_last_status_code)
-		{
-// 			sprintf(g_tempStr, "%u", g_last_status_code);
-			g_last_status_code = STATUS_CODE_IDLE;
 		}
 		
 		/*********************************
@@ -1888,8 +1906,6 @@ int main(void)
 			if(g_awakenedBy == AWAKENED_BY_BUTTONPRESS)
 			{	
 			}
-
- 			g_last_status_code = STATUS_CODE_RETURNED_FROM_SLEEP;
 		}
 	}
 }
@@ -1919,17 +1935,34 @@ Frequency_Hz getFrequencySetting(void)
 
 
 // Caller must provide a pointer to a string of length 6 or greater.
-char* externBatString(bool volts)
+char* externBatString(bool volts, float* value)
 {
 	static float filtered = 78.0;
 	static char str[7] = "?";
 	char* pstr = str;
-	float bat = (float)g_lastConversionResult[g_adcChannel2Slot[ADCBatteryVoltage]];
+	float bat;
+	
+	if(value)
+	{
+		bat = *value;
+	}
+	else
+	{
+		bat = (float)g_lastConversionResult[g_adcChannel2Slot[ADCBatteryVoltage]];
+	}
+	
 	bat *= 288.;
 	bat /= 4096.;
 	bat += 2.;
 	
-	filtered = (bat + 9*filtered) / 10.;
+	if(value)
+	{
+		filtered = bat;
+	}
+	else
+	{
+		filtered = (bat + 9*filtered) / 10.;
+	}
 	
 	if((bat >= 0.) && (bat <= 180.))
 	{
