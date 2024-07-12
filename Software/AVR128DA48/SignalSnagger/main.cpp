@@ -694,29 +694,36 @@ ISR(TCB0_INT_vect)
 		{
 			bool neg = g_rotary_edges < 0;
 			int val = abs(g_rotary_edges);
-
+			
 			if(holdRotaryEdges == g_rotary_edges)
 			{
 				if(rotaryNoMotionCountdown) rotaryNoMotionCountdown--;
 
-// 				if(!rotaryNoMotionCountdown)
-// 				{
-// 					g_inactivity_power_off = 900;
-// 					
-// 					if(val>1)
-// 					{
-// 						val = 4;
-// 					}
-// 					else
-// 					{
-// 						val = 0; 
-// 					}
-// 				}
+				if(!rotaryNoMotionCountdown)
+				{
+					g_inactivity_power_off = 900;
+					
+					if(val>1)
+					{
+						val = 4;
+					}
+					else
+					{
+						val = 0; 
+					}
+				}
 			}
 			else
 			{
 				if(val > 3)
 				{
+					if(g_encoderswitch_pressed)
+					{
+						encoderLongPressEnabled = false; /* prevent press activation while turning */
+						g_encoder_closed_time = 0;
+						g_encoder_presses_count = 0;
+					}
+
 					if(neg)
 					{
 						g_rotary_count--;
@@ -1487,7 +1494,17 @@ int main(void)
 						{
 							if(g_frequency_mode == MODE_VFO)
 							{
-								g_rx_frequency += 100;
+								if(g_rx_frequency < RX_MAXIMUM_80M_FREQUENCY)
+								{
+									if(g_encoderswitch_pressed)
+									{
+										g_rx_frequency += 1000;
+									}
+									else
+									{
+										g_rx_frequency += 100;
+									}
+								}
 							}
 							else
 							{
@@ -1578,7 +1595,17 @@ int main(void)
 						{
 							if(g_frequency_mode == MODE_VFO)
 							{
-								g_rx_frequency -= 100;
+								if(g_rx_frequency > RX_MINIMUM_80M_FREQUENCY)
+								{
+									if(g_encoderswitch_pressed)
+									{
+										g_rx_frequency -= 1000;
+									}
+									else
+									{
+										g_rx_frequency -= 100;
+									}				
+								}
 							}
 							else
 							{
@@ -1996,7 +2023,7 @@ uint8_t nextActiveMemory(uint8_t currentChan, bool up)
 			}
 			else
 			{
-				i = NUMBER_OF_FREQUENCY_CHANNELS -1;
+				i = NUMBER_OF_FREQUENCY_CHANNELS - 1;
 			}
 			
 			if(g_frequency_memory[i])
