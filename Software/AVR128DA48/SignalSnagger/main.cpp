@@ -119,7 +119,7 @@ static volatile int g_rotary_count = 0;
 static volatile int g_rotary_edges = 0;
 #define ROTARY_SYNC_DELAY 75
 
-static uint8_t g_rf_gain_setting = 50;
+static uint8_t g_rf_gain_setting = MAX_PWM_SETTING/2;
 
 extern volatile Frequency_Hz g_rx_frequency;
 extern volatile Frequency_Hz g_frequency_low;
@@ -1048,7 +1048,7 @@ int main(void)
 					{
 						hold_rf_gain_setting = g_rf_gain_setting;
 				
-						sprintf(g_tempStr, "10RF=%d  ", 100 - g_rf_gain_setting);
+						sprintf(g_tempStr, "10RF=%d  ", MAX_PWM_SETTING - g_rf_gain_setting);
 						g_text_buff.putString(g_tempStr);
 					}
 			
@@ -1645,7 +1645,7 @@ int main(void)
 						}
 						else
 						{
-							if(pwm < 100) 
+							if(pwm < MAX_PWM_SETTING) 
 							{
 								setPWM(++pwm);
 								g_tick++;

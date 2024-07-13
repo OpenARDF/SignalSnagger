@@ -16,9 +16,11 @@
 extern "C" {
 #endif
 
+#define MAX_PWM_SETTING (uint8_t)10
+
 void TIMERA_init(void);
-void setPWM(uint16_t duty);
-uint16_t getPWM(void);
+void setPWM(uint8_t duty);
+uint8_t getPWM(void);
 
 #ifdef __cplusplus
 }

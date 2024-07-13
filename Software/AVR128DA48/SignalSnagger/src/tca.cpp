@@ -34,8 +34,7 @@
 #include "port.h"
 #include "binio.h"
 
-uint16_t g_pwm_setting = 0;
-#define MAX_PWM_SETTING (uint16_t)100
+uint8_t g_pwm_setting = 0;
 
 void TIMERA_init(void)
 {
@@ -60,22 +59,25 @@ void TIMERA_init(void)
 	TCA0.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm; /* enable TimerA0 */
 }
 
-void setPWM(uint16_t duty)
+const uint16_t rf_gain_settings[MAX_PWM_SETTING+1] = {0, 960, 1920, 2880, 3840, 4800, 5760, 6720, 7680, 8640, 9600}; /* 2500 Hz PWM period */
+
+void setPWM(uint8_t duty)
 {
-	uint16_t dc = CLAMP((uint16_t)0, duty, MAX_PWM_SETTING);
+	uint8_t dc = CLAMP((uint8_t)0, duty, MAX_PWM_SETTING);
 	
 #ifdef TCA0_USE_SPLIT
 	uint16_t newCMP = (((uint16_t)(TCA0.SPLIT.HPER) * dc) / MAX_PWM_SETTING);
 	TCA0.SPLIT.HCMP0 = (uint8_t)newCMP;
 #else
-	uint32_t newCMP = (((uint32_t)(TCA0.SINGLE.PER) * dc) / MAX_PWM_SETTING);
-	TCA0.SINGLE.CMP2 = (uint16_t)newCMP;
+// 	uint32_t newCMP = (((uint32_t)(TCA0.SINGLE.PER) * dc) / MAX_PWM_SETTING);
+// 	TCA0.SINGLE.CMP2 = (uint16_t)newCMP;
+	TCA0.SINGLE.CMP2 = rf_gain_settings[dc];
 #endif
 
 	g_pwm_setting = dc;
 }
 
-uint16_t getPWM(void)
+uint8_t getPWM(void)
 {
 	return(g_pwm_setting);
 }
