@@ -146,7 +146,8 @@ extern volatile Frequency_Hz g_frequency_low;
 extern volatile Frequency_Hz g_frequency_med;
 extern volatile Frequency_Hz g_frequency_hi;
 extern volatile Frequency_Hz g_frequency_beacon;
-extern Frequency_Hz g_frequency_memory[NUMBER_OF_FREQUENCY_CHANNELS];
+extern Frequency_Hz g_channel_frequency[NUMBER_OF_FREQUENCY_CHANNELS];
+extern uint8_t g_channel_name[NUMBER_OF_FREQUENCY_CHANNELS];
 volatile FrequencyMode_t g_frequency_mode = MODE_VFO;
 
 char g_messages_text[STATION_ID+1][MAX_PATTERN_TEXT_LENGTH + 1];
@@ -619,6 +620,33 @@ void EepromManager::updateEEPROMVar(EE_var_t v, void* val)
 		}
 		break;
 		
+		
+		case Channel_Name:
+		{
+			int cnt = 0;
+			uint8_t* name_addr = (uint8_t*)val;
+			uint8_t n = *name_addr;
+			uint8_t q;
+			
+			eeprom_addr_t j = (eeprom_addr_t)Channel_Name;
+
+			while(cnt<NUMBER_OF_FREQUENCY_CHANNELS)
+			{
+				q = (uint8_t)eeprom_read_byte((uint8_t*)j);
+				if(n != q)
+				{
+					avr_eeprom_write_dword(j, n);
+				}
+
+				cnt++;
+				name_addr++;
+				n = *name_addr;
+				j++;
+			}
+		}
+		break;
+		
+		
 		case Frequency_Mode:
 		{
 			if(*(uint8_t*)val != eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.frequency_mode)))
@@ -672,7 +700,8 @@ void EepromManager::saveAllEEPROM(void)
 	updateEEPROMVar(Clock_calibration, (void*)&g_clock_calibration);
 	updateEEPROMVar(Days_to_run, (void*)&g_days_to_run);
 	updateEEPROMVar(I2C_failure_count, (void*)&g_i2c_failure_count);
-	updateEEPROMVar(Frequency_Memory, (void*)&g_frequency_memory[0]);
+	updateEEPROMVar(Frequency_Memory, (void*)&g_channel_frequency[0]);
+	updateEEPROMVar(Channel_Name, (void*)&g_channel_name[0]);
 	updateEEPROMVar(Frequency_Mode, (void*)&g_frequency_mode);
 }
 
@@ -769,12 +798,20 @@ bool EepromManager::readNonVols(void)
 		Frequency_Hz f;
 		for(i = 0; i < NUMBER_OF_FREQUENCY_CHANNELS; i++)
 		{
-			f = eeprom_read_dword(&(EepromManager::ee_vars.frequency_memory[i]));
+			f = eeprom_read_dword(&(EepromManager::ee_vars.channel_frequency[i]));
 			if(f==0xFFFFFFFF) f=0;
 			if((f==0) || ((f <= RX_MAXIMUM_80M_FREQUENCY) && (f >= RX_MINIMUM_80M_FREQUENCY)))
 			{
-				g_frequency_memory[i] = f;
+				g_channel_frequency[i] = f;
 			}
+		}
+		
+		uint8_t x;
+		for(i=0; i<NUMBER_OF_FREQUENCY_CHANNELS; i++)
+		{
+			x = eeprom_read_byte(&(EepromManager::ee_vars.channel_name[i]));
+			if(x >= NUMBER_OF_FREQUENCY_CHANNEL_NAMES) x = 0;
+			g_channel_name[i] = x;
 		}
 		
 		g_frequency_mode = (FrequencyMode_t)eeprom_read_byte((const uint8_t*)&(EepromManager::ee_vars.frequency_mode));
@@ -921,8 +958,16 @@ bool EepromManager::readNonVols(void)
 			i = Frequency_Memory;
 			for(j = 0; j < NUMBER_OF_FREQUENCY_CHANNELS; j++)
 			{
-				g_frequency_memory[j] = 0;
-				avr_eeprom_write_dword(i++, 0);
+				g_channel_frequency[j] = 0;
+				avr_eeprom_write_dword(i, 0);
+				i += 4;
+			}
+			
+			i = Channel_Name;
+			for(j=0; j<NUMBER_OF_FREQUENCY_CHANNELS; j++)
+			{
+				g_channel_name[j] = 0;
+				avr_eeprom_write_byte(i++, 0);
 			}
 			
 			g_frequency_mode = MODE_VFO;

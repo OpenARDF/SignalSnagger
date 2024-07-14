@@ -59,7 +59,8 @@ void TIMERA_init(void)
 	TCA0.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm; /* enable TimerA0 */
 }
 
-const uint16_t rf_gain_settings[MAX_PWM_SETTING+1] = {0, 960, 1920, 2880, 3840, 4800, 5760, 6720, 7680, 8640, 9600}; /* 2500 Hz PWM period */
+//const uint16_t rf_gain_settings[MAX_PWM_SETTING+1] = {0, 960, 1920, 2880, 3840, 4800, 5760, 6720, 7680, 8640, 9600}; /* 2500 Hz PWM period */
+const uint16_t rf_gain_settings[MAX_PWM_SETTING+1] = {0, 672, 1344, 2016, 2688, 3360, 4032, 4704, 5376, 6048, 6720}; /* 2500 Hz PWM period */
 
 void setPWM(uint8_t duty)
 {

@@ -33,7 +33,7 @@
 
 /******************************************************
  * Set the text that gets displayed to the user       */
-#define SW_REVISION "0.31"
+#define SW_REVISION "0.32"
 
 //#define TRANQUILIZE_WATCHDOG
 
@@ -218,13 +218,14 @@ typedef uint16_t BatteryLevel;  /* in milliVolts */
 
 /******************************************************
  * EEPROM definitions */
-#define EEPROM_INITIALIZED_FLAG (uint16_t)0x0109
+#define EEPROM_INITIALIZED_FLAG (uint16_t)0x010B
 #define EEPROM_UNINITIALIZED 0x00
 
 #define EEPROM_STATION_ID_DEFAULT "FOXBOX"
 #define EEPROM_PATTERN_TEXT_DEFAULT "PARIS|"
 
 #define NUMBER_OF_FREQUENCY_CHANNELS 20
+#define NUMBER_OF_FREQUENCY_CHANNEL_NAMES 24
 
 #define EEPROM_MASTER_SETTING_DEFAULT false
 #define EEPROM_START_TIME_DEFAULT 0
@@ -267,7 +268,7 @@ typedef uint16_t BatteryLevel;  /* in milliVolts */
 #define EEPROM_EVENT_SETTING_DEFAULT EVENT_FOXORING
 #define EEPROM_FOX_PATTERN_DEFAULT "MOE"
 #define EEPROM_FOXORING_PATTERN_DEFAULT "ME"
-#define EEPROM_FREQUENCY_DEFAULT 3700000
+#define EEPROM_FREQUENCY_DEFAULT 3550000
 #define EEPROM_FREQUENCY_LOW_DEFAULT 3530000
 #define EEPROM_FREQUENCY_MED_DEFAULT 3550000
 #define EEPROM_FREQUENCY_HI_DEFAULT 3570000

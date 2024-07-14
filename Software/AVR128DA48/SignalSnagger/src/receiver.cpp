@@ -41,7 +41,7 @@ volatile Frequency_Hz g_frequency_med = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 volatile Frequency_Hz g_frequency_hi = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 volatile Frequency_Hz g_frequency_beacon = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 
-Frequency_Hz g_frequency_memory[NUMBER_OF_FREQUENCY_CHANNELS];
+Frequency_Hz g_channel_frequency[NUMBER_OF_FREQUENCY_CHANNELS];
 
 /*
  *       This function sets the VFO frequency (CLK0 of the Si5351) based on the intended frequency passed in by the parameter (freq),

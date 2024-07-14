@@ -64,8 +64,11 @@ enum HardwareError_t
 enum MenuState_t {
 	MenuOperational,
 	MenuFreqMemories,
-	MenuSetMemory,
+	MenuSetMemFreq,
+	MenuSetMemName,
 	MenuMain,
+	MenuBattery,
+	MenuClock,
 	MenuInactivityPoweroff,
 	NumberOfMenuStates,
 	MenuBackOne,
@@ -77,16 +80,31 @@ enum SwitchAction_t {
 	SwitchRelease,
 	SwitchUnchanged
 	};
-	
 
-#define NUMBER_OF_MENUS 5
-const char menuTitle[NUMBER_OF_MENUS][10] = {"MEMORIES", "EVENT", "SOUNDS", "SETTINGS", "UTILITY"};
-#define MEMORIES 0
+enum PrimaryMenu_t {
+	MEMORIES,
+	BATTERY,
+	CLOCK,
+	EVENTS,
+	SOUNDS,
+	SETTINGS,
+	UTILITY,
+	NUMBER_OF_MENUS,
+	INVALID_MENU
+	};
+
+// #define NUMBER_OF_MENUS 5
+const char menuTitle[NUMBER_OF_MENUS][10] = {"MEMORIES", "BATTERY", "EVENT", "SOUNDS", "SETTINGS", "UTILITY"};
+// #define MEMORIES 0
+// #define BATTERY 1
 #define EMPTY_MEMORY 0
 #define INVALID_CHANNEL 0xFF
+#define INVALID_FREQUENCY 0
 #define MEMORY_DEFAULT_FREQUENCY 3550000
 const char clearRow[11] = "          ";
 
+const char channelNames[NUMBER_OF_FREQUENCY_CHANNEL_NAMES][7] = {"???", "FOXES ", "BEACON", "SPEC  ", "SLOW  ", "FAST  ", "FOX-1 ", "FOX-1F", "FOX-2 ", "FOX-2F", "FOX-3 ", "FOX-3F", "FOX-4 ", "FOX-4F", "FOX-5 ", "FOX-5F", "FOX-6 ", "FOX-6F", "FOX   ", "FINISH", "START ", "LOW   ", "MID   ", "HIGH  "};
+uint8_t g_channel_name[NUMBER_OF_FREQUENCY_CHANNELS] = {};
 
 #define QUAD_MASK ((1 << ROTARY_A_IN) | (ROTARY_B_IN))
 
@@ -126,7 +144,7 @@ extern volatile Frequency_Hz g_frequency_low;
 extern volatile Frequency_Hz g_frequency_med;
 extern volatile Frequency_Hz g_frequency_hi;
 extern volatile Frequency_Hz g_frequency_beacon;
-extern Frequency_Hz g_frequency_memory[NUMBER_OF_FREQUENCY_CHANNELS];
+extern Frequency_Hz g_channel_frequency[NUMBER_OF_FREQUENCY_CHANNELS];
 extern FrequencyMode_t g_frequency_mode;
 
 volatile bool g_seconds_transition = false;
@@ -234,8 +252,7 @@ EC hw_init(void);
 char* externBatString(bool volts, float* value);
 uint8_t nextActiveMemory(uint8_t currentChan, bool up);
 MenuState_t setMenu(MenuState_t menu);
-
-Frequency_Hz getFrequencySetting(void);
+// char* centerHorizontally(const char* text, uint8_t row);
 
 int repChar(char *str, char orig, char rep);
 char *trimwhitespace(char *str);
@@ -898,8 +915,8 @@ int main(void)
 	uint8_t hold_activeMemory = 0;
 	Frequency_Hz hold_activeMemoryFreq = 0;
 	
-	uint8_t hold_menuRow = 0;
-	uint8_t menuRow = 0;
+	PrimaryMenu_t hold_menuRow = MEMORIES;
+	PrimaryMenu_t menuRow = MEMORIES;
 
 	Frequency_Hz hold_rx_frequency = 0;
 	uint8_t hold_rf_gain_setting = 255;
@@ -1007,7 +1024,7 @@ int main(void)
 				hold_audio_gain = 0xff; /* force update */
 				hold_activeMemory = 0xff; /* force update */
 				hold_goertzel_rssi = 0; /* force update */
-				hold_menuRow = 0xff; /* force update */
+				hold_menuRow = INVALID_MENU; /* force update */
 				
 				if(currentMenu == MenuOperational)
 				{
@@ -1038,8 +1055,16 @@ int main(void)
 							hold_activeMemory = activeMemory;
 							hold_rx_frequency = g_rx_frequency;
 						
-							frequencyString(str, hold_rx_frequency);
-							snprintf(g_tempStr, 13, "00M%02d %s", hold_activeMemory + 1, str);
+							if(g_channel_name[activeMemory])
+							{
+								snprintf(g_tempStr, 13, "00M%02d %s", hold_activeMemory + 1, channelNames[g_channel_name[activeMemory]]);
+							}
+							else
+							{
+								frequencyString(str, hold_rx_frequency);
+								snprintf(g_tempStr, 13, "00M%02d %s", hold_activeMemory + 1, str);
+							}
+							
 							g_text_buff.putString(g_tempStr);
 						}
 					}
@@ -1107,20 +1132,27 @@ int main(void)
 				}
 				break;
 				
-				case MenuSetMemory:
+				case MenuBattery:
+				{
+					
+				}
+				break;
+				
+				case MenuSetMemFreq:
 				case MenuFreqMemories:
+				case MenuSetMemName:
 				{
 					if(activeMemory > NUMBER_OF_FREQUENCY_CHANNELS)
 					{
 						activeMemory = 0;
 					}
 					
-					Frequency_Hz chanF = g_frequency_memory[activeMemory];
+					Frequency_Hz chanF = g_channel_frequency[activeMemory];
 										
 					/* Reset any corrupted memory locations */
 					if((chanF > RX_MAXIMUM_80M_FREQUENCY) || (chanF < RX_MINIMUM_80M_FREQUENCY))
 					{
-						g_frequency_memory[activeMemory] = 0;
+						g_channel_frequency[activeMemory] = 0;
 						chanF = 0;
 					}
 
@@ -1133,7 +1165,7 @@ int main(void)
 						g_text_buff.putString(g_tempStr);
 						
 						char str[11];
-						chanF = g_frequency_memory[hold_activeMemory];
+						chanF = g_channel_frequency[hold_activeMemory];
 						
 						if(chanF)
 						{
@@ -1141,10 +1173,29 @@ int main(void)
 							if(currentMenu == MenuFreqMemories)
 							{
 								snprintf(g_tempStr, 13, "20  %s  ", str);
+								g_text_buff.putString(g_tempStr);
+								
+								if(g_channel_name[activeMemory])
+								{
+									snprintf(g_tempStr, 13, "30  %s", channelNames[g_channel_name[activeMemory]]);
+								}
+								else
+								{
+									snprintf(g_tempStr, 13, "30* NAME?? *");
+								}
 							}
 							else
 							{
-								snprintf(g_tempStr, 13, "20> %s  ", str);
+								if(currentMenu == MenuSetMemFreq)
+								{
+									snprintf(g_tempStr, 13, "20> %s  ", str);
+								}
+								else
+								{
+// 									snprintf(g_tempStr, 13, "20  %s  ", str);
+// 									g_text_buff.putString(g_tempStr);
+									snprintf(g_tempStr, 13, "30> %s  ", channelNames[g_channel_name[activeMemory]]);
+								}
 							}
 					
 							g_text_buff.putString(g_tempStr);
@@ -1263,7 +1314,7 @@ int main(void)
 			if(setMenu(MenuGetCurrent) != MenuOperational)
 			{
 				frequency_updates_enabled = false;
-				if(g_frequency_memory[activeMemory] == EMPTY_MEMORY)
+				if(g_channel_frequency[activeMemory] == EMPTY_MEMORY)
 				{
 					activeMemory = nextActiveMemory(activeMemory, UP);
 				
@@ -1273,7 +1324,7 @@ int main(void)
 					}
 					else if(g_frequency_mode == MODE_MEMORY)
 					{
-						g_rx_frequency = g_frequency_memory[activeMemory];
+						g_rx_frequency = g_channel_frequency[activeMemory];
 						si5351_set_quad_frequency(g_rx_frequency);					
 					}
 				}
@@ -1297,7 +1348,7 @@ int main(void)
 			if(setMenu(MenuGetCurrent) != MenuOperational)
 			{
 				frequency_updates_enabled = false;
-				if(g_frequency_memory[activeMemory] == EMPTY_MEMORY)
+				if(g_channel_frequency[activeMemory] == EMPTY_MEMORY)
 				{
 					activeMemory = nextActiveMemory(activeMemory, UP);
 				
@@ -1307,7 +1358,7 @@ int main(void)
 					}
 					else if(g_frequency_mode == MODE_MEMORY)
 					{
-						g_rx_frequency = g_frequency_memory[activeMemory];
+						g_rx_frequency = g_channel_frequency[activeMemory];
 						si5351_set_quad_frequency(g_rx_frequency);					
 					}
 				}
@@ -1342,7 +1393,7 @@ int main(void)
 			if(setMenu(MenuGetCurrent) != MenuOperational)
 			{
 				frequency_updates_enabled = false;
-				if(g_frequency_memory[activeMemory] == EMPTY_MEMORY)
+				if(g_channel_frequency[activeMemory] == EMPTY_MEMORY)
 				{
 					activeMemory = nextActiveMemory(activeMemory, UP);
 				
@@ -1352,7 +1403,7 @@ int main(void)
 					}
 					else if(g_frequency_mode == MODE_MEMORY)
 					{
-						g_rx_frequency = g_frequency_memory[activeMemory];
+						g_rx_frequency = g_channel_frequency[activeMemory];
 						si5351_set_quad_frequency(g_rx_frequency);					
 					}
 				}
@@ -1376,7 +1427,7 @@ int main(void)
 			if(setMenu(MenuGetCurrent) != MenuOperational)
 			{
 				frequency_updates_enabled = false;
-				if(g_frequency_memory[activeMemory] == EMPTY_MEMORY)
+				if(g_channel_frequency[activeMemory] == EMPTY_MEMORY)
 				{
 					activeMemory = nextActiveMemory(activeMemory, UP);
 				
@@ -1386,7 +1437,7 @@ int main(void)
 					}
 					else if(g_frequency_mode == MODE_MEMORY)
 					{
-						g_rx_frequency = g_frequency_memory[activeMemory];
+						g_rx_frequency = g_channel_frequency[activeMemory];
 						si5351_set_quad_frequency(g_rx_frequency);					
 					}
 				}
@@ -1411,7 +1462,7 @@ int main(void)
 				if((g_frequency_mode == MODE_VFO) && (nextActiveMemory(activeMemory, UP) != 0xFF))
 				{
 					g_frequency_mode = MODE_MEMORY;
-					g_rx_frequency = g_frequency_memory[activeMemory];
+					g_rx_frequency = g_channel_frequency[activeMemory];
 					si5351_set_quad_frequency(g_rx_frequency);					
 				}
 				else
@@ -1437,27 +1488,38 @@ int main(void)
 						{
 							setMenu(MenuFreqMemories);
 						}
+						else if(menuRow == BATTERY)
+						{
+							
+						}
 					}
 					break;
 					
 					case MenuFreqMemories:
 					{
-						setMenu(MenuSetMemory);
+						setMenu(MenuSetMemFreq);
 						
-						if(g_frequency_memory[activeMemory] == EMPTY_MEMORY)
+						if(g_channel_frequency[activeMemory] == EMPTY_MEMORY)
 						{
 							if((g_rx_frequency > RX_MAXIMUM_80M_FREQUENCY) || (g_rx_frequency < RX_MINIMUM_80M_FREQUENCY))
 							{
 								g_rx_frequency = MEMORY_DEFAULT_FREQUENCY;
 							}
 							
-							g_frequency_memory[activeMemory] = g_rx_frequency;
+							g_channel_frequency[activeMemory] = g_rx_frequency;
 						}
 					}
 					break;
 					
-					case MenuSetMemory:
+					case MenuSetMemFreq:
 					{
+						setMenu(MenuSetMemName);
+					}
+					break;
+					
+					case MenuSetMemName:
+					{
+						setMenu(MenuBackOne);
 					}
 					break;
 					
@@ -1467,9 +1529,10 @@ int main(void)
 			}
 			else if (g_handle_counted_encoder_presses == 3)
 			{
-				if(setMenu(MenuGetCurrent) == MenuSetMemory)
+				if(setMenu(MenuGetCurrent) == MenuSetMemFreq)
 				{
-					g_frequency_memory[activeMemory] = 0;
+					g_channel_frequency[activeMemory] = 0;
+					g_channel_name[activeMemory] = 0;
 					setMenu(MenuBackOne);
 				}
 			}
@@ -1527,7 +1590,7 @@ int main(void)
 							else
 							{
 								activeMemory = nextActiveMemory(activeMemory, UP);
-								g_rx_frequency = g_frequency_memory[activeMemory];
+								g_rx_frequency = g_channel_frequency[activeMemory];
 							}
 
 							si5351_set_quad_frequency(g_rx_frequency);
@@ -1560,19 +1623,20 @@ int main(void)
 					{
 						activeMemory++;
 						if(activeMemory >= NUMBER_OF_FREQUENCY_CHANNELS) activeMemory = 0;
-							
-						Frequency_Hz f = g_frequency_memory[activeMemory];
+						refresh_display = true;
+						
+						Frequency_Hz f = g_channel_frequency[activeMemory];
 							
 						if((f < RX_MAXIMUM_80M_FREQUENCY) && (f > RX_MINIMUM_80M_FREQUENCY))
 						{
-							g_rx_frequency = g_frequency_memory[activeMemory];
+							g_rx_frequency = g_channel_frequency[activeMemory];
 						}
 						
 						si5351_set_quad_frequency(g_rx_frequency);							
 					}
 					break;
 					
-					case MenuSetMemory:
+					case MenuSetMemFreq:
 					{
 						if(g_rx_frequency < RX_MAXIMUM_80M_FREQUENCY)
 						{
@@ -1586,14 +1650,28 @@ int main(void)
 							}
 						}
 
-						g_frequency_memory[activeMemory] = g_rx_frequency;
+						g_channel_frequency[activeMemory] = g_rx_frequency;
+					}
+					break;
+					
+					case MenuSetMemName:
+					{
+						uint8_t n = g_channel_name[activeMemory];
+						
+						if(++n >= NUMBER_OF_FREQUENCY_CHANNEL_NAMES)
+						{
+							n = 0;
+						}
+						
+						g_channel_name[activeMemory] = n;
+						hold_activeMemoryFreq = INVALID_FREQUENCY;
 					}
 					break;
 					
 					case MenuMain:
 					{
-						menuRow++;
-						if(menuRow == NUMBER_OF_MENUS) menuRow = 0;
+						menuRow = (PrimaryMenu_t)((uint8_t)menuRow + 1);
+						if(menuRow == NUMBER_OF_MENUS) menuRow = MEMORIES;
 					}
 					break;
 					
@@ -1628,7 +1706,7 @@ int main(void)
 							else
 							{
 								activeMemory = nextActiveMemory(activeMemory, !UP);
-								g_rx_frequency = g_frequency_memory[activeMemory];
+								g_rx_frequency = g_channel_frequency[activeMemory];
 							}
 
 							si5351_set_quad_frequency(g_rx_frequency);
@@ -1668,18 +1746,19 @@ int main(void)
 							activeMemory--;
 						}
 							
-						Frequency_Hz f = g_frequency_memory[activeMemory];
-							
+						Frequency_Hz f = g_channel_frequency[activeMemory];
+						refresh_display = true;
+													
 						if((f < RX_MAXIMUM_80M_FREQUENCY) && (f > RX_MINIMUM_80M_FREQUENCY))
 						{
-							g_rx_frequency = g_frequency_memory[activeMemory];
+							g_rx_frequency = g_channel_frequency[activeMemory];
 						}
 						
 						si5351_set_quad_frequency(g_rx_frequency);							
 					}
 					break;				
 					
-					case MenuSetMemory:
+					case MenuSetMemFreq:
 					{
 						if(g_rx_frequency > RX_MINIMUM_80M_FREQUENCY)
 						{
@@ -1692,21 +1771,43 @@ int main(void)
 								g_rx_frequency -= 100;
 							}
 						
-							g_frequency_memory[activeMemory] = g_rx_frequency;
+							g_channel_frequency[activeMemory] = g_rx_frequency;
 						}
+					}
+					break;
+					
+					case MenuSetMemName:
+					{
+						uint8_t n = g_channel_name[activeMemory];
+						
+						if(n)
+						{
+							n--;
+						}
+						else
+						{
+							n = NUMBER_OF_FREQUENCY_CHANNEL_NAMES - 1;
+						}
+						
+						g_channel_name[activeMemory] = n;
+						hold_activeMemoryFreq = INVALID_FREQUENCY;
 					}
 					break;
 					
 					case MenuMain:
 					{
-						if(menuRow) 
+						uint8_t m = (uint8_t)menuRow;
+						
+						if(m) 
 						{
-							menuRow--;
+							m--;
 						}
 						else
 						{
-							menuRow = NUMBER_OF_MENUS - 1;
+							m = (unsigned int)NUMBER_OF_MENUS - 1;
 						}
+						
+						menuRow = (PrimaryMenu_t)m;
 					}
 					break;
 
@@ -1928,12 +2029,6 @@ EC hw_init()
 }
 
 
-Frequency_Hz getFrequencySetting(void)
-{
-	return(rxGetFrequencty());
-}
-
-
 // Caller must provide a pointer to a string of length 6 or greater.
 char* externBatString(bool volts, float* value)
 {
@@ -2039,7 +2134,7 @@ uint8_t nextActiveMemory(uint8_t currentChan, bool up)
 				i = 0;
 			}
 			
-			if(g_frequency_memory[i])
+			if(g_channel_frequency[i])
 			{
 				done = true;
 			}
@@ -2059,7 +2154,7 @@ uint8_t nextActiveMemory(uint8_t currentChan, bool up)
 				i = NUMBER_OF_FREQUENCY_CHANNELS - 1;
 			}
 			
-			if(g_frequency_memory[i])
+			if(g_channel_frequency[i])
 			{
 				done = true;
 			}
@@ -2070,3 +2165,20 @@ uint8_t nextActiveMemory(uint8_t currentChan, bool up)
 	
 	return(i);
 }
+
+// char* centerHorizontally(const char* text, uint8_t row)
+// {
+// 	static char str[13];
+// 	uint8_t column = 0;
+// 	char spaces[6] = "     ";
+// 	
+// 	uint8_t len = strlen(text);
+// 	if(len < 10)
+// 	{
+// 		strcpy(str, text);
+// 		column = (10 - len) / 2;
+// 		snprintf(str, 13, "%d%d%s%s", row, column, text, spaces);
+// 	}
+// 	
+// 	return(str);
+// }
