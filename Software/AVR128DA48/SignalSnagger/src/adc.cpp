@@ -172,7 +172,7 @@ static void ADC0_Single_Init(bool twelveBit)
 	if(twelveBit)
 	{
 		VREF.ADC0REF = VREF_REFSEL_2V048_gc;  /* Internal 2.048V reference */
-		ADC0.CTRLC = ADC_PRESC_DIV4_gc;   /* CLK_PER divided by 128. Never set below DIV4 */
+		ADC0.CTRLC = ADC_PRESC_DIV128_gc;   /* CLK_PER divided by 128. Never set below DIV4 */
 		ADC0.CTRLA |= ADC_ENABLE_bm /* ADC Enable: enabled */
 		| ADC_RESSEL_12BIT_gc;      /* 12-bit mode */
 		ADC0.INTCTRL &= 0xFE; /* Disable interrupt */
@@ -181,7 +181,7 @@ static void ADC0_Single_Init(bool twelveBit)
 	else
 	{
 		VREF.ADC0REF = VREF_REFSEL_2V048_gc;  /* Internal 2.048V reference */
-		ADC0.CTRLC = ADC_PRESC_DIV4_gc;   /* CLK_PER divided by 128 and by 13.5 (10-bit conversion time = 13889 sps; Never set below DIV4 */
+		ADC0.CTRLC = ADC_PRESC_DIV128_gc;   /* CLK_PER divided by 128 and by 13.5 (10-bit conversion time = 13889 sps; Never set below DIV4 */
 		ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
 		| ADC_RESSEL_10BIT_gc;      /* 10-bit mode */
 		ADC0.INTCTRL &= 0xFE; /* Disable interrupt */
@@ -198,6 +198,13 @@ void ADC0_SYSTEM_init(bool twelveBit, bool freerun)
 	}
 	else
 	{
+		ADC0.INTCTRL &= 0xFE; /* Disable interrupt */		
+		if(ADC0.CTRLA & ADC_FREERUN_bm)
+		{
+			while(util_delay_ms(2) && !ADC0_conversionDone());
+		}
+
+		ADC0.CTRLA = 0;
 		ADC0_Single_Init(twelveBit);
 	}
 	

@@ -33,7 +33,7 @@
 
 /******************************************************
  * Set the text that gets displayed to the user       */
-#define SW_REVISION "0.32"
+#define SW_REVISION "0.33"
 
 //#define TRANQUILIZE_WATCHDOG
 
@@ -180,7 +180,7 @@ typedef unsigned char uint8_t;
 /*******************************************************
 * ADC Scale Factors */
 /* Battery voltage should be read when +12V supply is enabled and all transmitters are fully powered off */
-#define ADC_REF_VOLTAGE_mV 1100UL
+#define ADC_REF_VOLTAGE_mV 2048UL
 
 #define ADC_MAX_VOLTAGE_MV 4200L /* maximum voltage the ADC can read */
 #define BATTERY_VOLTAGE_MAX_MV 4200L /* voltage at which the battery is considered to be fully charged */
@@ -218,7 +218,7 @@ typedef uint16_t BatteryLevel;  /* in milliVolts */
 
 /******************************************************
  * EEPROM definitions */
-#define EEPROM_INITIALIZED_FLAG (uint16_t)0x010B
+#define EEPROM_INITIALIZED_FLAG (uint16_t)0x010C
 #define EEPROM_UNINITIALIZED 0x00
 
 #define EEPROM_STATION_ID_DEFAULT "FOXBOX"
@@ -349,6 +349,90 @@ typedef enum
 	ANT_CONNECTED
 } AntConnType;
 
+enum BatteryCapacity_t {
+	MAH_50mAh,
+	MAH_100mAh,
+	MAH_150mAh,
+	MAH_200mAh,
+	MAH_250mAh,
+	MAH_300mAh,
+	MAH_350mAh,
+	MAH_400mAh,
+	MAH_450mAh,
+	MAH_500mAh,
+	MAH_550mAh,
+	MAH_600mAh,
+	MAH_650mAh,
+	MAH_700mAh,
+	MAH_750mAh,
+	MAH_800mAh,
+	MAH_850mAh,
+	MAH_900mAh,
+	MAH_950mAh,
+	MAH_1000mAh,
+	MAH_1050mAh,
+	MAH_1100mAh,
+	MAH_1150mAh,
+	MAH_1200mAh,
+	MAH_1250mAh,
+	MAH_1300mAh,
+	MAH_1350mAh,
+	MAH_1400mAh,
+	MAH_1450mAh,
+	MAH_1500mAh,
+	MAH_1550mAh,
+	MAH_1600mAh,
+	MAH_1650mAh,
+	MAH_1700mAh,
+	MAH_1750mAh,
+	MAH_1800mAh,
+	MAH_1850mAh,
+	MAH_1900mAh,
+	MAH_1950mAh,
+	MAH_2000mAh,
+	MAH_2050mAh,
+	MAH_2100mAh,
+	MAH_2150mAh,
+	MAH_2200mAh,
+	MAH_2250mAh,
+	MAH_2300mAh,
+	MAH_2350mAh,
+	MAH_2400mAh,
+	MAH_2450mAh,
+	MAH_2500mAh,
+	MAH_2550mAh,
+	MAH_2600mAh,
+	MAH_2650mAh,
+	MAH_2700mAh,
+	MAH_2750mAh,
+	MAH_2800mAh,
+	MAH_2850mAh,
+	MAH_2900mAh,
+	MAH_2950mAh,
+	MAH_3000mAh,
+	MAH_3050mAh,
+	MAH_3100mAh,
+	MAH_3150mAh,
+	MAH_3200mAh,
+	MAH_3250mAh,
+	MAH_3300mAh,
+	MAH_3350mAh,
+	MAH_3400mAh,
+	MAH_3450mAh,
+	MAH_3500mAh,
+	MAH_3550mAh,
+	MAH_3600mAh,
+	MAH_3650mAh,
+	MAH_3700mAh,
+	MAH_3750mAh,
+	MAH_3800mAh,
+	MAH_3850mAh,
+	MAH_3900mAh,
+	MAH_3950mAh,
+	MAH_4000mAh,
+	NUMBER_OF_BATTERY_CAPACITY_VALUES
+	};
+	
 
 typedef enum
 {

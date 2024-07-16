@@ -68,6 +68,7 @@ enum MenuState_t {
 	MenuSetMemName,
 	MenuMain,
 	MenuBattery,
+	MenuSetmAh,
 	MenuClock,
 	MenuInactivityPoweroff,
 	NumberOfMenuStates,
@@ -94,7 +95,7 @@ enum PrimaryMenu_t {
 	};
 
 // #define NUMBER_OF_MENUS 5
-const char menuTitle[NUMBER_OF_MENUS][10] = {"MEMORIES", "BATTERY", "EVENT", "SOUNDS", "SETTINGS", "UTILITY"};
+const char menuTitle[NUMBER_OF_MENUS][10] = {"MEMORIES", "BATTERY", "CLOCK", "EVENT", "SOUNDS", "SETTINGS", "UTILITY"};
 // #define MEMORIES 0
 // #define BATTERY 1
 #define EMPTY_MEMORY 0
@@ -146,6 +147,7 @@ extern volatile Frequency_Hz g_frequency_hi;
 extern volatile Frequency_Hz g_frequency_beacon;
 extern Frequency_Hz g_channel_frequency[NUMBER_OF_FREQUENCY_CHANNELS];
 extern FrequencyMode_t g_frequency_mode;
+extern BatteryCapacity_t g_battery_capacity;
 
 volatile bool g_seconds_transition = false;
 volatile time_t g_seconds_since_poweron = 0;
@@ -712,24 +714,34 @@ ISR(TCB0_INT_vect)
 			
 			if(holdRotaryEdges == g_rotary_edges)
 			{
-				if(rotaryNoMotionCountdown) rotaryNoMotionCountdown--;
-
-				if(!rotaryNoMotionCountdown)
+				if(rotaryNoMotionCountdown) 
 				{
-					g_inactivity_power_off = 900;
+					rotaryNoMotionCountdown--;
+
+					if(!rotaryNoMotionCountdown)
+					{
+						g_inactivity_power_off = 900;
 					
-					if(val>1)
-					{
-						val = 4;
-					}
-					else
-					{
-						val = 0; 
+						if(val>1)
+						{
+							val += 3;
+							val = val >> 2;
+							val = val << 2;
+						}
+						else
+						{
+							val = 0; 
+						}
+					
+						g_rotary_edges = neg ? -val : val;
+						holdRotaryEdges = 0;
 					}
 				}
 			}
 			else
 			{
+				holdRotaryEdges = g_rotary_edges;
+				
 				if(val > 3)
 				{
 					if(g_encoderswitch_pressed)
@@ -752,10 +764,9 @@ ISR(TCB0_INT_vect)
 				}
 			
 				rotaryNoMotionCountdown = ROTARY_SYNC_DELAY;
-			}
-			
-			g_rotary_edges = neg ? -val : val;
-			holdRotaryEdges = g_rotary_edges;
+				g_rotary_edges = neg ? -val : val;
+				if(!val) holdRotaryEdges = 0;
+			}		
 		}
     }
 
@@ -911,7 +922,7 @@ int main(void)
 	
 	MenuState_t hold_menuState = MenuOperational;
 	bool frequency_updates_enabled = false;
-	uint8_t activeMemory = 0;
+	uint8_t activeMemory = 0; /* Add to EEPROM ? */
 	uint8_t hold_activeMemory = 0;
 	Frequency_Hz hold_activeMemoryFreq = 0;
 	
@@ -1006,7 +1017,7 @@ int main(void)
 	/* Start audio flow */
 	ADC0.MUXPOS = ADC_I_AMPED; 
 	ADC0_SYSTEM_init(ADC10BIT, true);
-	ADC0_startConversion();
+ 	ADC0_startConversion();
 
 	while (1) 
 	{
@@ -1017,6 +1028,17 @@ int main(void)
 			if(refresh_display || (currentMenu != hold_menuState))
 			{
 				refresh_display = false;
+				
+				if((hold_menuState == MenuBattery) || (hold_menuState == MenuSetmAh))
+				{
+					if((currentMenu != MenuBattery) && (currentMenu != MenuSetmAh))
+					{
+						ADC0.MUXPOS = ADC_I_AMPED; 
+						ADC0_SYSTEM_init(ADC10BIT, true);
+ 						ADC0_startConversion();
+					}
+				}
+				
 				hold_menuState = currentMenu;
 				display.cls();
 				hold_rx_frequency = 0; /* force update */
@@ -1132,9 +1154,42 @@ int main(void)
 				}
 				break;
 				
+				case MenuSetmAh:
 				case MenuBattery:
 				{
+					uint16_t result = 0;
+					float fresult = 0.;
+		
+					for(int i=0; i<100; i++)
+					{
+						ADC0_startConversion();
+						while(!ADC0_conversionDone());
+						result = ADC0.RES;
+						fresult += result;
+					}
+		
+					fresult /= 100.;
 					
+					uint16_t mah = ((uint8_t)g_battery_capacity + 1)*50;
+					snprintf(g_tempStr, 13, "00Bat: %sV", externBatString(true, &fresult));
+					g_text_buff.putString(g_tempStr);
+					
+					if(currentMenu == MenuBattery)
+					{
+// 						snprintf(g_tempStr, 13, "10Remaining:");
+// 						g_text_buff.putString(g_tempStr);
+						fresult = (fresult - 878.) / 2.85;
+						snprintf(g_tempStr, 13, "20     %d%%", (int)fresult);
+						g_text_buff.putString(g_tempStr);
+						fresult = 60. * fresult * mah / 5000.; /* Example: 50 mA average current */
+						snprintf(g_tempStr, 13, "30min: %d  ", (int)fresult);
+					}
+					else
+					{
+						snprintf(g_tempStr, 13, "20>%d mAh  ", mah);						
+					}
+					
+					g_text_buff.putString(g_tempStr);
 				}
 				break;
 				
@@ -1490,8 +1545,16 @@ int main(void)
 						}
 						else if(menuRow == BATTERY)
 						{
-							
+							ADC0_SYSTEM_init(ADC12BIT, false);
+							ADC0.MUXPOS = ADCBatteryVoltage;
+							setMenu(MenuBattery);
 						}
+					}
+					break;
+					
+					case MenuBattery:
+					{
+						setMenu(MenuSetmAh);
 					}
 					break;
 					
@@ -1668,6 +1731,19 @@ int main(void)
 					}
 					break;
 					
+					case MenuSetmAh:
+					{
+						uint8_t m = (uint8_t) g_battery_capacity;
+						
+						if(++m >= NUMBER_OF_BATTERY_CAPACITY_VALUES)
+						{
+							m = 0;
+						}
+						
+						g_battery_capacity = (BatteryCapacity_t)m;
+					}
+					break;
+					
 					case MenuMain:
 					{
 						menuRow = (PrimaryMenu_t)((uint8_t)menuRow + 1);
@@ -1791,6 +1867,23 @@ int main(void)
 						
 						g_channel_name[activeMemory] = n;
 						hold_activeMemoryFreq = INVALID_FREQUENCY;
+					}
+					break;
+					
+					case MenuSetmAh:
+					{
+						uint8_t m = (uint8_t) g_battery_capacity;
+						
+						if(m)
+						{
+							m--;
+						}
+						else
+						{
+							m = NUMBER_OF_BATTERY_CAPACITY_VALUES - 1;
+						}
+						
+						g_battery_capacity = (BatteryCapacity_t)m;
 					}
 					break;
 					
@@ -2063,7 +2156,7 @@ char* externBatString(bool volts, float* value)
 	{
 		if(volts)
 		{
-			dtostrf(filtered/10., 5, 1, str);
+			dtostrf(filtered/10., 5, 2, str);
 			str[6] = '\0';
 			pstr = trimwhitespace(str);
 			return pstr;

@@ -149,6 +149,7 @@ extern volatile Frequency_Hz g_frequency_beacon;
 extern Frequency_Hz g_channel_frequency[NUMBER_OF_FREQUENCY_CHANNELS];
 extern uint8_t g_channel_name[NUMBER_OF_FREQUENCY_CHANNELS];
 volatile FrequencyMode_t g_frequency_mode = MODE_VFO;
+volatile BatteryCapacity_t g_battery_capacity = MAH_450mAh;
 
 char g_messages_text[STATION_ID+1][MAX_PATTERN_TEXT_LENGTH + 1];
 volatile time_t g_event_start_epoch;
@@ -655,6 +656,16 @@ void EepromManager::updateEEPROMVar(EE_var_t v, void* val)
 			}
 		}
 		break;
+		
+		
+		case Battery_Capacity:
+		{
+			if(*(uint8_t*)val != eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.battery_capacity)))
+			{
+				avr_eeprom_write_byte(Battery_Capacity, *(uint8_t*)val);
+			}
+		}
+		break;
 
 		default:
 		{
@@ -703,6 +714,7 @@ void EepromManager::saveAllEEPROM(void)
 	updateEEPROMVar(Frequency_Memory, (void*)&g_channel_frequency[0]);
 	updateEEPROMVar(Channel_Name, (void*)&g_channel_name[0]);
 	updateEEPROMVar(Frequency_Mode, (void*)&g_frequency_mode);
+	updateEEPROMVar(Battery_Capacity, (void*)&g_battery_capacity);
 }
 
 
@@ -816,6 +828,9 @@ bool EepromManager::readNonVols(void)
 		
 		g_frequency_mode = (FrequencyMode_t)eeprom_read_byte((const uint8_t*)&(EepromManager::ee_vars.frequency_mode));
 		if(g_frequency_mode != MODE_MEMORY) g_frequency_mode = MODE_VFO;
+		
+		g_battery_capacity = (BatteryCapacity_t)eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.battery_capacity));
+		if((uint8_t)g_battery_capacity > NUMBER_OF_BATTERY_CAPACITY_VALUES) g_battery_capacity = MAH_450mAh;
 
 		failure = false;
 	}
@@ -972,6 +987,9 @@ bool EepromManager::readNonVols(void)
 			
 			g_frequency_mode = MODE_VFO;
 			avr_eeprom_write_byte(Frequency_Mode, g_frequency_mode);
+			
+			g_battery_capacity = MAH_450mAh;
+			avr_eeprom_write_byte(Battery_Capacity, g_battery_capacity);
 			
 			/* Done */
 
