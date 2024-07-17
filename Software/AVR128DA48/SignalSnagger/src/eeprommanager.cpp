@@ -112,6 +112,7 @@ const struct EE_prom EEMEM EepromManager::ee_vars
 	0x00,       //  uint8_t days_to_run
 	0x00000000, //  Guard
 	0x0000,     // uint16_t i2c_failure_count;
+	(Frequency_Hz)0x00000000, // Frequency_Memory
 	(Frequency_Hz)0x00000000,
 	(Frequency_Hz)0x00000000,
 	(Frequency_Hz)0x00000000,
@@ -131,7 +132,29 @@ const struct EE_prom EEMEM EepromManager::ee_vars
 	(Frequency_Hz)0x00000000,
 	(Frequency_Hz)0x00000000,
 	(Frequency_Hz)0x00000000,
-	(Frequency_Hz)0x00000000
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	0x00,       //  uint8_t channel name index
+	(FrequencyMode_t)0x00,		//  uint8_t frequency_mode
+	(BatteryCapacity_t)0x00,       //  uint8_t battery_capacity
+	0x00        //  uint8_t battery_threshold
 };
 
 bool g_isMaster = UNUSED_VAR;
@@ -150,6 +173,7 @@ extern Frequency_Hz g_channel_frequency[NUMBER_OF_FREQUENCY_CHANNELS];
 extern uint8_t g_channel_name[NUMBER_OF_FREQUENCY_CHANNELS];
 volatile FrequencyMode_t g_frequency_mode = MODE_VFO;
 volatile BatteryCapacity_t g_battery_capacity = MAH_450mAh;
+volatile BatteryWarnThreshold_t g_battery_warning_threshold = 10;
 
 char g_messages_text[STATION_ID+1][MAX_PATTERN_TEXT_LENGTH + 1];
 volatile time_t g_event_start_epoch;
@@ -666,6 +690,16 @@ void EepromManager::updateEEPROMVar(EE_var_t v, void* val)
 			}
 		}
 		break;
+		
+		
+		case Battery_Threshold:
+		{
+			if(*(uint8_t*)val != eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.battery_threshold)))
+			{
+				avr_eeprom_write_byte(Battery_Threshold, *(uint8_t*)val);
+			}
+		}
+		break;
 
 		default:
 		{
@@ -715,6 +749,7 @@ void EepromManager::saveAllEEPROM(void)
 	updateEEPROMVar(Channel_Name, (void*)&g_channel_name[0]);
 	updateEEPROMVar(Frequency_Mode, (void*)&g_frequency_mode);
 	updateEEPROMVar(Battery_Capacity, (void*)&g_battery_capacity);
+	updateEEPROMVar(Battery_Threshold, (void*)&g_battery_warning_threshold);
 }
 
 
@@ -831,6 +866,9 @@ bool EepromManager::readNonVols(void)
 		
 		g_battery_capacity = (BatteryCapacity_t)eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.battery_capacity));
 		if((uint8_t)g_battery_capacity > NUMBER_OF_BATTERY_CAPACITY_VALUES) g_battery_capacity = MAH_450mAh;
+		
+		g_battery_warning_threshold = (BatteryWarnThreshold_t)eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.battery_threshold));
+		if((uint8_t)g_battery_warning_threshold > 100) g_battery_warning_threshold = 10;
 
 		failure = false;
 	}
@@ -990,6 +1028,9 @@ bool EepromManager::readNonVols(void)
 			
 			g_battery_capacity = MAH_450mAh;
 			avr_eeprom_write_byte(Battery_Capacity, g_battery_capacity);
+			
+			g_battery_warning_threshold = 10;
+			avr_eeprom_write_byte(Battery_Threshold, g_battery_warning_threshold);
 			
 			/* Done */
 

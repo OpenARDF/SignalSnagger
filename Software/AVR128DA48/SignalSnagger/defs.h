@@ -30,10 +30,11 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <stdint.h>
 
 /******************************************************
  * Set the text that gets displayed to the user       */
-#define SW_REVISION "0.33"
+#define SW_REVISION "0.34"
 
 //#define TRANQUILIZE_WATCHDOG
 
@@ -218,7 +219,7 @@ typedef uint16_t BatteryLevel;  /* in milliVolts */
 
 /******************************************************
  * EEPROM definitions */
-#define EEPROM_INITIALIZED_FLAG (uint16_t)0x010C
+#define EEPROM_INITIALIZED_FLAG (uint16_t)0x0113
 #define EEPROM_UNINITIALIZED 0x00
 
 #define EEPROM_STATION_ID_DEFAULT "FOXBOX"
@@ -349,7 +350,9 @@ typedef enum
 	ANT_CONNECTED
 } AntConnType;
 
-enum BatteryCapacity_t {
+typedef uint8_t BatteryWarnThreshold_t;
+
+enum BatteryCapacity_t : uint8_t {
 	MAH_50mAh,
 	MAH_100mAh,
 	MAH_150mAh,
@@ -430,11 +433,31 @@ enum BatteryCapacity_t {
 	MAH_3900mAh,
 	MAH_3950mAh,
 	MAH_4000mAh,
+	MAH_4050mAh,
+	MAH_4100mAh,
+	MAH_4150mAh,
+	MAH_4200mAh,
+	MAH_4250mAh,
+	MAH_4300mAh,
+	MAH_4350mAh,
+	MAH_4400mAh,
+	MAH_4450mAh,
+	MAH_4500mAh,
+	MAH_4550mAh,
+	MAH_4600mAh,
+	MAH_4650mAh,
+	MAH_4700mAh,
+	MAH_4750mAh,
+	MAH_4800mAh,
+	MAH_4850mAh,
+	MAH_4900mAh,
+	MAH_4950mAh,
+	MAH_5000mAh,
 	NUMBER_OF_BATTERY_CAPACITY_VALUES
 	};
 	
 
-typedef enum
+enum Fox_t : uint8_t 
 {
 	BEACON = 0,
 	FOX_1,
@@ -461,7 +484,7 @@ typedef enum
 	,
 	REPORT_BATTERY
 	#endif // SUPPORT_TEMP_AND_VOLTAGE_REPORTING
-} Fox_t;
+};
 
 typedef enum
 {
@@ -473,12 +496,12 @@ typedef enum
 	EVENT_NUMBER_OF_EVENTS
 } Event_t;
 
-typedef enum
+enum FrequencyMode_t : uint8_t 
 {
 	MODE_VFO,
 	MODE_MEMORY,
 	MODE_NUMBER_OF_MODES
-} FrequencyMode_t;
+};
 
 /* Periodic TIMER2 interrupt timing definitions */
 #define OCR2A_OVF_FREQ_300 0x0C
