@@ -185,6 +185,24 @@ bool only_digits(char *s)
 	return( true);
 }
 
+/** 
+ * Checks a string to see if it contains only alphanumerical characters
+ */
+bool isDisplayable(char *s, int max)
+{
+	int i = max;
+	
+	while(*s && i--)
+	{
+		if((*s < 32) && (*s > 126))
+		{
+			return( false);
+		}
+	}
+
+	return( true);
+}
+
 
 /** 
  * Convert a frequency string to a proper Hz value and string format based on assumptions 

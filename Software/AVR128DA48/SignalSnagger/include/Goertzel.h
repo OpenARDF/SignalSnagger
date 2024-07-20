@@ -39,7 +39,9 @@
 #include <stdlib.h>
 
 #define MAXN 209
-#define ADCCENTER 512
+#define MINN 21
+#define ADCCENTER 2048
+#define SATURATION (9*ADCCENTER/5)
 
 /* Adjustments that can be made to tune performance:
 	N,

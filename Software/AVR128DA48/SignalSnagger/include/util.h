@@ -36,6 +36,7 @@
 
 int32_t timeDif(time_t a, time_t b);
 bool only_digits(char *s);
+bool isDisplayable(char *s, int max);
 
 /***********************************************************************************************
  *  Print Formatting Utility Functions

@@ -42,7 +42,7 @@ int* testData;
 Goertzel::Goertzel(float N, float sampling_frequency)
 {
 	_SAMPLING_FREQUENCY = sampling_frequency;   /*on 16mhz, ~8928.57142857143, on 8mhz ~44444 */
-	_N = CLAMP(100, N, MAXN);
+	_N = CLAMP(MINN, N, MAXN);
 	testData = (int*)malloc(_N * sizeof(int));
 }
 
@@ -81,7 +81,7 @@ void Goertzel::ProcessSample(int sample)
 {
 	float Q0 = g_coeff * Q1 - Q2 + (float)(sample - ADCCENTER);
 
-	if(sample > 1000)
+	if(sample > SATURATION)
 	{
 		highValueCount++;
 	}

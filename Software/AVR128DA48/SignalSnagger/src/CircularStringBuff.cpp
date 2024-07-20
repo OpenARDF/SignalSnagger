@@ -210,6 +210,8 @@ void CircularStringBuff::getString(char* str, size_t *length)
 		str[i++] = c;		
 	}
 	
+	str[i] = '\0';
+	
 	if(length) *length = i;
 	
 	return;

@@ -217,12 +217,15 @@ CircularStringBuff g_text_buff = CircularStringBuff(TEXT_BUFF_SIZE);
 
 EepromManager EEPromMgr;
 
-#define Goertzel_N 201
-#define SAMPLE_RATE 10000
+#define Goertzel_N 209
+#define SAMPLE_RATE 12080 // 13868
 const int N = Goertzel_N;
-const float threshold = 500000. * (Goertzel_N / 100);
+//const float threshold = 500000. * (Goertzel_N / 100);
 const float sampling_freq = SAMPLE_RATE;
-const float pitch_frequencies[3] = { 345., 622., 898. }; /* should be an integer multiple of SAMPLING_RATE/N (13889 / 201) */
+const float pitch_frequencies[3] = { 600., 700., 800.}; /* should be an integer multiple of SAMPLING_RATE/N (SAMPLE_RATE / Goertzel_N) */
+
+volatile bool g_audio_test = false;
+volatile uint16_t g_hold_assi_countdown = 0;
 
 /* VREF start-up time */
 #define VREF_STARTUP_TIME       (50)
@@ -230,19 +233,21 @@ const float pitch_frequencies[3] = { 345., 622., 898. }; /* should be an integer
 #define LSB_MASK                (0x03)
 /* Number of samples for a sine wave period */
 #define SINE_PERIOD_STEPS       (25)
+#define MAX_SINE_PERIOD_STEPS   (201)
 /* Sine wave amplitude */
-#define SINE_AMPLITUDE          (15) // (511)
+#define SINE_AMPLITUDE          (1) // (511)
 /* Sine wave DC offset */
-#define SINE_DC_OFFSET          (15) //(512)
+#define SINE_DC_OFFSET          (2048) //(512)
 /* Frequency of the sine wave */
-#define SINE_FREQ               (200)
-/* Step delay for the loop */
-#define STEP_DELAY_TIME         ((1000000 / SINE_FREQ) / SINE_PERIOD_STEPS)
+// #define SINE_FREQ               (200)
+// /* Step delay for the loop */
+// #define STEP_DELAY_TIME         1./13868.
 
-static void sineWaveInit(void);
+static void sineWaveInit(int sine_period_steps);
 
 /* Buffer to store the sine wave samples */
-uint16_t sineWave[SINE_PERIOD_STEPS];
+uint16_t sineWave[MAX_SINE_PERIOD_STEPS];
+static volatile uint8_t g_sine_period_steps = 25;
 static volatile uint16_t g_beep = 0;
 static volatile uint8_t g_tick = 0;
 
@@ -342,12 +347,27 @@ ISR(ADC0_RESRDY_vect)
 // 			}
 // 		}
 		
-// 		if(passAudio)
+ 		if(g_audio_test)
+		{
+			if(g_sine_period_steps)
+			{
+				if(g_beep)
+				{
+					result += sineWave[sineIndex++];
+					if(sineIndex == g_sine_period_steps) sineIndex = 0;
+					g_beep--;
+				}
+				DAC0_setVal(result);
+				g_goertzel.DataPoint(result);
+//				PORTC_toggle_pin_level(5);
+			}
+		}
+		else
 		{
 			if(g_beep)
 			{
 				result += sineWave[sineIndex++];
-				if(sineIndex == SINE_PERIOD_STEPS) sineIndex = 0;
+				if(sineIndex == g_sine_period_steps) sineIndex = 0;
 				g_beep--;
 			}
 			else if(g_tick)
@@ -362,7 +382,7 @@ ISR(ADC0_RESRDY_vect)
 			}
 			else
 			{
-				result = result >> abs(g_audio_gain - 4);
+				result = result >> (4 - g_audio_gain);
 			}
 		
 			DAC0_setVal(result);
@@ -392,6 +412,8 @@ ISR(TCB0_INT_vect)
 
 		static int holdRotaryEdges = 0;
 		static uint16_t rotaryNoMotionCountdown = 0;
+		
+		if(g_hold_assi_countdown) g_hold_assi_countdown--;
 		
 		fiftyMS++;
 		if(!(fiftyMS % 6))
@@ -565,14 +587,13 @@ ISR(TCB0_INT_vect)
 				{
 					if(leftSense_pressed) /* Switch closed and unchanged */
 					{
+						if(g_leftsense_closed_time < MAX_UINT16) g_leftsense_closed_time++;
+							
 						if(!g_long_leftsense_press && leftsenseLongPressEnabled)
 						{
-							if(g_leftsense_closed_time < MAX_UINT16) g_leftsense_closed_time++;
-							
 							if(g_leftsense_closed_time >= 100)
 							{
 								g_long_leftsense_press = true;
-								g_leftsense_closed_time = 0;
 								g_leftsense_presses_count = 0;
 								leftsenseLongPressEnabled = false;
 							}
@@ -581,14 +602,13 @@ ISR(TCB0_INT_vect)
 
 					if(rightSense_pressed) /* Switch closed and unchanged */
 					{
+						if(g_rightsense_closed_time < MAX_UINT16) g_rightsense_closed_time++;
+							
 						if(!g_long_rightsense_press && rightsenseLongPressEnabled)
 						{
-							if(g_rightsense_closed_time < MAX_UINT16) g_rightsense_closed_time++;
-							
 							if(g_rightsense_closed_time >= 100)
 							{
 								g_long_rightsense_press = true;
-								g_rightsense_closed_time = 0;
 								g_rightsense_presses_count = 0;
 								rightsenseLongPressEnabled = false;
 							}
@@ -598,14 +618,13 @@ ISR(TCB0_INT_vect)
 				
 				if(g_encoderswitch_pressed) /* Switch closed and unchanged */
 				{
+					if(g_encoder_closed_time < MAX_UINT16) g_encoder_closed_time++;
+						
 					if(!g_long_encoder_press && encoderLongPressEnabled)
 					{
-						if(g_encoder_closed_time < MAX_UINT16) g_encoder_closed_time++;
-						
 						if(g_encoder_closed_time >= 100)
 						{
 							g_long_encoder_press = true;
-							g_encoder_closed_time = 0;
 							g_encoder_presses_count = 0;
 							encoderLongPressEnabled = false;
 						}
@@ -855,13 +874,25 @@ ISR(PORTF_PORT_vect)
 }
 
 
-static void sineWaveInit(void)
+static void sineWaveInit(int sine_period_steps)
 {
     uint8_t i;
-    for(i = 0; i < SINE_PERIOD_STEPS; i++)
-    {
-        sineWave[i] = SINE_DC_OFFSET + SINE_AMPLITUDE * sin(2 * M_PI * i / SINE_PERIOD_STEPS);
-    }
+	
+	if((sine_period_steps > 10) && (sine_period_steps < 256))
+	{
+		bool hold_at = g_audio_test;
+		
+		g_audio_test = false;
+		g_sine_period_steps = 0;
+	
+		for(i = 0; i < sine_period_steps; i++)
+		{
+			sineWave[i] = SINE_DC_OFFSET + SINE_AMPLITUDE * sin(2 * M_PI * i / sine_period_steps);
+		}
+	
+		g_sine_period_steps = sine_period_steps;
+		g_audio_test = hold_at;
+	}
 }
 
 void powerdown(void)
@@ -924,7 +955,7 @@ MenuState_t setMenu(MenuState_t menu)
 
 int main(void)
 {
-	sineWaveInit();
+	sineWaveInit(25);
 	
 	MenuState_t hold_menuState = MenuOperational;
 	bool frequency_updates_enabled = false;
@@ -1017,8 +1048,8 @@ int main(void)
 		
 		if(percent <= (float)g_battery_warning_threshold)
 		{
-			g_text_buff.putString((char*)"00BATTERY");
-			g_text_buff.putString((char*)"10  WARNING!");
+			g_text_buff.putString((char*)"00BATTERY\0");
+			g_text_buff.putString((char*)"10  WARNING!\0");
 			snprintf(g_tempStr, 13, "20%s Volts", batteryVoltsString(true, &temp_float));
 			g_text_buff.putString(g_tempStr);
 			snprintf(g_tempStr, 13, "30min: %s  ", batteryTimeLeftString(&temp_float));
@@ -1036,7 +1067,7 @@ int main(void)
 	
 	/* Start audio flow */
 	ADC0.MUXPOS = ADC_I_AMPED; 
-	ADC0_SYSTEM_init(ADC10BIT, true);
+	ADC0_SYSTEM_init(ADC12BIT, true);
  	ADC0_startConversion();
 
 	while (1) 
@@ -1054,7 +1085,7 @@ int main(void)
 					if((currentMenu != MenuBattery) && (currentMenu != MenuSetmAh) && (currentMenu != MenuSetBatThresh))
 					{
 						ADC0.MUXPOS = ADC_I_AMPED; 
-						ADC0_SYSTEM_init(ADC10BIT, true);
+						ADC0_SYSTEM_init(ADC12BIT, true);
  						ADC0_startConversion();
 					}
 				}
@@ -1318,6 +1349,7 @@ int main(void)
 		/* Send text to the display */
 		if(g_text_buff.size())
 		{
+			EC err;
 			size_t s;
 			g_text_buff.getString(g_tempStr, &s);
 			
@@ -1325,14 +1357,27 @@ int main(void)
 			{
 				char r = g_tempStr[0];
 				char c = g_tempStr[1];
-				uint8_t row = r - '0';
-				uint8_t col = c - '0';
+				uint8_t row = CLAMP(0, r - '0', 3);
+				uint8_t col = CLAMP(0, c - '0', 9);
 				
-				display.locate(row, col);
-				s -= 2;
-				display.sendBuffer((uint8_t*)&g_tempStr[2], s);
+				if(isDisplayable(g_tempStr, s))
+				{				
+					display.locate(row, col);
+					s -= 2;
+					err = display.sendBuffer((uint8_t*)&g_tempStr[2], s);
 				
-				g_text_buff.getString(g_tempStr, &s);
+					if(err != ERROR_CODE_NO_ERROR)
+					{
+ 						display.reset();
+	// 					I2C_0_Shutdown();
+	// 					display.begin(DOGS104);
+	// 					display.reset();
+	// 					display.init();
+	// 					refresh_display = true;
+					}
+				}
+				
+ 				g_text_buff.getString(g_tempStr, &s);
 			}
 		}
 		
@@ -1345,8 +1390,8 @@ int main(void)
 			}
 			else if(!g_text_buff.size())
 			{
-				powerdown();
-				g_go_to_sleep_now = true; /* wait for processor reset */
+// 				powerdown();
+// 				g_go_to_sleep_now = true; /* wait for processor reset */
 			}
 		}
 		
@@ -1440,8 +1485,9 @@ int main(void)
 			g_handle_counted_leftsense_presses = 0;
 		}
 		
-		if(g_leftsense_closed_time >= 1000)
+		if(g_leftsense_closed_time >= 200)
 		{
+			g_audio_test = false;
 		}
 		
 		if(g_long_leftsense_press)
@@ -1539,8 +1585,9 @@ int main(void)
 			g_handle_counted_rightsense_presses = 0;
 		}
 		
-		if(g_rightsense_closed_time >= 1000)
+		if(g_rightsense_closed_time >= 200)
 		{
+			g_audio_test = true;
 		}
 		
 		if(g_long_rightsense_press)
@@ -1726,7 +1773,11 @@ int main(void)
 				{
 					case MenuOperational:
 					{
-						if(frequency_updates_enabled)
+						if(g_audio_test)
+						{
+							sineWaveInit(g_sine_period_steps + 5);
+						}
+						else if(frequency_updates_enabled)
 						{
 							if(g_frequency_mode == MODE_VFO)
 							{
@@ -1868,7 +1919,11 @@ int main(void)
 				{
 					case MenuOperational:
 					{
-						if(frequency_updates_enabled)
+						if(g_audio_test)
+						{
+							sineWaveInit(g_sine_period_steps - 5);
+						}
+						else if(frequency_updates_enabled)
 						{
 							if(g_frequency_mode == MODE_VFO)
 							{
@@ -2034,148 +2089,112 @@ int main(void)
 		if(g_goertzel.SamplesReady())
 		{
 			static uint8_t init = 100;
-//			static float noiseLevel = 99999.;
-//			float magnitudes[3];
-			float level;
-// 			float newNoiseLevel = noiseLevel;
-// 			int maxPitch = -1;
-			static float maxPitchLevel = 0.;
-			static float minPitchLevel = 500.;
+			static float level, levelA, levelB, levelC; //, minLevel, maxLevel;
+			static float highPitchLevel = 0.;
+			static float lowPitchLevel = 500.;
+			static float nominal = 0;
+			static uint16_t consecutiveDetect=0, consecutiveNoDetect=0, consecutiveNoise=0;
+			
+// 			static uint32_t low_rssi = 0, mid_rssi = 0, high_rssi = 0;
 
-// 			bool signalDetected = false;
-// 			bool noiseDetected = false;
 			int clipCount = 0;
 
+			g_goertzel.SetTargetFrequency(pitch_frequencies[0]);    /* Initialize the object with the sampling frequency, # of samples and target freq */
+			levelA = g_goertzel.Magnitude2(&clipCount);     /* Check samples for presence of the target frequency */
 			g_goertzel.SetTargetFrequency(pitch_frequencies[1]);    /* Initialize the object with the sampling frequency, # of samples and target freq */
-			level = g_goertzel.Magnitude2(&clipCount);     /* Check samples for presence of the target frequency */
-//			maxPitch = 1;
-			
-// 			for(int i = 0; i < 3; i++)
-// 			{
-// 				g_goertzel.SetTargetFrequency(pitch_frequencies[i]);    /* Initialize the object with the sampling frequency, # of samples and target freq */
-// 				magnitudes[i] = g_goertzel.Magnitude2(&clipCount);     /* Check samples for presence of the target frequency */
-// 
-// 				if(magnitudes[i] < noiseLevel)
-// 				{
-// 					newNoiseLevel = magnitudes[i];
-// 				}
-// 					
-// 				if(magnitudes[i] > maxPitchLevel)
-// 				{
-// 					maxPitch = i;
-// 					maxPitchLevel = magnitudes[i];
-// 				}
-// 				
-// 				if(magnitudes[i] < minPitchLevel)
-// 				{
-// 					minPitchLevel = magnitudes[i];
-// 				}
-// 			}
-				
-// 			bool centered = (maxPitch==1);
-// 			bool tooHigh = false;
-// 			bool tooLow = false;
- 			bool saturation = (clipCount > 50);
-// 				
-// 			if(!centered)
-// 			{
-// 				tooHigh = maxPitch == 2;
-// 				tooLow = maxPitch == 0;
-// 			}
-// 				
-// 			noiseLevel = newNoiseLevel;
-// 				
-			float nominal;
+			levelB = g_goertzel.Magnitude2(&clipCount);     /* Check samples for presence of the target frequency */
+			g_goertzel.SetTargetFrequency(pitch_frequencies[2]);    /* Initialize the object with the sampling frequency, # of samples and target freq */
+			levelC = g_goertzel.Magnitude2(&clipCount);     /* Check samples for presence of the target frequency */
 
-			if(!saturation)
-			{				
+ 			bool saturation = clipCount > 50;
+
+			level = levelA + levelB + levelC / 3.;
+
+ 			if(saturation)
+			{
+				LEDS.blink(LEDS_RED_ON_CONSTANT);
+			}
+
+
+			if(1)
+			{		
+				LEDS.blink(LEDS_RED_OFF);	
+				
+				if(nominal > 500000. * (10 -getPWM()))
+				{
+					highPitchLevel = 0.;
+					lowPitchLevel = 0.;
+					nominal = 0.;
+					init = 100;
+				}
+				
 				if(init)
 				{
 					init--;
 					
-					if(level > maxPitchLevel) 
+					if(level > highPitchLevel) 
 					{
-						maxPitchLevel = level;
+						highPitchLevel = level;
 					}
 				
-					if(level < minPitchLevel) 
+					if(level < lowPitchLevel) 
 					{
-						minPitchLevel = level;
-					}			
+						lowPitchLevel = level;
+					}	
+					
+					nominal = (highPitchLevel + lowPitchLevel) / 2.;		
 				}
 				else
 				{
-					bool newmax = false;
-					bool newmin = false;
+					nominal = (20.*nominal + level) / 21.; /* Slow-moving average */
 					
-					if(level > maxPitchLevel) 
+					if(level > (nominal + 100.)) 
 					{
-						maxPitchLevel = (5. * maxPitchLevel + level) / 6.;
-						newmax = true;
+						highPitchLevel = (5. * highPitchLevel + level) / 6.;
+// 						newmax = true;
 					}
-				
-					if(level < minPitchLevel) 
+					else if(level < (nominal - 100.)) 
 					{
-						minPitchLevel = (5. * minPitchLevel + level) / 6.;
-						newmin = true;
+						lowPitchLevel = (5. * lowPitchLevel + level) / 6.;
+// 						newmin = true;
 					}
-					
-					if(!newmax && !newmin)
+										
+					if(level > (highPitchLevel + nominal)/2.)
 					{
-						maxPitchLevel = (50. * maxPitchLevel + level) / 51.;
-						minPitchLevel = (50. * minPitchLevel + level) / 51.;
+						consecutiveDetect++;
+						
+						if(consecutiveDetect > 1)
+						{
+							LEDS.blink(LEDS_GREEN_ON_CONSTANT, true);
+							LEDS.blink(LEDS_RED_OFF, true);
+							consecutiveNoise = 0;
+							consecutiveNoDetect = 0;
+						}	
+					}
+					else if(level < (lowPitchLevel + nominal)/2.)
+					{
+						consecutiveNoDetect++;
+						
+						if(consecutiveNoDetect > 3)
+						{
+							LEDS.blink(LEDS_OFF, true);
+							consecutiveNoise = 0;
+							consecutiveDetect = 0;
+						}
 					}
 					else
 					{
-						nominal = (maxPitchLevel + minPitchLevel) / 2.;
+						consecutiveNoise++;
+						if((consecutiveNoise > 1) && (consecutiveDetect < 5) && (consecutiveNoDetect < 5))
+						{
+							LEDS.blink(LEDS_RED_ON_CONSTANT, true);
+						}
 					}
-										
-					if(level > nominal)
-					{
-						g_goertzel_rssi =  (uint32_t)(10. * log10f(maxPitchLevel));
-					}
+					
+					if(consecutiveDetect) g_goertzel_rssi = (uint32_t)(10. * log10f(highPitchLevel));							
 				}
-				
-				
-// 				if(g_goertzel_rssi > hold)
-// 				{
-// 					hold = g_goertzel_rssi - hold;
-// 					
-// 					if(hold < 200)
-// 					{
-// 						g_goertzel_rssi--;
-// 					}
-// 					else
-// 					{
-// 						g_goertzel_rssi -= hold >> 4;
-// 					}
-// 				}
-// 				else if(g_goertzel_rssi < hold)
-// 				{
-// 					hold = hold - g_goertzel_rssi;
-// 					
-// 					if(hold < 200)
-// 					{
-// 						g_goertzel_rssi++;
-// 					}
-// 					else
-// 					{
-// 						g_goertzel_rssi += hold >> 4;
-// 					}
-// 				}
 			}
-// 			else
-// 			{
-// 				noiseDetected = !saturation;
-// 			}
 		}
-
-		
-		
-		
-		
-		
-		
 		
 		
 		
