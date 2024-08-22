@@ -214,7 +214,13 @@
     <Compile Include="include\ccp.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="include\CircularFloatBuff.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="include\CircularStringBuff.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="include\CircularUintBuff.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="include\clkctrl.h">
@@ -292,7 +298,13 @@
     <Compile Include="src\bod.cpp">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="src\CircularFloatBuff.cpp">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="src\CircularStringBuff.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\CircularUintBuff.cpp">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\clkctrl.cpp">

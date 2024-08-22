@@ -34,9 +34,10 @@ main.d main.o: .././main.cpp .././atmel_start.h \
  ../include/adc.h ../include/Goertzel.h ../include/util.h \
  ../include/binio.h ../include/eeprommanager.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\avr\eeprom.h \
- ../include/leds.h ../include/CircularStringBuff.h ../include/rtc.h \
- ../include/tca.h ../include/display.h ../include/i2c.h ../include/dac0.h \
- ../include/ccp.h ../include/protected_io.h
+ ../include/leds.h ../include/CircularStringBuff.h \
+ ../include/CircularFloatBuff.h ../include/CircularUintBuff.h \
+ ../include/rtc.h ../include/tca.h ../include/display.h ../include/i2c.h \
+ ../include/dac0.h ../include/ccp.h ../include/protected_io.h
 
 .././atmel_start.h:
 
@@ -139,6 +140,10 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\
 ../include/leds.h:
 
 ../include/CircularStringBuff.h:
+
+../include/CircularFloatBuff.h:
+
+../include/CircularUintBuff.h:
 
 ../include/rtc.h:
 

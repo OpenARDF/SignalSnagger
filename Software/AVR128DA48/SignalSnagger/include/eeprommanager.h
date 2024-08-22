@@ -108,6 +108,8 @@ struct EE_prom
 	FrequencyMode_t frequency_mode;
 	BatteryCapacity_t battery_capacity;
 	uint8_t battery_threshold;
+	uint8_t active_memory;
+
 };
 
 typedef enum
@@ -181,7 +183,8 @@ typedef enum
 	Channel_Name =  Frequency_Memory + NUMBER_OF_FREQUENCY_CHANNELS * sizeof(Frequency_Hz),
 	Frequency_Mode = Channel_Name + NUMBER_OF_FREQUENCY_CHANNELS * sizeof(uint8_t),
 	Battery_Capacity = Frequency_Mode + sizeof(uint8_t),
-	Battery_Threshold = Battery_Capacity + sizeof(uint8_t)
+	Battery_Threshold = Battery_Capacity + sizeof(uint8_t),
+	Active_Memory = Battery_Threshold + sizeof(uint8_t)
 } EE_var_t;
 
 

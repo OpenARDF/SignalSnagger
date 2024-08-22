@@ -19,6 +19,8 @@
 #include "binio.h"
 #include "leds.h"
 #include "CircularStringBuff.h"
+#include "CircularFloatBuff.h"
+#include "CircularUintBuff.h"
 #include "rtc.h"
 #include "tca.h"
 #include "display.h"
@@ -73,6 +75,7 @@ enum MenuState_t {
 	MenuClock,
 	MenuAbout,
 	MenuInactivityPoweroff,
+	MenuNoHeadphones,
 	NumberOfMenuStates,
 	MenuBackOne,
 	MenuGetCurrent
@@ -151,6 +154,7 @@ extern Frequency_Hz g_channel_frequency[NUMBER_OF_FREQUENCY_CHANNELS];
 extern FrequencyMode_t g_frequency_mode;
 extern volatile BatteryCapacity_t g_battery_capacity;
 extern volatile BatteryWarnThreshold_t g_battery_warning_threshold;
+extern volatile uint8_t g_active_memory;
 
 volatile bool g_seconds_transition = false;
 volatile time_t g_seconds_since_poweron = 0;
@@ -177,7 +181,7 @@ static volatile uint16_t g_lastConversionResult[NUMBER_OF_POLLED_ADC_CHANNELS] =
 static volatile ADC_Active_Channel_t g_active_ADC_sample = ADC_I_AMPED;
 
 extern Goertzel g_goertzel;
-uint32_t g_goertzel_rssi = 0;
+uint16_t g_goertzel_rssi = 0;
 
 static volatile uint16_t g_leftsense_closed_time = 0;
 static volatile uint16_t g_rightsense_closed_time = 0;
@@ -215,6 +219,12 @@ Display display = Display();
 leds LEDS = leds();
 CircularStringBuff g_text_buff = CircularStringBuff(TEXT_BUFF_SIZE);
 
+#define NOMINAL_BUFF_SIZE 30
+#define HIGH_WATER_BUFF_SIZE 10
+static CircularFloatBuff g_nominal_buff = CircularFloatBuff(NOMINAL_BUFF_SIZE);
+static CircularFloatBuff g_high_water_buff = CircularFloatBuff(HIGH_WATER_BUFF_SIZE);
+static CircularUintBuff g_rssi_buff = CircularUintBuff(HIGH_WATER_BUFF_SIZE);
+
 EepromManager EEPromMgr;
 
 #define Goertzel_N 209
@@ -223,9 +233,9 @@ const int N = Goertzel_N;
 //const float threshold = 500000. * (Goertzel_N / 100);
 const float sampling_freq = SAMPLE_RATE;
 const float pitch_frequencies[3] = { 600., 700., 800.}; /* should be an integer multiple of SAMPLING_RATE/N (SAMPLE_RATE / Goertzel_N) */
+volatile uint16_t g_rssi_countdown = 100;
 
 volatile bool g_audio_test = false;
-volatile uint16_t g_hold_assi_countdown = 0;
 
 /* VREF start-up time */
 #define VREF_STARTUP_TIME       (50)
@@ -413,7 +423,7 @@ ISR(TCB0_INT_vect)
 		static int holdRotaryEdges = 0;
 		static uint16_t rotaryNoMotionCountdown = 0;
 		
-		if(g_hold_assi_countdown) g_hold_assi_countdown--;
+		if(g_rssi_countdown) g_rssi_countdown--;
 		
 		fiftyMS++;
 		if(!(fiftyMS % 6))
@@ -959,7 +969,6 @@ int main(void)
 	
 	MenuState_t hold_menuState = MenuOperational;
 	bool frequency_updates_enabled = false;
-	uint8_t activeMemory = 0; /* Add to EEPROM ? */
 	uint8_t hold_activeMemory = 0;
 	Frequency_Hz hold_activeMemoryFreq = 0;
 	
@@ -970,7 +979,7 @@ int main(void)
 	uint8_t hold_rf_gain_setting = 255;
 //	uint16_t hold_assi_result = 0;
 	uint16_t hold_audio_gain = 0;
-	uint32_t hold_goertzel_rssi = 0;
+	uint16_t hold_goertzel_rssi = 0;
 	bool refresh_display = true;
 	uint8_t x;
 	EC ec;
@@ -1101,7 +1110,8 @@ int main(void)
 				
 				if(currentMenu == MenuOperational)
 				{
-					EEPromMgr.saveAllEEPROM();
+					EEPromMgr.saveAllEEPROM();					
+					display.display(LINES_4);						
 				}
 			}
 			
@@ -1123,14 +1133,14 @@ int main(void)
 					}
 					else
 					{
-						if(hold_activeMemory != activeMemory)
+						if(hold_activeMemory != g_active_memory)
 						{
-							hold_activeMemory = activeMemory;
+							hold_activeMemory = g_active_memory;
 							hold_rx_frequency = g_rx_frequency;
 						
-							if(g_channel_name[activeMemory])
+							if(g_channel_name[g_active_memory])
 							{
-								snprintf(g_tempStr, 13, "00M%02d%s%s", hold_activeMemory + 1, frequency_updates_enabled ? ">":" ", channelNames[g_channel_name[activeMemory]]);
+								snprintf(g_tempStr, 13, "00M%02d%s%s", hold_activeMemory + 1, frequency_updates_enabled ? ">":" ", channelNames[g_channel_name[g_active_memory]]);
 							}
 							else
 							{
@@ -1149,13 +1159,6 @@ int main(void)
 						sprintf(g_tempStr, "10RF=%d  ", MAX_PWM_SETTING - g_rf_gain_setting);
 						g_text_buff.putString(g_tempStr);
 					}
-			
-					// 			if(hold_assi_result != g_lastConversionResult[ASSI_NEAR])
-					// 			{
-					// 				hold_assi_result = g_lastConversionResult[ASSI_NEAR];
-					// 				sprintf(g_tempStr, "30S=%d  ", hold_assi_result);
-					// 				g_text_buff.putString(g_tempStr);
-					// 			}
 
 					if(hold_audio_gain != g_audio_gain)
 					{
@@ -1167,22 +1170,9 @@ int main(void)
 					if(hold_goertzel_rssi != g_goertzel_rssi)
 					{
 						hold_goertzel_rssi = g_goertzel_rssi;
-						snprintf(g_tempStr, 7, "30%lu ", hold_goertzel_rssi);
+						snprintf(g_tempStr, 7, "30%u   ", hold_goertzel_rssi);
 						g_text_buff.putString(g_tempStr);
 					}
-			
-					// 			int16_t slot = g_adcChannel2Slot[ADCBatteryVoltage];
-					// 			ADC0_startConversion();
-					// 			while(!ADC0_conversionDone());
-					// 			g_lastConversionResult[slot] = ADC0.RES;
-					// 			g_adcUpdated[slot] = true;
-					// 			if(g_adcUpdated[slot])
-					// 			{
-					// // 				uint16_t volts = g_lastConversionResult[slot];
-					// 				g_adcUpdated[slot] = false;
-					// 				snprintf(g_tempStr, 7, "25%sV", batteryVoltsString(true));
-					// 				g_text_buff.putString(g_tempStr);
-					// 			}
 				}
 				break;
 				
@@ -1191,16 +1181,15 @@ int main(void)
 					if(hold_menuRow != menuRow)
 					{
 						hold_menuRow = menuRow;
+						
+						display.display(LINES_3_3);						
+
 						sprintf(g_tempStr, "00Main Menu");
 						g_text_buff.putString(g_tempStr);
 						sprintf(g_tempStr, "20%s", clearRow);
 						g_text_buff.putString(g_tempStr);
 						sprintf(g_tempStr, "20%s", menuTitle[menuRow]);
 						g_text_buff.putString(g_tempStr);
-// 						sprintf(g_tempStr, "20%s", menuTitle[menuRow+1]);
-// 						g_text_buff.putString(g_tempStr);
-// 						sprintf(g_tempStr, "30%s", menuTitle[menuRow+2]);
-// 						g_text_buff.putString(g_tempStr);
 					}									
 				}
 				break;
@@ -1254,23 +1243,23 @@ int main(void)
 				case MenuFreqMemories:
 				case MenuSetMemName:
 				{
-					if(activeMemory > NUMBER_OF_FREQUENCY_CHANNELS)
+					if(g_active_memory > NUMBER_OF_FREQUENCY_CHANNELS)
 					{
-						activeMemory = 0;
+						g_active_memory = 0;
 					}
 					
-					Frequency_Hz chanF = g_channel_frequency[activeMemory];
+					Frequency_Hz chanF = g_channel_frequency[g_active_memory];
 										
 					/* Reset any corrupted memory locations */
 					if((chanF > RX_MAXIMUM_80M_FREQUENCY) || (chanF < RX_MINIMUM_80M_FREQUENCY))
 					{
-						g_channel_frequency[activeMemory] = 0;
+						g_channel_frequency[g_active_memory] = 0;
 						chanF = 0;
 					}
 
-					if((hold_activeMemory != activeMemory) || (hold_activeMemoryFreq != chanF))
+					if((hold_activeMemory != g_active_memory) || (hold_activeMemoryFreq != chanF))
 					{
-						hold_activeMemory = activeMemory;
+						hold_activeMemory = g_active_memory;
 						hold_activeMemoryFreq = chanF;
 						
 						snprintf(g_tempStr, 13, "00Memory %02d", hold_activeMemory + 1);
@@ -1287,13 +1276,13 @@ int main(void)
 								snprintf(g_tempStr, 13, "20  %s  ", str);
 								g_text_buff.putString(g_tempStr);
 								
-								if(g_channel_name[activeMemory])
+								if(g_channel_name[g_active_memory])
 								{
-									snprintf(g_tempStr, 13, "30  %s", channelNames[g_channel_name[activeMemory]]);
+									snprintf(g_tempStr, 13, "20  %s", channelNames[g_channel_name[g_active_memory]]);
 								}
 								else
 								{
-									snprintf(g_tempStr, 13, "30* NAME?? *");
+									snprintf(g_tempStr, 13, "20* NAME?? *");
 								}
 							}
 							else
@@ -1304,9 +1293,7 @@ int main(void)
 								}
 								else
 								{
-// 									snprintf(g_tempStr, 13, "20  %s  ", str);
-// 									g_text_buff.putString(g_tempStr);
-									snprintf(g_tempStr, 13, "30> %s  ", channelNames[g_channel_name[activeMemory]]);
+									snprintf(g_tempStr, 13, "20> %s  ", channelNames[g_channel_name[g_active_memory]]);
 								}
 							}
 					
@@ -1330,12 +1317,25 @@ int main(void)
 				}
 				break;
 				
+				case MenuNoHeadphones:
+				{
+					sprintf(g_tempStr, "10HEADPHONES");
+					g_text_buff.putString(g_tempStr);
+					sprintf(g_tempStr, "20UNPLUGGED!");
+					g_text_buff.putString(g_tempStr);
+				}
+				break;
+				
 				case MenuAbout:
 				{
-					g_text_buff.putString((char*)"00Signal");
-					g_text_buff.putString((char*)"12Snagger!");
-					sprintf(g_tempStr, "30Ver:%s", SW_REVISION);
-					g_text_buff.putString(g_tempStr);
+					if(hold_menuRow != menuRow)
+					{
+						hold_menuRow = menuRow;
+						g_text_buff.putString((char*)"00Signal");
+						g_text_buff.putString((char*)"12Snagger!");
+						sprintf(g_tempStr, "20Ver:%s", SW_REVISION);
+						g_text_buff.putString(g_tempStr);
+					}
 				}
 				break;
 				
@@ -1361,7 +1361,7 @@ int main(void)
 				uint8_t col = CLAMP(0, c - '0', 9);
 				
 				if(isDisplayable(g_tempStr, s))
-				{				
+				{
 					display.locate(row, col);
 					s -= 2;
 					err = display.sendBuffer((uint8_t*)&g_tempStr[2], s);
@@ -1401,6 +1401,13 @@ int main(void)
 			/* Reach here if headphones are plugged back in before total power off occurs */
 			PORTA_set_pin_level(PWR_5V_ENABLE, HIGH);  /* Enable 5V power regulator */
 			PORTA_set_pin_level(POWER_ENABLE, HIGH);
+		}
+		else if(!g_headphones_detected)
+		{
+			if(setMenu(MenuGetCurrent) != MenuNoHeadphones)
+			{
+				setMenu(MenuNoHeadphones);
+			}
 		}
 		
 		/*************************************************************************************
@@ -1456,17 +1463,17 @@ int main(void)
 					refresh_display = true;
 				}
 
-				if(g_channel_frequency[activeMemory] == EMPTY_MEMORY)
+				if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
 				{
-					activeMemory = nextActiveMemory(activeMemory, UP);
+					g_active_memory = nextActiveMemory(g_active_memory, UP);
 				
-					if(activeMemory == INVALID_CHANNEL)
+					if(g_active_memory == INVALID_CHANNEL)
 					{
 						g_frequency_mode = MODE_VFO;
 					}
 					else if(g_frequency_mode == MODE_MEMORY)
 					{
-						g_rx_frequency = g_channel_frequency[activeMemory];
+						g_rx_frequency = g_channel_frequency[g_active_memory];
 						si5351_set_quad_frequency(g_rx_frequency);					
 					}
 				}
@@ -1485,10 +1492,10 @@ int main(void)
 			g_handle_counted_leftsense_presses = 0;
 		}
 		
-		if(g_leftsense_closed_time >= 200)
-		{
-			g_audio_test = false;
-		}
+// 		if(g_leftsense_closed_time >= 200)
+// 		{
+// 			g_audio_test = false;
+// 		}
 		
 		if(g_long_leftsense_press)
 		{
@@ -1500,17 +1507,17 @@ int main(void)
 					refresh_display = true;
 				}
 
-				if(g_channel_frequency[activeMemory] == EMPTY_MEMORY)
+				if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
 				{
-					activeMemory = nextActiveMemory(activeMemory, UP);
+					g_active_memory = nextActiveMemory(g_active_memory, UP);
 				
-					if(activeMemory == INVALID_CHANNEL)
+					if(g_active_memory == INVALID_CHANNEL)
 					{
 						g_frequency_mode = MODE_VFO;
 					}
 					else if(g_frequency_mode == MODE_MEMORY)
 					{
-						g_rx_frequency = g_channel_frequency[activeMemory];
+						g_rx_frequency = g_channel_frequency[g_active_memory];
 						si5351_set_quad_frequency(g_rx_frequency);					
 					}
 				}
@@ -1556,17 +1563,17 @@ int main(void)
 					refresh_display = true;
 				}
 
-				if(g_channel_frequency[activeMemory] == EMPTY_MEMORY)
+				if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
 				{
-					activeMemory = nextActiveMemory(activeMemory, UP);
+					g_active_memory = nextActiveMemory(g_active_memory, UP);
 				
-					if(activeMemory == INVALID_CHANNEL)
+					if(g_active_memory == INVALID_CHANNEL)
 					{
 						g_frequency_mode = MODE_VFO;
 					}
 					else if(g_frequency_mode == MODE_MEMORY)
 					{
-						g_rx_frequency = g_channel_frequency[activeMemory];
+						g_rx_frequency = g_channel_frequency[g_active_memory];
 						si5351_set_quad_frequency(g_rx_frequency);					
 					}
 				}
@@ -1585,10 +1592,10 @@ int main(void)
 			g_handle_counted_rightsense_presses = 0;
 		}
 		
-		if(g_rightsense_closed_time >= 200)
-		{
-			g_audio_test = true;
-		}
+// 		if(g_rightsense_closed_time >= 200)
+// 		{
+// 			g_audio_test = true;
+// 		}
 		
 		if(g_long_rightsense_press)
 		{
@@ -1600,17 +1607,17 @@ int main(void)
 					refresh_display = true;
 				}
 
-				if(g_channel_frequency[activeMemory] == EMPTY_MEMORY)
+				if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
 				{
-					activeMemory = nextActiveMemory(activeMemory, UP);
+					g_active_memory = nextActiveMemory(g_active_memory, UP);
 				
-					if(activeMemory == INVALID_CHANNEL)
+					if(g_active_memory == INVALID_CHANNEL)
 					{
 						g_frequency_mode = MODE_VFO;
 					}
 					else if(g_frequency_mode == MODE_MEMORY)
 					{
-						g_rx_frequency = g_channel_frequency[activeMemory];
+						g_rx_frequency = g_channel_frequency[g_active_memory];
 						si5351_set_quad_frequency(g_rx_frequency);					
 					}
 				}
@@ -1636,10 +1643,10 @@ int main(void)
 		{
 			if(g_handle_counted_encoder_presses == 1)
 			{
-				if((g_frequency_mode == MODE_VFO) && (nextActiveMemory(activeMemory, UP) != 0xFF))
+				if((g_frequency_mode == MODE_VFO) && (nextActiveMemory(g_active_memory, UP) != 0xFF))
 				{
 					g_frequency_mode = MODE_MEMORY;
-					g_rx_frequency = g_channel_frequency[activeMemory];
+					g_rx_frequency = g_channel_frequency[g_active_memory];
 					si5351_set_quad_frequency(g_rx_frequency);					
 				}
 				else
@@ -1701,14 +1708,14 @@ int main(void)
 					{
 						setMenu(MenuSetMemFreq);
 						
-						if(g_channel_frequency[activeMemory] == EMPTY_MEMORY)
+						if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
 						{
 							if((g_rx_frequency > RX_MAXIMUM_80M_FREQUENCY) || (g_rx_frequency < RX_MINIMUM_80M_FREQUENCY))
 							{
 								g_rx_frequency = MEMORY_DEFAULT_FREQUENCY;
 							}
 							
-							g_channel_frequency[activeMemory] = g_rx_frequency;
+							g_channel_frequency[g_active_memory] = g_rx_frequency;
 						}
 					}
 					break;
@@ -1733,8 +1740,8 @@ int main(void)
 			{
 				if(setMenu(MenuGetCurrent) == MenuSetMemFreq)
 				{
-					g_channel_frequency[activeMemory] = 0;
-					g_channel_name[activeMemory] = 0;
+					g_channel_frequency[g_active_memory] = 0;
+					g_channel_name[g_active_memory] = 0;
 					setMenu(MenuBackOne);
 				}
 			}
@@ -1795,8 +1802,8 @@ int main(void)
 							}
 							else
 							{
-								activeMemory = nextActiveMemory(activeMemory, UP);
-								g_rx_frequency = g_channel_frequency[activeMemory];
+								g_active_memory = nextActiveMemory(g_active_memory, UP);
+								g_rx_frequency = g_channel_frequency[g_active_memory];
 							}
 
 							si5351_set_quad_frequency(g_rx_frequency);
@@ -1827,15 +1834,15 @@ int main(void)
 					
 					case MenuFreqMemories:
 					{
-						activeMemory++;
-						if(activeMemory >= NUMBER_OF_FREQUENCY_CHANNELS) activeMemory = 0;
+						g_active_memory++;
+						if(g_active_memory >= NUMBER_OF_FREQUENCY_CHANNELS) g_active_memory = 0;
 						refresh_display = true;
 						
-						Frequency_Hz f = g_channel_frequency[activeMemory];
+						Frequency_Hz f = g_channel_frequency[g_active_memory];
 							
 						if((f < RX_MAXIMUM_80M_FREQUENCY) && (f > RX_MINIMUM_80M_FREQUENCY))
 						{
-							g_rx_frequency = g_channel_frequency[activeMemory];
+							g_rx_frequency = g_channel_frequency[g_active_memory];
 						}
 						
 						si5351_set_quad_frequency(g_rx_frequency);							
@@ -1856,20 +1863,20 @@ int main(void)
 							}
 						}
 
-						g_channel_frequency[activeMemory] = g_rx_frequency;
+						g_channel_frequency[g_active_memory] = g_rx_frequency;
 					}
 					break;
 					
 					case MenuSetMemName:
 					{
-						uint8_t n = g_channel_name[activeMemory];
+						uint8_t n = g_channel_name[g_active_memory];
 						
 						if(++n >= NUMBER_OF_FREQUENCY_CHANNEL_NAMES)
 						{
 							n = 0;
 						}
 						
-						g_channel_name[activeMemory] = n;
+						g_channel_name[g_active_memory] = n;
 						hold_activeMemoryFreq = INVALID_FREQUENCY;
 					}
 					break;
@@ -1941,8 +1948,8 @@ int main(void)
 							}
 							else
 							{
-								activeMemory = nextActiveMemory(activeMemory, !UP);
-								g_rx_frequency = g_channel_frequency[activeMemory];
+								g_active_memory = nextActiveMemory(g_active_memory, !UP);
+								g_rx_frequency = g_channel_frequency[g_active_memory];
 							}
 
 							si5351_set_quad_frequency(g_rx_frequency);
@@ -1973,21 +1980,21 @@ int main(void)
 					
 					case MenuFreqMemories:
 					{
-						if(activeMemory == 0) 
+						if(g_active_memory == 0) 
 						{
-							activeMemory = NUMBER_OF_FREQUENCY_CHANNELS-1;
+							g_active_memory = NUMBER_OF_FREQUENCY_CHANNELS-1;
 						}
 						else
 						{
-							activeMemory--;
+							g_active_memory--;
 						}
 							
-						Frequency_Hz f = g_channel_frequency[activeMemory];
+						Frequency_Hz f = g_channel_frequency[g_active_memory];
 						refresh_display = true;
 													
 						if((f < RX_MAXIMUM_80M_FREQUENCY) && (f > RX_MINIMUM_80M_FREQUENCY))
 						{
-							g_rx_frequency = g_channel_frequency[activeMemory];
+							g_rx_frequency = g_channel_frequency[g_active_memory];
 						}
 						
 						si5351_set_quad_frequency(g_rx_frequency);							
@@ -2007,14 +2014,14 @@ int main(void)
 								g_rx_frequency -= 100;
 							}
 						
-							g_channel_frequency[activeMemory] = g_rx_frequency;
+							g_channel_frequency[g_active_memory] = g_rx_frequency;
 						}
 					}
 					break;
 					
 					case MenuSetMemName:
 					{
-						uint8_t n = g_channel_name[activeMemory];
+						uint8_t n = g_channel_name[g_active_memory];
 						
 						if(n)
 						{
@@ -2025,7 +2032,7 @@ int main(void)
 							n = NUMBER_OF_FREQUENCY_CHANNEL_NAMES - 1;
 						}
 						
-						g_channel_name[activeMemory] = n;
+						g_channel_name[g_active_memory] = n;
 						hold_activeMemoryFreq = INVALID_FREQUENCY;
 					}
 					break;
@@ -2086,16 +2093,19 @@ int main(void)
 		}
 				
 //======================================================		
-		if(g_goertzel.SamplesReady())
+		if(g_goertzel.SamplesReady() && !g_rssi_countdown)
 		{
-			static uint8_t init = 100;
-			static float level, levelA, levelB, levelC; //, minLevel, maxLevel;
-			static float highPitchLevel = 0.;
-			static float lowPitchLevel = 500.;
-			static float nominal = 0;
-			static uint16_t consecutiveDetect=0, consecutiveNoDetect=0, consecutiveNoise=0;
-			
-// 			static uint32_t low_rssi = 0, mid_rssi = 0, high_rssi = 0;
+			static uint8_t init = NOMINAL_BUFF_SIZE;
+			float level, levelA, levelB, levelC; //, minLevel, maxLevel;
+			static float highSigDetectThreshold = 0.;
+			static float low_water = 999999.;
+			static float nominal = 0., high_water = 0.;
+			uint16_t signal_to_noise = 0.;
+			static uint16_t consecutiveDetect=0, consecutiveNoise=0;
+			static uint8_t holdPWM = 255;
+			bool sigDetected = false;
+								
+			g_rssi_countdown = 5;
 
 			int clipCount = 0;
 
@@ -2106,92 +2116,114 @@ int main(void)
 			g_goertzel.SetTargetFrequency(pitch_frequencies[2]);    /* Initialize the object with the sampling frequency, # of samples and target freq */
 			levelC = g_goertzel.Magnitude2(&clipCount);     /* Check samples for presence of the target frequency */
 
- 			bool saturation = clipCount > 50;
-
-			level = levelA + levelB + levelC / 3.;
-
- 			if(saturation)
-			{
-				LEDS.blink(LEDS_RED_ON_CONSTANT);
-			}
-
+			level = (levelA + levelB + levelC);
 
 			if(1)
 			{		
-				LEDS.blink(LEDS_RED_OFF);	
-				
-				if(nominal > 500000. * (10 -getPWM()))
+				if(holdPWM != getPWM())
 				{
-					highPitchLevel = 0.;
-					lowPitchLevel = 0.;
+					holdPWM = getPWM();
+					high_water = 0.;
+					low_water = 999999.;
 					nominal = 0.;
-					init = 100;
+					init = 20;
 				}
 				
 				if(init)
 				{
 					init--;
 					
-					if(level > highPitchLevel) 
+					if(level > highSigDetectThreshold) 
 					{
-						highPitchLevel = level;
+						high_water = level;
+						g_high_water_buff.put(level);
 					}
-				
-					if(level < lowPitchLevel) 
-					{
-						lowPitchLevel = level;
-					}	
 					
-					nominal = (highPitchLevel + lowPitchLevel) / 2.;		
+					if(level < low_water) 
+					{
+						low_water = level;
+					}
+					
+					g_nominal_buff.put(level);
 				}
 				else
 				{
-					nominal = (20.*nominal + level) / 21.; /* Slow-moving average */
-					
-					if(level > (nominal + 100.)) 
+					if(level > nominal) 
 					{
-						highPitchLevel = (5. * highPitchLevel + level) / 6.;
-// 						newmax = true;
+						high_water = ((9. * high_water + level) / 10.);
+						g_high_water_buff.put(high_water);
+						highSigDetectThreshold = nominal + (g_high_water_buff.olympic() / 4.);
+						
+						sigDetected = level > highSigDetectThreshold;					
 					}
-					else if(level < (nominal - 100.)) 
+					else // if(level < (nominal - 100.)) 
 					{
-						lowPitchLevel = (5. * lowPitchLevel + level) / 6.;
-// 						newmin = true;
+						low_water = ((9. * low_water + level) / 10.);
+						g_nominal_buff.put(low_water);
 					}
 										
-					if(level > (highPitchLevel + nominal)/2.)
-					{
+					g_rssi_buff.put((uint16_t)(100. * (log10f(highSigDetectThreshold) - log10f(nominal + 20.))));
+					signal_to_noise = g_rssi_buff.olympic();
+
+					if(sigDetected)
+					{										
 						consecutiveDetect++;
 						
 						if(consecutiveDetect > 1)
 						{
-							LEDS.blink(LEDS_GREEN_ON_CONSTANT, true);
-							LEDS.blink(LEDS_RED_OFF, true);
-							consecutiveNoise = 0;
-							consecutiveNoDetect = 0;
+							if(signal_to_noise > 13)
+							{
+								LEDS.blink(LEDS_GREEN_ON_CONSTANT, true);
+								LEDS.blink(LEDS_RED_OFF);
+							}
+							
+							consecutiveNoise = 0;	
+							
+							/* Determine RSSI. Capture maximum if a sense button is pressed */
+							if(g_leftsense_pressed || g_rightsense_pressed)
+							{
+								static uint16_t consec_lower = 0;
+								
+								if(signal_to_noise > g_goertzel_rssi)
+								{
+									g_goertzel_rssi++;
+									g_rssi_countdown = 0;
+									consec_lower = 0;
+								}
+								else if(signal_to_noise < g_goertzel_rssi)
+								{
+									consec_lower++;
+									
+									if(consec_lower > 100)
+									{
+										g_goertzel_rssi--;
+									}
+								}
+							}				
+							else
+							{
+								g_goertzel_rssi = signal_to_noise;
+							}
 						}	
 					}
-					else if(level < (lowPitchLevel + nominal)/2.)
-					{
-						consecutiveNoDetect++;
-						
-						if(consecutiveNoDetect > 3)
-						{
-							LEDS.blink(LEDS_OFF, true);
-							consecutiveNoise = 0;
-							consecutiveDetect = 0;
-						}
-					}
-					else
+					else 
 					{
 						consecutiveNoise++;
-						if((consecutiveNoise > 1) && (consecutiveDetect < 5) && (consecutiveNoDetect < 5))
+						consecutiveDetect = 0;
+
+						if(consecutiveNoise > 2)
 						{
 							LEDS.blink(LEDS_RED_ON_CONSTANT, true);
+							LEDS.blink(LEDS_GREEN_OFF, true);
 						}
-					}
-					
-					if(consecutiveDetect) g_goertzel_rssi = (uint32_t)(10. * log10f(highPitchLevel));							
+					}									
+				}
+				
+				if(signal_to_noise < 20)
+				{
+					nominal = MIN((high_water + low_water) / 2., highSigDetectThreshold);				
+					g_nominal_buff.put(nominal);
+					nominal = g_nominal_buff.olympic();
 				}
 			}
 		}

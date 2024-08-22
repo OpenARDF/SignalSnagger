@@ -12,7 +12,11 @@ src\binio.cpp
 
 src\bod.cpp
 
+src\CircularFloatBuff.cpp
+
 src\CircularStringBuff.cpp
+
+src\CircularUintBuff.cpp
 
 src\clkctrl.cpp
 

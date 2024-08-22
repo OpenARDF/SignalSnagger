@@ -34,7 +34,7 @@
 
 /******************************************************
  * Set the text that gets displayed to the user       */
-#define SW_REVISION "0.35"
+#define SW_REVISION "0.36"
 
 //#define TRANQUILIZE_WATCHDOG
 
@@ -55,7 +55,6 @@
 /******************************************************
  * Include only the necessary hardware support */
 #define INCLUDE_SI5351_SUPPORT true // Silicon Labs Programmable Clock
-#define INCLUDE_DS3231_SUPPORT true // Maxim RTC
 
 #define DATE_STRING_SUPPORT_ENABLED
 
@@ -219,7 +218,7 @@ typedef uint16_t BatteryLevel;  /* in milliVolts */
 
 /******************************************************
  * EEPROM definitions */
-#define EEPROM_INITIALIZED_FLAG (uint16_t)0x0113
+#define EEPROM_INITIALIZED_FLAG (uint16_t)0x0114
 #define EEPROM_UNINITIALIZED 0x00
 
 #define EEPROM_STATION_ID_DEFAULT "FOXBOX"
