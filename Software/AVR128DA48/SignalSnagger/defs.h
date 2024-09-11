@@ -34,7 +34,7 @@
 
 /******************************************************
  * Set the text that gets displayed to the user       */
-#define SW_REVISION "0.36"
+#define SW_REVISION "0.37"
 
 //#define TRANQUILIZE_WATCHDOG
 
@@ -50,6 +50,10 @@
 #define DIGITAL_POT_I_I2C_SLAVE_ADDR	0x2F
 #define DIGITAL_POT_Q_I2C_SLAVE_ADDR	0x2F
 #define RF_GAIN_DAC_I2C_SLAVE_ADDR		0x61
+/*******************************************************/
+
+/*******************************************************/
+#define INACTIVITY_POWER_DOWN_DELAY_SECONDS 1800
 /*******************************************************/
 
 /******************************************************

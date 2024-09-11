@@ -128,7 +128,7 @@ static char g_tempStr[TEMPSTR_SIZE] = { '\0' };
 static volatile bool g_battery_measurements_active = false;
 static volatile uint16_t g_maximum_battery = 0;
 
-static volatile uint16_t g_powerdown_seconds = 300;
+static volatile uint16_t g_powerdown_seconds = INACTIVITY_POWER_DOWN_DELAY_SECONDS;
 static volatile bool g_headphones_detected = false;
 static volatile bool g_powering_off = false;
 
@@ -158,7 +158,6 @@ extern volatile uint8_t g_active_memory;
 
 volatile bool g_seconds_transition = false;
 volatile time_t g_seconds_since_poweron = 0;
-volatile time_t g_inactivity_power_off = 900; /* 15 minutes */
 volatile uint8_t g_display_active_countdown = false;
 
 static volatile bool g_sufficient_power_detected = false;
@@ -228,7 +227,7 @@ static CircularUintBuff g_rssi_buff = CircularUintBuff(HIGH_WATER_BUFF_SIZE);
 EepromManager EEPromMgr;
 
 #define Goertzel_N 209
-#define SAMPLE_RATE 12080 // 13868
+#define SAMPLE_RATE 480965 /* 12080  13868 */
 const int N = Goertzel_N;
 //const float threshold = 500000. * (Goertzel_N / 100);
 const float sampling_freq = SAMPLE_RATE;
@@ -289,7 +288,6 @@ ISR(RTC_CNT_vect)
     {
         system_tick();
 		if(g_powerdown_seconds) g_powerdown_seconds--;
-		if(g_inactivity_power_off) g_inactivity_power_off--;
 		g_seconds_transition = true;
 		g_seconds_since_poweron++;
 		if(g_seconds_since_poweron == 2) g_rotary_enable = true;
@@ -369,7 +367,6 @@ ISR(ADC0_RESRDY_vect)
 				}
 				DAC0_setVal(result);
 				g_goertzel.DataPoint(result);
-//				PORTC_toggle_pin_level(5);
 			}
 		}
 		else
@@ -397,6 +394,7 @@ ISR(ADC0_RESRDY_vect)
 		
 			DAC0_setVal(result);
 			g_goertzel.DataPoint(sample);
+// 				PORTC_toggle_pin_level(5);
 		}
 	}
 	
@@ -410,6 +408,7 @@ Periodic tasks not requiring precise timing. Rate = 300 Hz
 ISR(TCB0_INT_vect)
 {
 	static uint8_t fiftyMS = 6;
+	static uint8_t headphones_filter = 100;
 	
 	uint8_t x = TCB0.INTFLAGS;
 	
@@ -442,9 +441,27 @@ ISR(TCB0_INT_vect)
 			int8_t encoderSwitch = nowSwitch & (1 << ENCODER_SWITCH);
 			int8_t headphones = nowSwitch & (1 << HEADPHONE_DETECT);
 			
-			if((g_headphones_detected = !headphones)) /* Set and check headphones presence */
+			if(g_headphones_detected != !headphones)
 			{
-				g_powerdown_seconds = 60;
+				if(headphones_filter) headphones_filter--;
+				
+				if(!headphones_filter)
+				{
+					if(headphones) 
+					{				
+						g_headphones_detected = false;
+					}
+					else
+					{
+						g_headphones_detected = true;
+					}
+					
+					headphones_filter = 50;
+				}
+			}
+			else
+			{
+				headphones_filter = 50;
 			}
 			
 			bothSense_pressed = false;
@@ -480,8 +497,11 @@ ISR(TCB0_INT_vect)
 				int8_t changed = nowSwitch ^ holdSwitch;
 				
 				g_active_ADC_sample = ADCBatteryVoltage;
-				g_powerdown_seconds = 60;
-				g_inactivity_power_off = 900;
+				
+				if(g_headphones_detected)
+				{
+					g_powerdown_seconds = INACTIVITY_POWER_DOWN_DELAY_SECONDS;
+				}
 				
 				if(changed & (1 << SENSE_SWITCH_LEFT)) // left sense button changed
 				{
@@ -755,8 +775,6 @@ ISR(TCB0_INT_vect)
 
 					if(!rotaryNoMotionCountdown)
 					{
-						g_inactivity_power_off = 900;
-					
 						if(val>1)
 						{
 							val += 3;
@@ -980,6 +998,7 @@ int main(void)
 //	uint16_t hold_assi_result = 0;
 	uint16_t hold_audio_gain = 0;
 	uint16_t hold_goertzel_rssi = 0;
+	bool hold_headphone_state = true;
 	bool refresh_display = true;
 	uint8_t x;
 	EC ec;
@@ -1112,6 +1131,10 @@ int main(void)
 				{
 					EEPromMgr.saveAllEEPROM();					
 					display.display(LINES_4);						
+				}
+				else if(currentMenu == MenuNoHeadphones)
+				{
+					display.display(LINES_2);
 				}
 			}
 			
@@ -1319,9 +1342,9 @@ int main(void)
 				
 				case MenuNoHeadphones:
 				{
-					sprintf(g_tempStr, "10HEADPHONES");
+					sprintf(g_tempStr, "00HEADPHONES");
 					g_text_buff.putString(g_tempStr);
-					sprintf(g_tempStr, "20UNPLUGGED!");
+					sprintf(g_tempStr, "10    %u ", g_powerdown_seconds);
 					g_text_buff.putString(g_tempStr);
 				}
 				break;
@@ -1382,31 +1405,54 @@ int main(void)
 		}
 		
 		
-		if(!g_inactivity_power_off)
+		if(hold_headphone_state != g_headphones_detected)
 		{
-			if(setMenu(MenuGetCurrent) != MenuInactivityPoweroff)
+			hold_headphone_state = g_headphones_detected;
+			
+			if(!hold_headphone_state)
 			{
-				setMenu(MenuInactivityPoweroff);
+				if(setMenu(MenuGetCurrent) != MenuNoHeadphones)
+				{
+					setMenu(MenuNoHeadphones);
+				}
+				
+				g_powerdown_seconds = 60;
 			}
-			else if(!g_text_buff.size())
+			else
 			{
-// 				powerdown();
-// 				g_go_to_sleep_now = true; /* wait for processor reset */
+				if(setMenu(MenuGetCurrent) != MenuOperational)
+				{
+					setMenu(MenuOperational);
+				}
+				
+				g_powerdown_seconds = INACTIVITY_POWER_DOWN_DELAY_SECONDS;
 			}
 		}
 		
 		if(!g_powerdown_seconds)
 		{
-			powerdown();
-			/* Reach here if headphones are plugged back in before total power off occurs */
-			PORTA_set_pin_level(PWR_5V_ENABLE, HIGH);  /* Enable 5V power regulator */
-			PORTA_set_pin_level(POWER_ENABLE, HIGH);
-		}
-		else if(!g_headphones_detected)
-		{
-			if(setMenu(MenuGetCurrent) != MenuNoHeadphones)
+			if(g_headphones_detected) /* Inactivity power down */
 			{
-				setMenu(MenuNoHeadphones);
+				if(setMenu(MenuGetCurrent) != MenuInactivityPoweroff)
+				{
+					setMenu(MenuInactivityPoweroff);
+				}
+				else if(!g_text_buff.size())
+				{
+					powerdown();
+					g_go_to_sleep_now = true; /* wait for processor reset */
+				}
+			}
+			else
+			{
+				powerdown();
+				/* Reach here if headphones are plugged back in before total power off occurs */
+				
+				if(g_headphones_detected)
+				{
+					PORTA_set_pin_level(PWR_5V_ENABLE, HIGH);  /* Enable 5V power regulator */
+					PORTA_set_pin_level(POWER_ENABLE, HIGH);
+				}
 			}
 		}
 		
@@ -1414,684 +1460,687 @@ int main(void)
 		USER INPUT - Handing button presses and rotary encoder turns
 		**************************************************************************************/
 		
-		/* Both sense switches pressed simultaneously */
-		if(g_handle_counted_doublesense_presses)
+		if(hold_headphone_state)
 		{
-			if(g_handle_counted_doublesense_presses == 1)
+			/* Both sense switches pressed simultaneously */
+			if(g_handle_counted_doublesense_presses)
 			{
-			}
-			else if(g_handle_counted_doublesense_presses == 2)
-			{
-			}
+				if(g_handle_counted_doublesense_presses == 1)
+				{
+				}
+				else if(g_handle_counted_doublesense_presses == 2)
+				{
+				}
 			
-			g_handle_counted_doublesense_presses = 0;
-		}
+				g_handle_counted_doublesense_presses = 0;
+			}
 		
-		if(g_long_doublesense_press)
-		{
-			g_long_doublesense_press = false;
-			if(setMenu(MenuGetCurrent) == MenuOperational) 
+			if(g_long_doublesense_press)
 			{
-				setMenu(MenuMain);
-			}
-			else
-			{
-				setMenu(MenuOperational);
-			}
-		}
-
-
-		/*********************************
-		* Left sense switch pressed 
-		*********************************/
-		if(g_handle_counted_leftsense_presses)
-		{
-			if(g_handle_counted_leftsense_presses == 1)
-			{
-			}
-			else if (g_handle_counted_leftsense_presses == 2)
-			{
-			}
-			
-			if(g_display_active_countdown) g_display_active_countdown = 0;
-			
-			if(setMenu(MenuGetCurrent) != MenuOperational)
-			{
-				if(frequency_updates_enabled)
+				g_long_doublesense_press = false;
+				if(setMenu(MenuGetCurrent) == MenuOperational) 
 				{
-					frequency_updates_enabled = false;
-					refresh_display = true;
-				}
-
-				if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
-				{
-					g_active_memory = nextActiveMemory(g_active_memory, UP);
-				
-					if(g_active_memory == INVALID_CHANNEL)
-					{
-						g_frequency_mode = MODE_VFO;
-					}
-					else if(g_frequency_mode == MODE_MEMORY)
-					{
-						g_rx_frequency = g_channel_frequency[g_active_memory];
-						si5351_set_quad_frequency(g_rx_frequency);					
-					}
-				}
-				
-				setMenu(MenuBackOne);
-			}
-			else
-			{
-				if(frequency_updates_enabled)
-				{
-					frequency_updates_enabled = false;
-					refresh_display = true;
-				}
-			}
-			
-			g_handle_counted_leftsense_presses = 0;
-		}
-		
-// 		if(g_leftsense_closed_time >= 200)
-// 		{
-// 			g_audio_test = false;
-// 		}
-		
-		if(g_long_leftsense_press)
-		{
-			if(setMenu(MenuGetCurrent) != MenuOperational)
-			{
-				if(frequency_updates_enabled)
-				{
-					frequency_updates_enabled = false;
-					refresh_display = true;
-				}
-
-				if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
-				{
-					g_active_memory = nextActiveMemory(g_active_memory, UP);
-				
-					if(g_active_memory == INVALID_CHANNEL)
-					{
-						g_frequency_mode = MODE_VFO;
-					}
-					else if(g_frequency_mode == MODE_MEMORY)
-					{
-						g_rx_frequency = g_channel_frequency[g_active_memory];
-						si5351_set_quad_frequency(g_rx_frequency);					
-					}
-				}
-				
-				setMenu(MenuOperational);
-			}
-			else
-			{
-				if(frequency_updates_enabled)
-				{
-					frequency_updates_enabled = false;
-					refresh_display = true;
-				}
-			}
-			
-			g_long_leftsense_press = false;
-		}
-		
-		/*********************************
-		* Right sense switch pressed 
-		*********************************/
-		if(g_handle_counted_rightsense_presses)
-		{
-			if(g_handle_counted_rightsense_presses == 1)
-			{
-				LEDS.blink(LEDS_OFF, true);
-			}
-			else if (g_handle_counted_rightsense_presses == 2)
-			{
-				if(g_encoderswitch_pressed)
-				{
-					g_enable_audio_feedthrough = !g_enable_audio_feedthrough;
-				}
-			}
-			
-			if(g_display_active_countdown) g_display_active_countdown = 0;
-			
-			if(setMenu(MenuGetCurrent) != MenuOperational)
-			{
-				if(frequency_updates_enabled)
-				{
-					frequency_updates_enabled = false;
-					refresh_display = true;
-				}
-
-				if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
-				{
-					g_active_memory = nextActiveMemory(g_active_memory, UP);
-				
-					if(g_active_memory == INVALID_CHANNEL)
-					{
-						g_frequency_mode = MODE_VFO;
-					}
-					else if(g_frequency_mode == MODE_MEMORY)
-					{
-						g_rx_frequency = g_channel_frequency[g_active_memory];
-						si5351_set_quad_frequency(g_rx_frequency);					
-					}
-				}
-				
-				setMenu(MenuBackOne);
-			}
-			else
-			{
-				if(frequency_updates_enabled)
-				{
-					frequency_updates_enabled = false;
-					refresh_display = true;
-				}
-			}
-			
-			g_handle_counted_rightsense_presses = 0;
-		}
-		
-// 		if(g_rightsense_closed_time >= 200)
-// 		{
-// 			g_audio_test = true;
-// 		}
-		
-		if(g_long_rightsense_press)
-		{
-			if(setMenu(MenuGetCurrent) != MenuOperational)
-			{
-				if(frequency_updates_enabled)
-				{
-					frequency_updates_enabled = false;
-					refresh_display = true;
-				}
-
-				if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
-				{
-					g_active_memory = nextActiveMemory(g_active_memory, UP);
-				
-					if(g_active_memory == INVALID_CHANNEL)
-					{
-						g_frequency_mode = MODE_VFO;
-					}
-					else if(g_frequency_mode == MODE_MEMORY)
-					{
-						g_rx_frequency = g_channel_frequency[g_active_memory];
-						si5351_set_quad_frequency(g_rx_frequency);					
-					}
-				}
-				
-				setMenu(MenuOperational);
-			}
-			else
-			{
-				if(frequency_updates_enabled)
-				{
-					frequency_updates_enabled = false;
-					refresh_display = true;
-				}
-			}
-			
-			g_long_rightsense_press = false;
-		}
-		
-		/*********************************
-		* Encoder switch pressed 
-		*********************************/
-		if(g_handle_counted_encoder_presses)
-		{
-			if(g_handle_counted_encoder_presses == 1)
-			{
-				if((g_frequency_mode == MODE_VFO) && (nextActiveMemory(g_active_memory, UP) != 0xFF))
-				{
-					g_frequency_mode = MODE_MEMORY;
-					g_rx_frequency = g_channel_frequency[g_active_memory];
-					si5351_set_quad_frequency(g_rx_frequency);					
+					setMenu(MenuMain);
 				}
 				else
 				{
-					g_frequency_mode = MODE_VFO;
+					setMenu(MenuOperational);
 				}
-				
-				refresh_display = true;
 			}
-			else if (g_handle_counted_encoder_presses == 2)
+
+
+			/*********************************
+			* Left sense switch pressed 
+			*********************************/
+			if(g_handle_counted_leftsense_presses)
 			{
-				switch(setMenu(MenuGetCurrent))
+				if(g_handle_counted_leftsense_presses == 1)
 				{
-					case MenuOperational:
+				}
+				else if (g_handle_counted_leftsense_presses == 2)
+				{
+				}
+			
+				if(g_display_active_countdown) g_display_active_countdown = 0;
+			
+				if(setMenu(MenuGetCurrent) != MenuOperational)
+				{
+					if(frequency_updates_enabled)
 					{
-						frequency_updates_enabled = true;
+						frequency_updates_enabled = false;
 						refresh_display = true;
 					}
-					break;
-					
-					case MenuMain:
+
+					if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
 					{
-						if(menuRow == MEMORIES)
+						g_active_memory = nextActiveMemory(g_active_memory, UP);
+				
+						if(g_active_memory == INVALID_CHANNEL)
 						{
-							setMenu(MenuFreqMemories);
+							g_frequency_mode = MODE_VFO;
 						}
-						else if(menuRow == BATTERY)
+						else if(g_frequency_mode == MODE_MEMORY)
 						{
-							ADC0_SYSTEM_init(ADC12BIT, false);
-							ADC0.MUXPOS = ADCBatteryVoltage;
-							setMenu(MenuBattery);
-						}
-						else if(menuRow == ABOUT)
-						{
-							setMenu(MenuAbout);
+							g_rx_frequency = g_channel_frequency[g_active_memory];
+							si5351_set_quad_frequency(g_rx_frequency);					
 						}
 					}
-					break;
-					
-					case MenuBattery:
-					{
-						setMenu(MenuSetmAh);
-					}
-					break;
-					
-					case MenuSetmAh:
-					{
-						setMenu(MenuSetBatThresh);
-					}
-					break;
-					
-					case MenuSetBatThresh:
-					{
-						setMenu(MenuBackOne);
-					}
-					break;
-					
-					case MenuFreqMemories:
-					{
-						setMenu(MenuSetMemFreq);
-						
-						if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
-						{
-							if((g_rx_frequency > RX_MAXIMUM_80M_FREQUENCY) || (g_rx_frequency < RX_MINIMUM_80M_FREQUENCY))
-							{
-								g_rx_frequency = MEMORY_DEFAULT_FREQUENCY;
-							}
-							
-							g_channel_frequency[g_active_memory] = g_rx_frequency;
-						}
-					}
-					break;
-					
-					case MenuSetMemFreq:
-					{
-						setMenu(MenuSetMemName);
-					}
-					break;
-					
-					case MenuSetMemName:
-					{
-						setMenu(MenuBackOne);
-					}
-					break;
-					
-					default:
-					break;
-				}
-			}
-			else if (g_handle_counted_encoder_presses == 3)
-			{
-				if(setMenu(MenuGetCurrent) == MenuSetMemFreq)
-				{
-					g_channel_frequency[g_active_memory] = 0;
-					g_channel_name[g_active_memory] = 0;
+				
 					setMenu(MenuBackOne);
 				}
-			}
-			
-			g_handle_counted_encoder_presses = 0;
-		}
-		
-		if(g_encoder_closed_time >= 1000)
-		{
-		}
-		
-		if(g_long_encoder_press)
-		{
-			g_long_encoder_press = false;
-
-			if(!inhibit_long_encoder_press)
-			{
-			}
-		}
-		
-		/*********************************
-		* Handle Rotary Encoder Turns
-		*********************************/
-		if(!g_encoderswitch_pressed) inhibit_long_encoder_press = false;
-		
-		if(g_rotary_count)
-		{
-			uint8_t pwm = g_rf_gain_setting;
-			
-			g_powerdown_seconds = 60;
-			inhibit_long_encoder_press = g_encoderswitch_pressed;
-			
-			if(g_rotary_count < 0)
-			{
-				switch(setMenu(MenuGetCurrent))
+				else
 				{
-					case MenuOperational:
+					if(frequency_updates_enabled)
 					{
-						if(g_audio_test)
-						{
-							sineWaveInit(g_sine_period_steps + 5);
-						}
-						else if(frequency_updates_enabled)
-						{
-							if(g_frequency_mode == MODE_VFO)
-							{
-								if(g_rx_frequency < RX_MAXIMUM_80M_FREQUENCY)
-								{
-									if(g_encoderswitch_pressed)
-									{
-										g_rx_frequency += 1000;
-									}
-									else
-									{
-										g_rx_frequency += 100;
-									}
-								}
-							}
-							else
-							{
-								g_active_memory = nextActiveMemory(g_active_memory, UP);
-								g_rx_frequency = g_channel_frequency[g_active_memory];
-							}
-
-							si5351_set_quad_frequency(g_rx_frequency);
-							
-							g_tick++;
-						}
-						else if(g_leftsense_pressed)
-						{
-							if(g_audio_gain < 10) 
-							{
-								g_audio_gain++;
-								g_tick++;
-							}
-						}
-						else
-						{
-							if(pwm)
-							{
-								setPWM(--pwm);
-								g_tick++;
-							}
-						}
-						
-						g_rx_frequency = si5351_get_frequency(SI5351_CLK0);			
-						g_rf_gain_setting = getPWM();
-					}
-					break;
-					
-					case MenuFreqMemories:
-					{
-						g_active_memory++;
-						if(g_active_memory >= NUMBER_OF_FREQUENCY_CHANNELS) g_active_memory = 0;
+						frequency_updates_enabled = false;
 						refresh_display = true;
-						
-						Frequency_Hz f = g_channel_frequency[g_active_memory];
-							
-						if((f < RX_MAXIMUM_80M_FREQUENCY) && (f > RX_MINIMUM_80M_FREQUENCY))
-						{
-							g_rx_frequency = g_channel_frequency[g_active_memory];
-						}
-						
-						si5351_set_quad_frequency(g_rx_frequency);							
 					}
-					break;
-					
-					case MenuSetMemFreq:
-					{
-						if(g_rx_frequency < RX_MAXIMUM_80M_FREQUENCY)
-						{
-							if(g_encoderswitch_pressed)
-							{
-								g_rx_frequency += 1000;
-							}
-							else
-							{
-								g_rx_frequency += 100;
-							}
-						}
-
-						g_channel_frequency[g_active_memory] = g_rx_frequency;
-					}
-					break;
-					
-					case MenuSetMemName:
-					{
-						uint8_t n = g_channel_name[g_active_memory];
-						
-						if(++n >= NUMBER_OF_FREQUENCY_CHANNEL_NAMES)
-						{
-							n = 0;
-						}
-						
-						g_channel_name[g_active_memory] = n;
-						hold_activeMemoryFreq = INVALID_FREQUENCY;
-					}
-					break;
-					
-					case MenuSetmAh:
-					{
-						uint8_t m = (uint8_t) g_battery_capacity;
-						
-						if(++m >= NUMBER_OF_BATTERY_CAPACITY_VALUES)
-						{
-							m = 0;
-						}
-						
-						g_battery_capacity = (BatteryCapacity_t)m;
-					}
-					break;
-					
-					case MenuSetBatThresh:
-					{
-						uint8_t t = g_battery_warning_threshold;
-						
-						if(++t > 99)
-						{
-							t = 99;
-						}
-						
-						g_battery_warning_threshold = t;
-					}
-					break;
-					
-					case MenuMain:
-					{
-						menuRow = (PrimaryMenu_t)((uint8_t)menuRow + 1);
-						if(menuRow == NUMBER_OF_MENUS) menuRow = MEMORIES;
-					}
-					break;
-					
-					default:
-					break;
 				}
-				
-				g_rotary_count++;
+			
+				g_handle_counted_leftsense_presses = 0;
 			}
-			else
+		
+	// 		if(g_leftsense_closed_time >= 200)
+	// 		{
+	// 			g_audio_test = false;
+	// 		}
+		
+			if(g_long_leftsense_press)
 			{
-				switch(setMenu(MenuGetCurrent))
+				if(setMenu(MenuGetCurrent) != MenuOperational)
 				{
-					case MenuOperational:
+					if(frequency_updates_enabled)
 					{
-						if(g_audio_test)
+						frequency_updates_enabled = false;
+						refresh_display = true;
+					}
+
+					if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
+					{
+						g_active_memory = nextActiveMemory(g_active_memory, UP);
+				
+						if(g_active_memory == INVALID_CHANNEL)
 						{
-							sineWaveInit(g_sine_period_steps - 5);
+							g_frequency_mode = MODE_VFO;
 						}
-						else if(frequency_updates_enabled)
+						else if(g_frequency_mode == MODE_MEMORY)
 						{
-							if(g_frequency_mode == MODE_VFO)
+							g_rx_frequency = g_channel_frequency[g_active_memory];
+							si5351_set_quad_frequency(g_rx_frequency);					
+						}
+					}
+				
+					setMenu(MenuOperational);
+				}
+				else
+				{
+					if(frequency_updates_enabled)
+					{
+						frequency_updates_enabled = false;
+						refresh_display = true;
+					}
+				}
+			
+				g_long_leftsense_press = false;
+			}
+		
+			/*********************************
+			* Right sense switch pressed 
+			*********************************/
+			if(g_handle_counted_rightsense_presses)
+			{
+				if(g_handle_counted_rightsense_presses == 1)
+				{
+					LEDS.blink(LEDS_OFF, true);
+				}
+				else if (g_handle_counted_rightsense_presses == 2)
+				{
+					if(g_encoderswitch_pressed)
+					{
+						g_enable_audio_feedthrough = !g_enable_audio_feedthrough;
+					}
+				}
+			
+				if(g_display_active_countdown) g_display_active_countdown = 0;
+			
+				if(setMenu(MenuGetCurrent) != MenuOperational)
+				{
+					if(frequency_updates_enabled)
+					{
+						frequency_updates_enabled = false;
+						refresh_display = true;
+					}
+
+					if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
+					{
+						g_active_memory = nextActiveMemory(g_active_memory, UP);
+				
+						if(g_active_memory == INVALID_CHANNEL)
+						{
+							g_frequency_mode = MODE_VFO;
+						}
+						else if(g_frequency_mode == MODE_MEMORY)
+						{
+							g_rx_frequency = g_channel_frequency[g_active_memory];
+							si5351_set_quad_frequency(g_rx_frequency);					
+						}
+					}
+				
+					setMenu(MenuBackOne);
+				}
+				else
+				{
+					if(frequency_updates_enabled)
+					{
+						frequency_updates_enabled = false;
+						refresh_display = true;
+					}
+				}
+			
+				g_handle_counted_rightsense_presses = 0;
+			}
+		
+	// 		if(g_rightsense_closed_time >= 200)
+	// 		{
+	// 			g_audio_test = true;
+	// 		}
+		
+			if(g_long_rightsense_press)
+			{
+				if(setMenu(MenuGetCurrent) != MenuOperational)
+				{
+					if(frequency_updates_enabled)
+					{
+						frequency_updates_enabled = false;
+						refresh_display = true;
+					}
+
+					if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
+					{
+						g_active_memory = nextActiveMemory(g_active_memory, UP);
+				
+						if(g_active_memory == INVALID_CHANNEL)
+						{
+							g_frequency_mode = MODE_VFO;
+						}
+						else if(g_frequency_mode == MODE_MEMORY)
+						{
+							g_rx_frequency = g_channel_frequency[g_active_memory];
+							si5351_set_quad_frequency(g_rx_frequency);					
+						}
+					}
+				
+					setMenu(MenuOperational);
+				}
+				else
+				{
+					if(frequency_updates_enabled)
+					{
+						frequency_updates_enabled = false;
+						refresh_display = true;
+					}
+				}
+			
+				g_long_rightsense_press = false;
+			}
+		
+			/*********************************
+			* Encoder switch pressed 
+			*********************************/
+			if(g_handle_counted_encoder_presses)
+			{
+				if(g_handle_counted_encoder_presses == 1)
+				{
+					if((g_frequency_mode == MODE_VFO) && (nextActiveMemory(g_active_memory, UP) != 0xFF))
+					{
+						g_frequency_mode = MODE_MEMORY;
+						g_rx_frequency = g_channel_frequency[g_active_memory];
+						si5351_set_quad_frequency(g_rx_frequency);					
+					}
+					else
+					{
+						g_frequency_mode = MODE_VFO;
+					}
+				
+					refresh_display = true;
+				}
+				else if (g_handle_counted_encoder_presses == 2)
+				{
+					switch(setMenu(MenuGetCurrent))
+					{
+						case MenuOperational:
+						{
+							frequency_updates_enabled = true;
+							refresh_display = true;
+						}
+						break;
+					
+						case MenuMain:
+						{
+							if(menuRow == MEMORIES)
 							{
-								if(g_rx_frequency > RX_MINIMUM_80M_FREQUENCY)
+								setMenu(MenuFreqMemories);
+							}
+							else if(menuRow == BATTERY)
+							{
+								ADC0_SYSTEM_init(ADC12BIT, false);
+								ADC0.MUXPOS = ADCBatteryVoltage;
+								setMenu(MenuBattery);
+							}
+							else if(menuRow == ABOUT)
+							{
+								setMenu(MenuAbout);
+							}
+						}
+						break;
+					
+						case MenuBattery:
+						{
+							setMenu(MenuSetmAh);
+						}
+						break;
+					
+						case MenuSetmAh:
+						{
+							setMenu(MenuSetBatThresh);
+						}
+						break;
+					
+						case MenuSetBatThresh:
+						{
+							setMenu(MenuBackOne);
+						}
+						break;
+					
+						case MenuFreqMemories:
+						{
+							setMenu(MenuSetMemFreq);
+						
+							if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
+							{
+								if((g_rx_frequency > RX_MAXIMUM_80M_FREQUENCY) || (g_rx_frequency < RX_MINIMUM_80M_FREQUENCY))
 								{
-									if(g_encoderswitch_pressed)
+									g_rx_frequency = MEMORY_DEFAULT_FREQUENCY;
+								}
+							
+								g_channel_frequency[g_active_memory] = g_rx_frequency;
+							}
+						}
+						break;
+					
+						case MenuSetMemFreq:
+						{
+							setMenu(MenuSetMemName);
+						}
+						break;
+					
+						case MenuSetMemName:
+						{
+							setMenu(MenuBackOne);
+						}
+						break;
+					
+						default:
+						break;
+					}
+				}
+				else if (g_handle_counted_encoder_presses == 3)
+				{
+					if(setMenu(MenuGetCurrent) == MenuSetMemFreq)
+					{
+						g_channel_frequency[g_active_memory] = 0;
+						g_channel_name[g_active_memory] = 0;
+						setMenu(MenuBackOne);
+					}
+				}
+			
+				g_handle_counted_encoder_presses = 0;
+			}
+		
+			if(g_encoder_closed_time >= 1000)
+			{
+			}
+		
+			if(g_long_encoder_press)
+			{
+				g_long_encoder_press = false;
+
+				if(!inhibit_long_encoder_press)
+				{
+				}
+			}
+		
+			/*********************************
+			* Handle Rotary Encoder Turns
+			*********************************/
+			if(!g_encoderswitch_pressed) inhibit_long_encoder_press = false;
+		
+			if(g_rotary_count)
+			{
+				uint8_t pwm = g_rf_gain_setting;
+			
+				g_powerdown_seconds = INACTIVITY_POWER_DOWN_DELAY_SECONDS;
+				inhibit_long_encoder_press = g_encoderswitch_pressed;
+			
+				if(g_rotary_count < 0)
+				{
+					switch(setMenu(MenuGetCurrent))
+					{
+						case MenuOperational:
+						{
+							if(g_audio_test)
+							{
+								sineWaveInit(g_sine_period_steps + 5);
+							}
+							else if(frequency_updates_enabled)
+							{
+								if(g_frequency_mode == MODE_VFO)
+								{
+									if(g_rx_frequency < RX_MAXIMUM_80M_FREQUENCY)
 									{
-										g_rx_frequency -= 1000;
+										if(g_encoderswitch_pressed)
+										{
+											g_rx_frequency += 1000;
+										}
+										else
+										{
+											g_rx_frequency += 100;
+										}
 									}
-									else
-									{
-										g_rx_frequency -= 100;
-									}				
+								}
+								else
+								{
+									g_active_memory = nextActiveMemory(g_active_memory, UP);
+									g_rx_frequency = g_channel_frequency[g_active_memory];
+								}
+
+								si5351_set_quad_frequency(g_rx_frequency);
+							
+								g_tick++;
+							}
+							else if(g_leftsense_pressed)
+							{
+								if(g_audio_gain < 10) 
+								{
+									g_audio_gain++;
+									g_tick++;
 								}
 							}
 							else
 							{
-								g_active_memory = nextActiveMemory(g_active_memory, !UP);
+								if(pwm)
+								{
+									setPWM(--pwm);
+									g_tick++;
+								}
+							}
+						
+							g_rx_frequency = si5351_get_frequency(SI5351_CLK0);			
+							g_rf_gain_setting = getPWM();
+						}
+						break;
+					
+						case MenuFreqMemories:
+						{
+							g_active_memory++;
+							if(g_active_memory >= NUMBER_OF_FREQUENCY_CHANNELS) g_active_memory = 0;
+							refresh_display = true;
+						
+							Frequency_Hz f = g_channel_frequency[g_active_memory];
+							
+							if((f < RX_MAXIMUM_80M_FREQUENCY) && (f > RX_MINIMUM_80M_FREQUENCY))
+							{
 								g_rx_frequency = g_channel_frequency[g_active_memory];
 							}
+						
+							si5351_set_quad_frequency(g_rx_frequency);							
+						}
+						break;
+					
+						case MenuSetMemFreq:
+						{
+							if(g_rx_frequency < RX_MAXIMUM_80M_FREQUENCY)
+							{
+								if(g_encoderswitch_pressed)
+								{
+									g_rx_frequency += 1000;
+								}
+								else
+								{
+									g_rx_frequency += 100;
+								}
+							}
 
-							si5351_set_quad_frequency(g_rx_frequency);
-							
-							g_tick++;
-						}
-						else if(g_leftsense_pressed)
-						{
-							if(g_audio_gain > 1) 
-							{
-								g_audio_gain--;
-								g_tick++;
-							}
-						}
-						else
-						{
-							if(pwm < MAX_PWM_SETTING) 
-							{
-								setPWM(++pwm);
-								g_tick++;
-							}
-						}
-						
-						g_rx_frequency = si5351_get_frequency(SI5351_CLK0);			
-						g_rf_gain_setting = getPWM();
-					}
-					break;
-					
-					case MenuFreqMemories:
-					{
-						if(g_active_memory == 0) 
-						{
-							g_active_memory = NUMBER_OF_FREQUENCY_CHANNELS-1;
-						}
-						else
-						{
-							g_active_memory--;
-						}
-							
-						Frequency_Hz f = g_channel_frequency[g_active_memory];
-						refresh_display = true;
-													
-						if((f < RX_MAXIMUM_80M_FREQUENCY) && (f > RX_MINIMUM_80M_FREQUENCY))
-						{
-							g_rx_frequency = g_channel_frequency[g_active_memory];
-						}
-						
-						si5351_set_quad_frequency(g_rx_frequency);							
-					}
-					break;				
-					
-					case MenuSetMemFreq:
-					{
-						if(g_rx_frequency > RX_MINIMUM_80M_FREQUENCY)
-						{
-							if(g_encoderswitch_pressed)
-							{
-								g_rx_frequency -= 1000;
-							}
-							else
-							{
-								g_rx_frequency -= 100;
-							}
-						
 							g_channel_frequency[g_active_memory] = g_rx_frequency;
 						}
-					}
-					break;
+						break;
 					
-					case MenuSetMemName:
-					{
-						uint8_t n = g_channel_name[g_active_memory];
-						
-						if(n)
+						case MenuSetMemName:
 						{
-							n--;
-						}
-						else
-						{
-							n = NUMBER_OF_FREQUENCY_CHANNEL_NAMES - 1;
-						}
+							uint8_t n = g_channel_name[g_active_memory];
 						
-						g_channel_name[g_active_memory] = n;
-						hold_activeMemoryFreq = INVALID_FREQUENCY;
-					}
-					break;
+							if(++n >= NUMBER_OF_FREQUENCY_CHANNEL_NAMES)
+							{
+								n = 0;
+							}
+						
+							g_channel_name[g_active_memory] = n;
+							hold_activeMemoryFreq = INVALID_FREQUENCY;
+						}
+						break;
 					
-					case MenuSetmAh:
-					{
-						uint8_t m = (uint8_t) g_battery_capacity;
-						
-						if(m)
+						case MenuSetmAh:
 						{
-							m--;
-						}
-						else
-						{
-							m = NUMBER_OF_BATTERY_CAPACITY_VALUES - 1;
-						}
+							uint8_t m = (uint8_t) g_battery_capacity;
 						
-						g_battery_capacity = (BatteryCapacity_t)m;
-					}
-					break;
+							if(++m >= NUMBER_OF_BATTERY_CAPACITY_VALUES)
+							{
+								m = 0;
+							}
+						
+							g_battery_capacity = (BatteryCapacity_t)m;
+						}
+						break;
 					
-					case MenuSetBatThresh:
-					{
-						uint8_t t = g_battery_warning_threshold;
-						
-						if(t)
+						case MenuSetBatThresh:
 						{
-							t--;
-						}
+							uint8_t t = g_battery_warning_threshold;
 						
-						g_battery_warning_threshold = t;
-					}
-					break;
+							if(++t > 99)
+							{
+								t = 99;
+							}
+						
+							g_battery_warning_threshold = t;
+						}
+						break;
 					
-					case MenuMain:
-					{
-						uint8_t m = (uint8_t)menuRow;
-						
-						if(m) 
+						case MenuMain:
 						{
-							m--;
+							menuRow = (PrimaryMenu_t)((uint8_t)menuRow + 1);
+							if(menuRow == NUMBER_OF_MENUS) menuRow = MEMORIES;
 						}
-						else
-						{
-							m = (unsigned int)NUMBER_OF_MENUS - 1;
-						}
-						
-						menuRow = (PrimaryMenu_t)m;
+						break;
+					
+						default:
+						break;
 					}
-					break;
-
-					default:
-					break;
-				}
-
-				g_rotary_count--;
-			}		
-		}
 				
+					g_rotary_count++;
+				}
+				else
+				{
+					switch(setMenu(MenuGetCurrent))
+					{
+						case MenuOperational:
+						{
+							if(g_audio_test)
+							{
+								sineWaveInit(g_sine_period_steps - 5);
+							}
+							else if(frequency_updates_enabled)
+							{
+								if(g_frequency_mode == MODE_VFO)
+								{
+									if(g_rx_frequency > RX_MINIMUM_80M_FREQUENCY)
+									{
+										if(g_encoderswitch_pressed)
+										{
+											g_rx_frequency -= 1000;
+										}
+										else
+										{
+											g_rx_frequency -= 100;
+										}				
+									}
+								}
+								else
+								{
+									g_active_memory = nextActiveMemory(g_active_memory, !UP);
+									g_rx_frequency = g_channel_frequency[g_active_memory];
+								}
+
+								si5351_set_quad_frequency(g_rx_frequency);
+							
+								g_tick++;
+							}
+							else if(g_leftsense_pressed)
+							{
+								if(g_audio_gain > 1) 
+								{
+									g_audio_gain--;
+									g_tick++;
+								}
+							}
+							else
+							{
+								if(pwm < MAX_PWM_SETTING) 
+								{
+									setPWM(++pwm);
+									g_tick++;
+								}
+							}
+						
+							g_rx_frequency = si5351_get_frequency(SI5351_CLK0);			
+							g_rf_gain_setting = getPWM();
+						}
+						break;
+					
+						case MenuFreqMemories:
+						{
+							if(g_active_memory == 0) 
+							{
+								g_active_memory = NUMBER_OF_FREQUENCY_CHANNELS-1;
+							}
+							else
+							{
+								g_active_memory--;
+							}
+							
+							Frequency_Hz f = g_channel_frequency[g_active_memory];
+							refresh_display = true;
+													
+							if((f < RX_MAXIMUM_80M_FREQUENCY) && (f > RX_MINIMUM_80M_FREQUENCY))
+							{
+								g_rx_frequency = g_channel_frequency[g_active_memory];
+							}
+						
+							si5351_set_quad_frequency(g_rx_frequency);							
+						}
+						break;				
+					
+						case MenuSetMemFreq:
+						{
+							if(g_rx_frequency > RX_MINIMUM_80M_FREQUENCY)
+							{
+								if(g_encoderswitch_pressed)
+								{
+									g_rx_frequency -= 1000;
+								}
+								else
+								{
+									g_rx_frequency -= 100;
+								}
+						
+								g_channel_frequency[g_active_memory] = g_rx_frequency;
+							}
+						}
+						break;
+					
+						case MenuSetMemName:
+						{
+							uint8_t n = g_channel_name[g_active_memory];
+						
+							if(n)
+							{
+								n--;
+							}
+							else
+							{
+								n = NUMBER_OF_FREQUENCY_CHANNEL_NAMES - 1;
+							}
+						
+							g_channel_name[g_active_memory] = n;
+							hold_activeMemoryFreq = INVALID_FREQUENCY;
+						}
+						break;
+					
+						case MenuSetmAh:
+						{
+							uint8_t m = (uint8_t) g_battery_capacity;
+						
+							if(m)
+							{
+								m--;
+							}
+							else
+							{
+								m = NUMBER_OF_BATTERY_CAPACITY_VALUES - 1;
+							}
+						
+							g_battery_capacity = (BatteryCapacity_t)m;
+						}
+						break;
+					
+						case MenuSetBatThresh:
+						{
+							uint8_t t = g_battery_warning_threshold;
+						
+							if(t)
+							{
+								t--;
+							}
+						
+							g_battery_warning_threshold = t;
+						}
+						break;
+					
+						case MenuMain:
+						{
+							uint8_t m = (uint8_t)menuRow;
+						
+							if(m) 
+							{
+								m--;
+							}
+							else
+							{
+								m = (unsigned int)NUMBER_OF_MENUS - 1;
+							}
+						
+							menuRow = (PrimaryMenu_t)m;
+						}
+						break;
+
+						default:
+						break;
+					}
+
+					g_rotary_count--;
+				}		
+			}
+		}
+		
 //======================================================		
 		if(g_goertzel.SamplesReady() && !g_rssi_countdown)
 		{
@@ -2181,23 +2230,11 @@ int main(void)
 							
 							/* Determine RSSI. Capture maximum if a sense button is pressed */
 							if(g_leftsense_pressed || g_rightsense_pressed)
-							{
-								static uint16_t consec_lower = 0;
-								
+							{								
 								if(signal_to_noise > g_goertzel_rssi)
 								{
 									g_goertzel_rssi++;
 									g_rssi_countdown = 0;
-									consec_lower = 0;
-								}
-								else if(signal_to_noise < g_goertzel_rssi)
-								{
-									consec_lower++;
-									
-									if(consec_lower > 100)
-									{
-										g_goertzel_rssi--;
-									}
 								}
 							}				
 							else

@@ -148,7 +148,7 @@ static void ADC0_Freerun_Init(bool twelveBit)
 	if(twelveBit)
 	{
 		VREF.ADC0REF = 0x80 |VREF_REFSEL_2V048_gc;  /* Internal 2.048V reference */
-		ADC0.CTRLC = ADC_PRESC_DIV128_gc;   /* CLK_PER divided by 128 and by 13.5 (10-bit conversion time = 13889 sps */
+		ADC0.CTRLC = ADC_PRESC_DIV32_gc;   /* CLK_PER frequency divided by prescaler and by 15.6 (12-bit conversion time = 48.1 ksps) */
 		ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
 		| ADC_RESSEL_12BIT_gc      /* 12-bit mode */
 		| ADC_FREERUN_bm;          /* Enable Free-Run mode */
@@ -158,7 +158,7 @@ static void ADC0_Freerun_Init(bool twelveBit)
 	else
 	{
 		VREF.ADC0REF = 0x80 | VREF_REFSEL_2V048_gc;  /* Internal 2.048V reference */
-		ADC0.CTRLC = ADC_PRESC_DIV128_gc;   /* CLK_PER divided by 128 and by 13.5 (10-bit conversion time = 13889 sps */
+		ADC0.CTRLC = ADC_PRESC_DIV128_gc;   /* CLK_PER frequency divided by prescaler and by 13.5 (10-bit conversion time = 13889 sps) */
 		ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
 		| ADC_RESSEL_10BIT_gc      /* 10-bit mode */
 		| ADC_FREERUN_bm;          /* Enable Free-Run mode */
