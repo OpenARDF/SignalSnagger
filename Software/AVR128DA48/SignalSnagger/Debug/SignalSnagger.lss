@@ -8148,7 +8148,7 @@ void ADC0_SYSTEM_shutdown(void)
     48ec:	20 83       	st	Z, r18
     48ee:	80 e0       	ldi	r24, 0x00	; 0
     48f0:	96 e0       	ldi	r25, 0x06	; 6
-    48f2:	28 e0       	ldi	r18, 0x08	; 8
+    48f2:	24 e0       	ldi	r18, 0x04	; 4
     48f4:	fc 01       	movw	r30, r24
     48f6:	22 83       	std	Z+2, r18	; 0x02
     48f8:	80 e0       	ldi	r24, 0x00	; 0
@@ -8371,9 +8371,9 @@ void ADC0_SYSTEM_shutdown(void)
 volatile int16_t g_adcVal;
 Goertzel g_goertzel(N, sampling_freq);
     4ab0:	00 e0       	ldi	r16, 0x00	; 0
-    4ab2:	14 e0       	ldi	r17, 0x04	; 4
-    4ab4:	29 e5       	ldi	r18, 0x59	; 89
-    4ab6:	36 e4       	ldi	r19, 0x46	; 70
+    4ab2:	1d ec       	ldi	r17, 0xCD	; 205
+    4ab4:	2b eb       	ldi	r18, 0xBB	; 187
+    4ab6:	37 e4       	ldi	r19, 0x47	; 71
     4ab8:	40 e0       	ldi	r20, 0x00	; 0
     4aba:	50 e0       	ldi	r21, 0x00	; 0
     4abc:	6a ec       	ldi	r22, 0xCA	; 202

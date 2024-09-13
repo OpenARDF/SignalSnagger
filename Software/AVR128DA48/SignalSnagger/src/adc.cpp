@@ -30,7 +30,7 @@
 #include <compiler.h>
 #include "Goertzel.h"
 
-#define SAMPLE_RATE 13889
+#define SAMPLE_RATE 96154
 #define Goertzel_N 101
 const int N = Goertzel_N;
 const float threshold = 500000. * (Goertzel_N / 100.);
@@ -148,7 +148,7 @@ static void ADC0_Freerun_Init(bool twelveBit)
 	if(twelveBit)
 	{
 		VREF.ADC0REF = 0x80 |VREF_REFSEL_2V048_gc;  /* Internal 2.048V reference */
-		ADC0.CTRLC = ADC_PRESC_DIV32_gc;   /* CLK_PER frequency divided by prescaler and by 15.6 (12-bit conversion time = 48.1 ksps) */
+		ADC0.CTRLC = ADC_PRESC_DIV16_gc;   /* CLK_PER frequency divided by prescaler and by 15.6 (12-bit conversion time = 48.1 ksps) */
 		ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
 		| ADC_RESSEL_12BIT_gc      /* 12-bit mode */
 		| ADC_FREERUN_bm;          /* Enable Free-Run mode */

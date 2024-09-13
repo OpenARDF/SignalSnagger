@@ -227,7 +227,7 @@ static CircularUintBuff g_rssi_buff = CircularUintBuff(HIGH_WATER_BUFF_SIZE);
 EepromManager EEPromMgr;
 
 #define Goertzel_N 209
-#define SAMPLE_RATE 480965 /* 12080  13868 */
+#define SAMPLE_RATE 96154 /* 480965 12080  13868 */
 const int N = Goertzel_N;
 //const float threshold = 500000. * (Goertzel_N / 100);
 const float sampling_freq = SAMPLE_RATE;
