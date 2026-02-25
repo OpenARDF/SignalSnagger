@@ -6,8 +6,8 @@
 	(paper "A4")
 	(title_block
 		(title "SignalSnagger")
-		(date "2024-10-20")
-		(rev "0.328")
+		(date "2026-02-25")
+		(rev "0.4")
 	)
 	(lib_symbols
 		(symbol "Graphic:Logo_Open_Hardware_Small"

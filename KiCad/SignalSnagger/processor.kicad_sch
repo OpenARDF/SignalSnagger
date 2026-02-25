@@ -6,8 +6,8 @@
 	(paper "A4")
 	(title_block
 		(title "SignalSnagger")
-		(date "2024-10-20")
-		(rev "0.328")
+		(date "2026-02-25")
+		(rev "0.4")
 	)
 	(lib_symbols
 		(symbol "Connector:Conn_01x01_Generic"
@@ -12334,28 +12334,6 @@
 			)
 		)
 	)
-	(global_label "ASSI_FAR"
-		(shape input)
-		(at 102.87 109.22 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1 1)
-			)
-			(justify left)
-		)
-		(uuid "fdfea0c3-ba59-400a-9ef4-4c401f43c398")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 111.4843 109.1575 0)
-			(effects
-				(font
-					(size 1 1)
-				)
-				(justify left)
-				(hide yes)
-			)
-		)
-	)
 	(symbol
 		(lib_id "power:+3.3VP")
 		(at 132.08 124.46 90)
@@ -12530,12 +12508,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 24.13 66.04 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -12566,15 +12545,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 24.13 66.04 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 24.13 66.04 0)
 			(effects
 				(font
@@ -12643,12 +12613,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "IC REG LINEAR 3.3V 150MA SOT23-5"
 			(at 179.07 124.46 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "296-18476-1-ND"
@@ -12670,15 +12641,6 @@
 			)
 		)
 		(property "Manufacturer PN" "LP2985-33DBVR"
-			(at 179.07 124.46 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "IC REG LINEAR 3.3V 150MA SOT23-5"
 			(at 179.07 124.46 0)
 			(effects
 				(font
@@ -13025,12 +12987,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 10UF 16V X6S 0603"
 			(at 25.4 82.55 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "490-7198-1-ND"
@@ -13061,15 +13024,6 @@
 			)
 		)
 		(property "Manufacturer PN" "GRM188C81C106MA73D"
-			(at 25.4 82.55 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 10UF 16V X6S 0603"
 			(at 25.4 82.55 0)
 			(effects
 				(font
@@ -13138,12 +13092,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 251.46 107.95 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-10.0KHRCT-ND"
@@ -13174,15 +13129,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-0710KL"
-			(at 251.46 107.95 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 251.46 107.95 0)
 			(effects
 				(font
@@ -13252,12 +13198,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0603 10NF 16V ULTRA STAB"
 			(at 125.73 110.49 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "399-C0603X103J4HACAUTOCT-ND"
@@ -13288,15 +13235,6 @@
 			)
 		)
 		(property "Manufacturer PN" "C0603X103J4HACAUTO"
-			(at 125.73 110.49 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0603 10NF 16V ULTRA STAB"
 			(at 125.73 110.49 0)
 			(effects
 				(font
@@ -13363,12 +13301,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 220 OHM 1% 1/10W 0603"
 			(at 163.83 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-220HRCT-ND"
@@ -13399,15 +13338,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-07220RL"
-			(at 163.83 88.9 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 220 OHM 1% 1/10W 0603"
 			(at 163.83 88.9 0)
 			(effects
 				(font
@@ -13476,12 +13406,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "DIODE GEN PURP 80V 125MA SOD523"
 			(at 222.25 121.92 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1N4148WTDICT-ND"
@@ -13512,15 +13443,6 @@
 			)
 		)
 		(property "Manufacturer PN" "1N4148WT-7"
-			(at 222.25 121.92 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "DIODE GEN PURP 80V 125MA SOD523"
 			(at 222.25 121.92 0)
 			(effects
 				(font
@@ -13728,12 +13650,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 10UF 16V X6S 0603"
 			(at 199.39 125.73 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "490-7198-1-ND"
@@ -13764,15 +13687,6 @@
 			)
 		)
 		(property "Manufacturer PN" "GRM188C81C106MA73D"
-			(at 199.39 125.73 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 10UF 16V X6S 0603"
 			(at 199.39 125.73 0)
 			(effects
 				(font
@@ -14040,12 +13954,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "LCD MOD 40DIG 10X4 TRANSFLECTIVE"
 			(at 163.83 53.34 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1481-1233-ND"
@@ -14076,15 +13991,6 @@
 			)
 		)
 		(property "Manufacturer PN" "EA DOGS104W-A"
-			(at 163.83 53.34 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "LCD MOD 40DIG 10X4 TRANSFLECTIVE"
 			(at 163.83 53.34 0)
 			(effects
 				(font
@@ -14322,12 +14228,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 133.35 186.69 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "490-9666-1-ND"
@@ -14349,15 +14256,6 @@
 			)
 		)
 		(property "Manufacturer PN" "GRM1885C1H103JA01D"
-			(at 133.35 186.69 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 133.35 186.69 0)
 			(effects
 				(font
@@ -14752,12 +14650,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 162K OHM 1% 1/10W 0603"
 			(at 248.92 146.05 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-162KHRCT-ND"
@@ -14788,15 +14687,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-07162KL"
-			(at 248.92 146.05 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 162K OHM 1% 1/10W 0603"
 			(at 248.92 146.05 0)
 			(effects
 				(font
@@ -14929,12 +14819,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "ROTARY ENCODER MECHANICAL 24PPR"
 			(at 139.7 147.32 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "PEC12R-4225F-S0024-ND"
@@ -14965,15 +14856,6 @@
 			)
 		)
 		(property "Manufacturer PN" "PEC12R-4225F-S0024"
-			(at 139.7 147.32 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "ROTARY ENCODER MECHANICAL 24PPR"
 			(at 139.7 147.32 0)
 			(effects
 				(font
@@ -15338,12 +15220,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "LED RED CLEAR SMD"
 			(at 144.78 86.36 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "160-1415-1-ND"
@@ -15365,15 +15248,6 @@
 			)
 		)
 		(property "Manufacturer PN" "LTST-C170KRKT"
-			(at 144.78 86.36 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "LED RED CLEAR SMD"
 			(at 144.78 86.36 0)
 			(effects
 				(font
@@ -15481,6 +15355,72 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector:Conn_01x01_Generic")
+		(at 104.14 109.22 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "389e2159-806e-4eaa-9df8-3869a2ad3628")
+		(property "Reference" "J210"
+			(at 104.14 109.22 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "Conn_01x01_Female"
+			(at 104.8512 110.9222 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+				(hide yes)
+			)
+		)
+		(property "Footprint" "Oddities:Dummy_Empty"
+			(at 104.14 109.22 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 104.14 109.22 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 104.14 109.22 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "a1689b96-79f6-42c0-ad13-a61033006745")
+		)
+		(instances
+			(project "SignalSnagger"
+				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55/b7e6c0d8-791a-469a-85d5-f8e886443224"
+					(reference "J210")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Connector_Generic:Conn_02x03_Odd_Even")
 		(at 33.02 157.48 0)
 		(mirror y)
@@ -15525,12 +15465,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CONN HEADER SMD 8POS 2.54MM"
 			(at 33.02 157.48 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "M20-8760442-ND"
@@ -15561,15 +15502,6 @@
 			)
 		)
 		(property "Manufacturer PN" "M20-8760442"
-			(at 33.02 157.48 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CONN HEADER SMD 8POS 2.54MM"
 			(at 33.02 157.48 0)
 			(effects
 				(font
@@ -15717,12 +15649,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "FIXED IND 10UH 80MA 360 MOHM SMD"
 			(at 31.75 87.63 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "587-1714-1-ND"
@@ -15753,15 +15686,6 @@
 			)
 		)
 		(property "Manufacturer PN" "LBMF1608T100K"
-			(at 31.75 87.63 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "FIXED IND 10UH 80MA 360 MOHM SMD"
 			(at 31.75 87.63 0)
 			(effects
 				(font
@@ -15895,12 +15819,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 47UF 16V X5R 1210"
 			(at 199.39 152.4 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-3376-1-ND"
@@ -15922,15 +15847,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL32A476KOJNNNE"
-			(at 199.39 152.4 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 47UF 16V X5R 1210"
 			(at 199.39 152.4 0)
 			(effects
 				(font
@@ -16065,12 +15981,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "DIODE GEN PURP 80V 125MA SOD523"
 			(at 252.73 121.92 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1N4148WTDICT-ND"
@@ -16101,15 +16018,6 @@
 			)
 		)
 		(property "Manufacturer PN" "1N4148WT-7"
-			(at 252.73 121.92 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "DIODE GEN PURP 80V 125MA SOD523"
 			(at 252.73 121.92 0)
 			(effects
 				(font
@@ -16187,12 +16095,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "DIODE GEN PURP 80V 125MA SOD523"
 			(at 125.73 41.91 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1N4148WTDICT-ND"
@@ -16223,15 +16132,6 @@
 			)
 		)
 		(property "Manufacturer PN" "1N4148WT-7"
-			(at 125.73 41.91 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "DIODE GEN PURP 80V 125MA SOD523"
 			(at 125.73 41.91 0)
 			(effects
 				(font
@@ -16504,12 +16404,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 22.86 76.2 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -16540,15 +16441,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 22.86 76.2 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 22.86 76.2 0)
 			(effects
 				(font
@@ -16814,12 +16706,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 22.86 125.73 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -16850,15 +16743,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 22.86 125.73 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 22.86 125.73 0)
 			(effects
 				(font
@@ -16928,12 +16812,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SWITCH TACTILE SPST-NO 0.05A 12V"
 			(at 128.27 58.42 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "EG5042CT-ND"
@@ -16955,15 +16840,6 @@
 			)
 		)
 		(property "Manufacturer PN" "TL1014BF160QG"
-			(at 128.27 58.42 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "SWITCH TACTILE SPST-NO 0.05A 12V"
 			(at 128.27 58.42 0)
 			(effects
 				(font
@@ -17114,12 +16990,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 1UF 25V X5R 0603"
 			(at 160.02 39.37 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-1445-1-ND"
@@ -17141,15 +17018,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CC0603KRX5R8BB105"
-			(at 160.02 39.37 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 1UF 25V X5R 0603"
 			(at 160.02 39.37 0)
 			(effects
 				(font
@@ -17302,12 +17170,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 190.5 128.27 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "490-9666-1-ND"
@@ -17329,15 +17198,6 @@
 			)
 		)
 		(property "Manufacturer PN" "GRM1885C1H103JA01D"
-			(at 190.5 128.27 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 190.5 128.27 0)
 			(effects
 				(font
@@ -17602,12 +17462,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "IC REG LINEAR 5.0V 150MA SOT23-5"
 			(at 179.07 154.94 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "296-20717-1-ND"
@@ -17629,15 +17490,6 @@
 			)
 		)
 		(property "Manufacturer PN" "LP2985-50DBVR"
-			(at 179.07 154.94 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "IC REG LINEAR 5.0V 150MA SOT23-5"
 			(at 179.07 154.94 0)
 			(effects
 				(font
@@ -17793,12 +17645,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "MOSFET N-CH 50V 200MA SOT323"
 			(at 242.57 113.03 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "BSS138W-FDICT-ND"
@@ -17820,15 +17673,6 @@
 			)
 		)
 		(property "Manufacturer PN" "BSS138W-7-F"
-			(at 242.57 113.03 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "MOSFET N-CH 50V 200MA SOT323"
 			(at 242.57 113.03 0)
 			(effects
 				(font
@@ -17916,12 +17760,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 100.33 180.34 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -17952,15 +17797,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 100.33 180.34 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 100.33 180.34 0)
 			(effects
 				(font
@@ -18157,12 +17993,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 47UF 16V X5R 1210"
 			(at 135.89 180.34 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-3376-1-ND"
@@ -18184,15 +18021,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL32A476KOJNNNE"
-			(at 135.89 180.34 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 47UF 16V X5R 1210"
 			(at 135.89 180.34 0)
 			(effects
 				(font
@@ -18610,12 +18438,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "XTAL OSC TCXO 25.0000MHZ SNWV"
 			(at 205.74 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1664-1273-1-ND"
@@ -18646,15 +18475,6 @@
 			)
 		)
 		(property "Manufacturer PN" "TXETCLSANF-25.000000"
-			(at 205.74 63.5 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "XTAL OSC TCXO 25.0000MHZ SNWV"
 			(at 205.74 63.5 0)
 			(effects
 				(font
@@ -18796,12 +18616,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 234.95 82.55 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-10.0KHRCT-ND"
@@ -18832,15 +18653,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-0710KL"
-			(at 234.95 82.55 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 234.95 82.55 0)
 			(effects
 				(font
@@ -19041,12 +18853,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 163.83 152.4 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -19077,15 +18890,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 163.83 152.4 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 163.83 152.4 0)
 			(effects
 				(font
@@ -19285,12 +19089,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 470NF 25V X7R 0603"
 			(at 265.43 68.58 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-CL10B474KA8VPJCCT-ND"
@@ -19312,15 +19117,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B474KA8VPJC"
-			(at 265.43 68.58 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 470NF 25V X7R 0603"
 			(at 265.43 68.58 0)
 			(effects
 				(font
@@ -19389,12 +19185,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 121.92 144.78 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-10.0KHRCT-ND"
@@ -19425,15 +19222,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-0710KL"
-			(at 121.92 144.78 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 121.92 144.78 0)
 			(effects
 				(font
@@ -19502,12 +19290,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "IC REG LINEAR 3.3V 150MA SOT23-5"
 			(at 119.38 182.88 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "296-18476-1-ND"
@@ -19529,15 +19318,6 @@
 			)
 		)
 		(property "Manufacturer PN" "LP2985-33DBVR"
-			(at 119.38 182.88 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "IC REG LINEAR 3.3V 150MA SOT23-5"
 			(at 119.38 182.88 0)
 			(effects
 				(font
@@ -19690,12 +19470,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "MOSFET P-CH 30V 1.2A SC70-3"
 			(at 240.03 132.08 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "NTS4173PT1GOSCT-ND"
@@ -19717,15 +19498,6 @@
 			)
 		)
 		(property "Manufacturer PN" "NTS4173PT1G"
-			(at 240.03 132.08 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "MOSFET P-CH 30V 1.2A SC70-3"
 			(at 240.03 132.08 0)
 			(effects
 				(font
@@ -19806,12 +19578,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 100K OHM 1% 1/10W 0603"
 			(at 229.87 128.27 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-100KHRCT-ND"
@@ -19842,15 +19615,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-07100KL"
-			(at 229.87 128.27 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 100K OHM 1% 1/10W 0603"
 			(at 229.87 128.27 0)
 			(effects
 				(font
@@ -19919,12 +19683,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 116.84 149.86 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-10.0KHRCT-ND"
@@ -19955,15 +19720,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-0710KL"
-			(at 116.84 149.86 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 116.84 149.86 0)
 			(effects
 				(font
@@ -20163,12 +19919,13 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "IC MCU 8BIT 128KB FLASH 48TQFP"
 			(at 31.75 41.91 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "150-AVR128DA48T-E/PTCT-ND"
@@ -20199,15 +19956,6 @@
 			)
 		)
 		(property "Manufacturer PN" "AVR128DA48T-E/PT"
-			(at 31.75 41.91 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "IC MCU 8BIT 128KB FLASH 48TQFP"
 			(at 31.75 41.91 0)
 			(effects
 				(font
@@ -20489,12 +20237,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "IC CLK GENERATOR 200MHZ 10MSOP"
 			(at 242.57 62.23 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "336-2399-5-ND"
@@ -20525,15 +20274,6 @@
 			)
 		)
 		(property "Manufacturer PN" "SI5351A-B-GT"
-			(at 242.57 62.23 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "IC CLK GENERATOR 200MHZ 10MSOP"
 			(at 242.57 62.23 0)
 			(effects
 				(font
@@ -20700,12 +20440,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "LED GREEN CLEAR SMD"
 			(at 176.53 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "160-1414-1-ND"
@@ -20727,15 +20468,6 @@
 			)
 		)
 		(property "Manufacturer PN" "LTST-C170KGKT"
-			(at 176.53 88.9 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "LED GREEN CLEAR SMD"
 			(at 176.53 88.9 0)
 			(effects
 				(font
@@ -21020,12 +20752,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 115.57 139.7 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "490-9666-1-ND"
@@ -21047,15 +20780,6 @@
 			)
 		)
 		(property "Manufacturer PN" "GRM1885C1H103JA01D"
-			(at 115.57 139.7 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 115.57 139.7 0)
 			(effects
 				(font
@@ -21649,12 +21373,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 1K OHM 1% 1/10W 0603"
 			(at 134.62 86.36 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-1.00KHRCT-ND"
@@ -21685,15 +21410,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-071KL"
-			(at 134.62 86.36 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 1K OHM 1% 1/10W 0603"
 			(at 134.62 86.36 0)
 			(effects
 				(font
@@ -21968,12 +21684,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 470NF 25V X7R 0603"
 			(at 220.98 50.8 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-CL10B474KA8VPJCCT-ND"
@@ -21995,15 +21712,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B474KA8VPJC"
-			(at 220.98 50.8 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 470NF 25V X7R 0603"
 			(at 220.98 50.8 0)
 			(effects
 				(font
@@ -22070,12 +21778,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 1UF 25V X5R 0603"
 			(at 180.34 48.26 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-1445-1-ND"
@@ -22097,15 +21806,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CC0603KRX5R8BB105"
-			(at 180.34 48.26 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 1UF 25V X5R 0603"
 			(at 180.34 48.26 0)
 			(effects
 				(font
@@ -22322,12 +22022,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "OSC TCXO 32.768KHZ 3.0V SMD"
 			(at 33.02 114.3 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "50-ECS-327TXO-30-CT-ND"
@@ -22349,15 +22050,6 @@
 			)
 		)
 		(property "Manufacturer PN" "ECS-327TXO-30-TR"
-			(at 33.02 114.3 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "OSC TCXO 32.768KHZ 3.0V SMD"
 			(at 33.02 114.3 0)
 			(effects
 				(font
@@ -22432,12 +22124,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "DIODE GEN PURP 80V 125MA SOD523"
 			(at 274.32 113.03 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1N4148WTDICT-ND"
@@ -22468,15 +22161,6 @@
 			)
 		)
 		(property "Manufacturer PN" "1N4148WT-7"
-			(at 274.32 113.03 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "DIODE GEN PURP 80V 125MA SOD523"
 			(at 274.32 113.03 0)
 			(effects
 				(font
@@ -23170,12 +22854,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 100 OHM 1% 1/10W 0603"
 			(at 118.11 106.68 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-100HRCT-ND"
@@ -23206,15 +22891,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-07100RL"
-			(at 118.11 106.68 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 100 OHM 1% 1/10W 0603"
 			(at 118.11 106.68 0)
 			(effects
 				(font
@@ -23348,12 +23024,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 222.25 59.69 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -23384,15 +23061,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 222.25 59.69 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 222.25 59.69 0)
 			(effects
 				(font
@@ -23462,12 +23130,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "SWITCH TACTILE SPST-NO 0.05A 12V"
 			(at 135.89 41.91 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "EG5042CT-ND"
@@ -23489,15 +23158,6 @@
 			)
 		)
 		(property "Manufacturer PN" "TL1014BF160QG"
-			(at 135.89 41.91 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "SWITCH TACTILE SPST-NO 0.05A 12V"
 			(at 135.89 41.91 0)
 			(effects
 				(font
@@ -23575,12 +23235,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 266.7 128.27 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "490-9666-1-ND"
@@ -23602,15 +23263,6 @@
 			)
 		)
 		(property "Manufacturer PN" "GRM1885C1H103JA01D"
-			(at 266.7 128.27 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 266.7 128.27 0)
 			(effects
 				(font
@@ -23745,12 +23397,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 110.49 153.67 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "490-9666-1-ND"
@@ -23772,15 +23425,6 @@
 			)
 		)
 		(property "Manufacturer PN" "GRM1885C1H103JA01D"
-			(at 110.49 153.67 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 110.49 153.67 0)
 			(effects
 				(font
@@ -23914,12 +23558,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 163.83 121.92 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -23950,15 +23595,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 163.83 121.92 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 163.83 121.92 0)
 			(effects
 				(font
@@ -24425,12 +24061,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 234.95 77.47 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-10.0KHRCT-ND"
@@ -24461,15 +24098,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-0710KL"
-			(at 234.95 77.47 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 234.95 77.47 0)
 			(effects
 				(font
@@ -24601,12 +24229,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 187.96 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -24637,15 +24266,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 187.96 63.5 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 187.96 63.5 0)
 			(effects
 				(font
@@ -24715,12 +24335,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 193.04 158.75 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "490-9666-1-ND"
@@ -24742,15 +24363,6 @@
 			)
 		)
 		(property "Manufacturer PN" "GRM1885C1H103JA01D"
-			(at 193.04 158.75 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 193.04 158.75 0)
 			(effects
 				(font
@@ -24967,12 +24579,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 25.4 58.42 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -25003,15 +24616,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 25.4 58.42 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 25.4 58.42 0)
 			(effects
 				(font
@@ -25078,12 +24682,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 12.4K OHM 1% 1/10W 0603"
 			(at 248.92 156.21 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-12.4KHRCT-ND"
@@ -25114,15 +24719,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-0712K4L"
-			(at 248.92 156.21 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 12.4K OHM 1% 1/10W 0603"
 			(at 248.92 156.21 0)
 			(effects
 				(font

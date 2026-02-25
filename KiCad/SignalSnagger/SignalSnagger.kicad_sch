@@ -3,11 +3,11 @@
 	(generator "eeschema")
 	(generator_version "9.0")
 	(uuid "e63e39d7-6ac0-4ffd-8aa3-1841a4541b55")
-	(paper "A4")
+	(paper "USLetter")
 	(title_block
 		(title "SignalSnagger")
-		(date "2024-10-20")
-		(rev "0.328")
+		(date "2026-02-25")
+		(rev "0.4")
 	)
 	(lib_symbols
 		(symbol "Amplifier_Operational:LT6231"
@@ -5451,6 +5451,156 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "Jumper:Jumper_2_Open"
+			(pin_numbers
+				(hide yes)
+			)
+			(pin_names
+				(offset 0)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "JP"
+				(at 0 2.794 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "Jumper_2_Open"
+				(at 0 -2.286 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "~"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "Jumper, 2-pole, open"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_keywords" "Jumper SPST"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_fp_filters" "Jumper* TestPoint*2Pads* TestPoint*Bridge*"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "Jumper_2_Open_0_0"
+				(circle
+					(center -2.032 0)
+					(radius 0.508)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(circle
+					(center 2.032 0)
+					(radius 0.508)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "Jumper_2_Open_0_1"
+				(arc
+					(start -1.524 1.27)
+					(mid 0 1.778)
+					(end 1.524 1.27)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "Jumper_2_Open_1_1"
+				(pin passive line
+					(at -5.08 0 0)
+					(length 2.54)
+					(name "A"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 5.08 0 180)
+					(length 2.54)
+					(name "B"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "Reference_Voltage:REF4132B33"
 			(exclude_from_sim no)
 			(in_bom yes)
@@ -5810,6 +5960,210 @@
 						)
 					)
 					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+		(symbol "Transistor_FET:BF545B"
+			(pin_names
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "Q"
+				(at 5.08 1.905 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left)
+				)
+			)
+			(property "Value" "BF545B"
+				(at 5.08 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left)
+				)
+			)
+			(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
+				(at 5.08 -1.905 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+						(italic yes)
+					)
+					(justify left)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "https://www.nxp.com/docs/en/data-sheet/BF545A_BF545B_BF545C.pdf"
+				(at 5.08 -3.81 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left)
+					(hide yes)
+				)
+			)
+			(property "Description" "15mA Idss, 30V Vgs, N-Channel JFET, SOT-23"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_keywords" "N-Channel FET Transistor Low Voltage"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_fp_filters" "SOT?23*"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "BF545B_0_1"
+				(polyline
+					(pts
+						(xy 0 0) (xy -1.016 0.381) (xy -1.016 -0.381) (xy 0 0)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0.254 1.905) (xy 0.254 -1.905)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0.254 0) (xy -2.54 0)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(circle
+					(center 1.27 0)
+					(radius 2.8194)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 2.54 2.54) (xy 2.54 1.397) (xy 0.254 1.397)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 2.54 -2.54) (xy 2.54 -1.397) (xy 0.254 -1.397)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "BF545B_1_1"
+				(pin input line
+					(at -5.08 0 0)
+					(length 2.54)
+					(name "G"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 2.54 5.08 270)
+					(length 2.54)
+					(name "D"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 2.54 -5.08 90)
+					(length 2.54)
+					(name "S"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -6548,7 +6902,7 @@
 	)
 	(text "Sense Adj."
 		(exclude_from_sim no)
-		(at 21.59 144.78 0)
+		(at 23.876 141.986 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -6642,10 +6996,22 @@
 		(uuid "4051ff01-c794-4d34-a757-bb4f5d5b148c")
 	)
 	(junction
+		(at 96.52 102.87)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "451876ed-5fdf-4bd1-9bca-a4b7fcf7520b")
+	)
+	(junction
 		(at 129.54 158.75)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "47258d81-15a9-4cb6-8bf2-ba15f3b70a49")
+	)
+	(junction
+		(at 21.59 73.66)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "48a28c64-d841-4df3-981e-ca492eacc103")
 	)
 	(junction
 		(at 91.44 52.07)
@@ -6714,7 +7080,13 @@
 		(uuid "6593c194-ba13-45a2-a34d-b591e7d83d11")
 	)
 	(junction
-		(at 86.36 95.25)
+		(at 21.59 149.86)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "6793a3d4-9d1d-424c-82a6-6c12bc89d20c")
+	)
+	(junction
+		(at 88.9 95.25)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "697e3376-0b1f-4d84-9c27-d0345aa2c3ee")
@@ -6730,6 +7102,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "6d67869c-43b8-4941-a75e-a02b2d00c0c2")
+	)
+	(junction
+		(at 21.59 134.62)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "76b067e0-fd74-4b9e-ada0-c0ae4535f008")
 	)
 	(junction
 		(at 100.33 173.99)
@@ -6774,12 +7152,6 @@
 		(uuid "985a1ec0-9367-45f0-a41b-e7e8dc89867e")
 	)
 	(junction
-		(at 93.98 102.87)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "9c63bce2-3f27-4b7e-8e01-6a8c6f1f1c7c")
-	)
-	(junction
 		(at 186.69 93.98)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -6790,6 +7162,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "9edd442f-a68b-4fea-a74a-03593fe4991e")
+	)
+	(junction
+		(at 34.29 128.27)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "a2ccc1e5-4cc2-458a-ada0-852f0e5429c3")
 	)
 	(junction
 		(at 129.54 96.52)
@@ -6816,16 +7194,34 @@
 		(uuid "a9b1b7fe-3a3a-41c9-89a3-8665a9db8c0e")
 	)
 	(junction
-		(at 21.59 140.97)
+		(at 69.85 140.97)
 		(diameter 0)
 		(color 0 0 0 0)
-		(uuid "bbc5d92e-3986-4cf2-bb91-61367de2dd46")
+		(uuid "b221ad9e-8bb0-476e-bce1-f2db9f5109ae")
+	)
+	(junction
+		(at 74.93 166.37)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "b8d5a774-58e2-4429-bf6e-3527652958eb")
 	)
 	(junction
 		(at 151.13 146.05)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "bda60187-83f7-4b24-9192-3936cc292e20")
+	)
+	(junction
+		(at 74.93 157.48)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "c1579411-9f32-47d7-ac8a-b92f485faafe")
+	)
+	(junction
+		(at 76.2 97.79)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "c5c2c9f4-bb37-4308-814d-00b374800a1c")
 	)
 	(junction
 		(at 199.39 38.1)
@@ -6846,12 +7242,6 @@
 		(uuid "d459bccd-d779-4219-92a7-5b1090e0c45e")
 	)
 	(junction
-		(at 43.18 133.35)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "d6ab085f-e25b-45a0-a778-f3b5398132d9")
-	)
-	(junction
 		(at 186.69 66.04)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -6870,12 +7260,6 @@
 		(uuid "dcba8bd3-2a00-4c4b-8c24-ad77a6d01af8")
 	)
 	(junction
-		(at 21.59 121.92)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "de6ef71c-c24d-40aa-bad7-20f1b4e813f4")
-	)
-	(junction
 		(at 120.65 173.99)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -6886,6 +7270,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "e46ebd89-e32e-4325-9a8e-05aec96a4241")
+	)
+	(junction
+		(at 39.37 97.79)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "fd061ca0-edce-4274-8eb9-7e6422bcbe10")
 	)
 	(no_connect
 		(at 157.48 93.98)
@@ -6937,6 +7327,16 @@
 	)
 	(wire
 		(pts
+			(xy 21.59 166.37) (xy 21.59 149.86)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "01db5fee-1651-41b0-8571-031ae355a5a1")
+	)
+	(wire
+		(pts
 			(xy 241.3 106.68) (xy 245.11 106.68)
 		)
 		(stroke
@@ -6954,16 +7354,6 @@
 			(type default)
 		)
 		(uuid "03088ce0-e686-48cc-8f83-98dc3013c127")
-	)
-	(wire
-		(pts
-			(xy 21.59 121.92) (xy 21.59 128.27)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "05670f8d-ceda-4b27-a833-0dadd7320c90")
 	)
 	(wire
 		(pts
@@ -7017,6 +7407,16 @@
 	)
 	(wire
 		(pts
+			(xy 31.75 134.62) (xy 30.48 134.62)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "090f0a2a-b04b-4657-874e-c573a0b301d5")
+	)
+	(wire
+		(pts
 			(xy 54.61 46.99) (xy 83.82 46.99)
 		)
 		(stroke
@@ -7037,7 +7437,7 @@
 	)
 	(wire
 		(pts
-			(xy 31.75 114.3) (xy 93.98 114.3)
+			(xy 31.75 114.3) (xy 96.52 114.3)
 		)
 		(stroke
 			(width 0)
@@ -7074,6 +7474,16 @@
 			(type default)
 		)
 		(uuid "101577f8-ff1d-47cb-b8c6-d21310bd83bf")
+	)
+	(wire
+		(pts
+			(xy 21.59 166.37) (xy 67.31 166.37)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "10e8bd85-15cc-45ae-8755-d85cede63f36")
 	)
 	(wire
 		(pts
@@ -7197,7 +7607,7 @@
 	)
 	(wire
 		(pts
-			(xy 29.21 111.76) (xy 81.28 111.76)
+			(xy 29.21 111.76) (xy 83.82 111.76)
 		)
 		(stroke
 			(width 0)
@@ -7257,6 +7667,16 @@
 	)
 	(wire
 		(pts
+			(xy 21.59 73.66) (xy 21.59 80.01)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1b36fbe7-bb2b-4bc3-96d4-403278a2560d")
+	)
+	(wire
+		(pts
 			(xy 78.74 31.75) (xy 78.74 45.72)
 		)
 		(stroke
@@ -7304,16 +7724,6 @@
 			(type default)
 		)
 		(uuid "1c8dd1f6-571e-4075-8b7c-86725c622235")
-	)
-	(wire
-		(pts
-			(xy 21.59 149.86) (xy 35.56 149.86)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "1cb84136-73b4-4581-ad2c-772abb5a8b24")
 	)
 	(wire
 		(pts
@@ -7457,7 +7867,7 @@
 	)
 	(wire
 		(pts
-			(xy 92.71 95.25) (xy 93.98 95.25)
+			(xy 95.25 95.25) (xy 96.52 95.25)
 		)
 		(stroke
 			(width 0)
@@ -7474,6 +7884,26 @@
 			(type default)
 		)
 		(uuid "29df0ed4-1dd0-4bab-a683-25912e616400")
+	)
+	(wire
+		(pts
+			(xy 67.31 166.37) (xy 67.31 151.13)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2ad8b3f5-e07d-4d07-aa89-d88684ba4cc7")
+	)
+	(wire
+		(pts
+			(xy 54.61 157.48) (xy 62.23 157.48)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2b99e148-29b0-41b2-a2c8-742f023571b1")
 	)
 	(wire
 		(pts
@@ -7514,6 +7944,16 @@
 			(type default)
 		)
 		(uuid "2d0c63b0-6450-40f3-800b-1713f7909070")
+	)
+	(wire
+		(pts
+			(xy 74.93 146.05) (xy 74.93 140.97)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2d7e7354-e12c-4a3c-93d2-a89faf7def9f")
 	)
 	(wire
 		(pts
@@ -7627,7 +8067,7 @@
 	)
 	(wire
 		(pts
-			(xy 77.47 97.79) (xy 76.2 97.79)
+			(xy 76.2 97.79) (xy 80.01 97.79)
 		)
 		(stroke
 			(width 0)
@@ -7657,17 +8097,7 @@
 	)
 	(wire
 		(pts
-			(xy 43.18 132.08) (xy 43.18 133.35)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "38b34e28-91c8-4e63-91da-4fd62ce0590a")
-	)
-	(wire
-		(pts
-			(xy 43.18 142.24) (xy 43.18 143.51)
+			(xy 43.18 139.7) (xy 43.18 143.51)
 		)
 		(stroke
 			(width 0)
@@ -7677,7 +8107,7 @@
 	)
 	(wire
 		(pts
-			(xy 93.98 114.3) (xy 93.98 102.87)
+			(xy 96.52 114.3) (xy 96.52 102.87)
 		)
 		(stroke
 			(width 0)
@@ -7697,6 +8127,16 @@
 	)
 	(wire
 		(pts
+			(xy 21.59 149.86) (xy 35.56 149.86)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3f6d01b5-cbf1-4800-a2c7-249cd5e080fe")
+	)
+	(wire
+		(pts
 			(xy 57.15 92.71) (xy 57.15 97.79)
 		)
 		(stroke
@@ -7704,6 +8144,16 @@
 			(type default)
 		)
 		(uuid "3f7bc42e-08ec-4d55-91b2-e8fb59200caf")
+	)
+	(wire
+		(pts
+			(xy 74.93 157.48) (xy 74.93 156.21)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4137395d-2cd6-4059-8bad-629b3f9d6ce9")
 	)
 	(wire
 		(pts
@@ -7717,7 +8167,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 92.71) (xy 76.2 92.71)
+			(xy 86.36 92.71) (xy 76.2 92.71)
 		)
 		(stroke
 			(width 0)
@@ -7777,7 +8227,7 @@
 	)
 	(wire
 		(pts
-			(xy 87.63 102.87) (xy 86.36 102.87)
+			(xy 90.17 102.87) (xy 88.9 102.87)
 		)
 		(stroke
 			(width 0)
@@ -7907,6 +8357,16 @@
 	)
 	(wire
 		(pts
+			(xy 74.93 140.97) (xy 69.85 140.97)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4db139e8-fc1d-48eb-9f2e-00624a948af5")
+	)
+	(wire
+		(pts
 			(xy 151.13 146.05) (xy 151.13 134.62)
 		)
 		(stroke
@@ -7917,7 +8377,7 @@
 	)
 	(wire
 		(pts
-			(xy 21.59 133.35) (xy 21.59 140.97)
+			(xy 21.59 85.09) (xy 21.59 134.62)
 		)
 		(stroke
 			(width 0)
@@ -7927,7 +8387,7 @@
 	)
 	(wire
 		(pts
-			(xy 93.98 102.87) (xy 93.98 95.25)
+			(xy 96.52 102.87) (xy 96.52 95.25)
 		)
 		(stroke
 			(width 0)
@@ -7937,7 +8397,7 @@
 	)
 	(polyline
 		(pts
-			(xy 110.49 162.56) (xy 15.24 162.56)
+			(xy 110.49 172.72) (xy 15.24 172.72)
 		)
 		(stroke
 			(width 0)
@@ -8007,7 +8467,17 @@
 	)
 	(wire
 		(pts
-			(xy 81.28 111.76) (xy 81.28 90.17)
+			(xy 62.23 153.67) (xy 62.23 157.48)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "53dc5086-a596-4ced-9979-16fa4ff43b91")
+	)
+	(wire
+		(pts
+			(xy 83.82 111.76) (xy 83.82 90.17)
 		)
 		(stroke
 			(width 0)
@@ -8027,7 +8497,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 92.71) (xy 83.82 116.84)
+			(xy 86.36 92.71) (xy 86.36 116.84)
 		)
 		(stroke
 			(width 0)
@@ -8037,13 +8507,23 @@
 	)
 	(wire
 		(pts
-			(xy 76.2 95.25) (xy 86.36 95.25)
+			(xy 76.2 95.25) (xy 88.9 95.25)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "556c3822-3fae-4be6-8c68-a9c696385ea8")
+	)
+	(wire
+		(pts
+			(xy 21.59 134.62) (xy 24.13 134.62)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "558b0b68-8fac-433b-9334-0c52fc26a905")
 	)
 	(wire
 		(pts
@@ -8077,7 +8557,7 @@
 	)
 	(wire
 		(pts
-			(xy 34.29 133.35) (xy 43.18 133.35)
+			(xy 34.29 128.27) (xy 43.18 128.27)
 		)
 		(stroke
 			(width 0)
@@ -8197,7 +8677,7 @@
 	)
 	(wire
 		(pts
-			(xy 43.18 133.35) (xy 43.18 134.62)
+			(xy 43.18 128.27) (xy 43.18 132.08)
 		)
 		(stroke
 			(width 0)
@@ -8307,16 +8787,6 @@
 	)
 	(wire
 		(pts
-			(xy 34.29 137.16) (xy 34.29 133.35)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "731db4ef-9a85-4efe-8abc-6a180f927a30")
-	)
-	(wire
-		(pts
 			(xy 81.28 31.75) (xy 81.28 39.37)
 		)
 		(stroke
@@ -8397,7 +8867,7 @@
 	)
 	(wire
 		(pts
-			(xy 86.36 95.25) (xy 87.63 95.25)
+			(xy 88.9 95.25) (xy 90.17 95.25)
 		)
 		(stroke
 			(width 0)
@@ -8464,6 +8934,16 @@
 			(type default)
 		)
 		(uuid "80e0dfc9-3317-42c0-b495-28373c5979d0")
+	)
+	(wire
+		(pts
+			(xy 81.28 157.48) (xy 74.93 157.48)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "83df1d36-d47d-460d-9e44-38b3146ace14")
 	)
 	(wire
 		(pts
@@ -8557,6 +9037,16 @@
 	)
 	(wire
 		(pts
+			(xy 96.52 102.87) (xy 95.25 102.87)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "88819e9b-c187-4ab2-a98c-fb81bd4e11c7")
+	)
+	(wire
+		(pts
 			(xy 52.07 92.71) (xy 57.15 92.71)
 		)
 		(stroke
@@ -8564,16 +9054,6 @@
 			(type default)
 		)
 		(uuid "8a38a84d-d3dd-436b-b73a-335937f66893")
-	)
-	(wire
-		(pts
-			(xy 54.61 157.48) (xy 62.23 157.48)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "8caa7f09-0ca1-4d52-bd0e-def0cacc60d6")
 	)
 	(wire
 		(pts
@@ -8617,7 +9097,7 @@
 	)
 	(polyline
 		(pts
-			(xy 110.49 118.11) (xy 110.49 162.56)
+			(xy 110.49 118.11) (xy 110.49 172.72)
 		)
 		(stroke
 			(width 0)
@@ -8634,6 +9114,16 @@
 			(type default)
 		)
 		(uuid "9012bb90-951f-4790-9d07-de0fb011c643")
+	)
+	(wire
+		(pts
+			(xy 34.29 128.27) (xy 34.29 130.81)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "91f841a8-4041-4c1b-8032-3e64e83f1414")
 	)
 	(wire
 		(pts
@@ -8727,7 +9217,7 @@
 	)
 	(wire
 		(pts
-			(xy 86.36 102.87) (xy 86.36 95.25)
+			(xy 88.9 102.87) (xy 88.9 95.25)
 		)
 		(stroke
 			(width 0)
@@ -8757,13 +9247,23 @@
 	)
 	(wire
 		(pts
-			(xy 81.28 90.17) (xy 76.2 90.17)
+			(xy 83.82 90.17) (xy 76.2 90.17)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "9d683d91-2be5-4fe0-8e1a-60a9d10b3d21")
+	)
+	(wire
+		(pts
+			(xy 35.56 97.79) (xy 39.37 97.79)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9e165c83-4f30-4af1-8aa4-d20263c40d2c")
 	)
 	(wire
 		(pts
@@ -8777,7 +9277,7 @@
 	)
 	(wire
 		(pts
-			(xy 26.67 116.84) (xy 83.82 116.84)
+			(xy 26.67 116.84) (xy 86.36 116.84)
 		)
 		(stroke
 			(width 0)
@@ -8824,16 +9324,6 @@
 			(type default)
 		)
 		(uuid "a4d66479-03ed-4662-8779-0cd0d79ec911")
-	)
-	(wire
-		(pts
-			(xy 21.59 140.97) (xy 22.86 140.97)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "a5af576f-8062-4f1f-9d7f-db1a16faeccb")
 	)
 	(wire
 		(pts
@@ -9037,6 +9527,16 @@
 	)
 	(wire
 		(pts
+			(xy 81.28 161.29) (xy 81.28 157.48)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b7a29e61-2266-40ec-b6db-803b73104fb0")
+	)
+	(wire
+		(pts
 			(xy 34.29 74.93) (xy 39.37 74.93)
 		)
 		(stroke
@@ -9087,13 +9587,23 @@
 	)
 	(wire
 		(pts
-			(xy 21.59 33.02) (xy 21.59 121.92)
+			(xy 21.59 33.02) (xy 21.59 73.66)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "bce052b6-fd57-4a38-8da0-f7d3cf4cc802")
+	)
+	(wire
+		(pts
+			(xy 74.93 166.37) (xy 81.28 166.37)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bf0fa1d9-2d73-4f78-be4a-129aa565f9ca")
 	)
 	(wire
 		(pts
@@ -9277,6 +9787,16 @@
 	)
 	(wire
 		(pts
+			(xy 34.29 124.46) (xy 34.29 128.27)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ca66f52c-09f2-4537-9fcc-75d088f522df")
+	)
+	(wire
+		(pts
 			(xy 186.69 66.04) (xy 189.23 66.04)
 		)
 		(stroke
@@ -9367,7 +9887,7 @@
 	)
 	(wire
 		(pts
-			(xy 21.59 149.86) (xy 21.59 140.97)
+			(xy 21.59 149.86) (xy 21.59 134.62)
 		)
 		(stroke
 			(width 0)
@@ -9447,6 +9967,16 @@
 	)
 	(wire
 		(pts
+			(xy 74.93 166.37) (xy 74.93 168.91)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d9261480-4c1a-4cb0-b004-d4b2f60b0ae8")
+	)
+	(wire
+		(pts
 			(xy 120.65 105.41) (xy 125.73 105.41)
 		)
 		(stroke
@@ -9517,23 +10047,13 @@
 	)
 	(polyline
 		(pts
-			(xy 15.24 115.57) (xy 15.24 162.56)
+			(xy 15.24 115.57) (xy 15.24 172.72)
 		)
 		(stroke
 			(width 0)
 			(type dash)
 		)
 		(uuid "e86c0210-dd77-4b33-b5d9-eff887e2edcc")
-	)
-	(wire
-		(pts
-			(xy 92.71 102.87) (xy 93.98 102.87)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "e90987dd-a014-4ff5-bcdc-f63338262729")
 	)
 	(wire
 		(pts
@@ -9584,6 +10104,16 @@
 			(type default)
 		)
 		(uuid "ebed796d-872e-45c9-ae0c-d86d5f849dd0")
+	)
+	(wire
+		(pts
+			(xy 74.93 158.75) (xy 74.93 157.48)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ed372af7-77ae-4b8d-ad96-60659a444fc2")
 	)
 	(wire
 		(pts
@@ -9747,7 +10277,7 @@
 	)
 	(wire
 		(pts
-			(xy 62.23 147.32) (xy 62.23 140.97)
+			(xy 62.23 143.51) (xy 62.23 140.97)
 		)
 		(stroke
 			(width 0)
@@ -10006,6 +10536,71 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+VSW")
+		(at 80.01 107.95 0)
+		(mirror x)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "005955d2-3955-409d-a751-607b20196536")
+		(property "Reference" "#PWR0176"
+			(at 80.01 104.14 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+VSW"
+			(at 83.058 110.236 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 80.01 107.95 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 80.01 107.95 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 80.01 107.95 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "810e1b06-407c-46f3-8b03-d85f20e06f6c")
+		)
+		(instances
+			(project "SignalSnagger"
+				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
+					(reference "#PWR0176")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 39.37 107.95 0)
 		(unit 1)
@@ -10183,12 +10778,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "FIXED IND 10UH 80MA 360 MOHM SMD"
 			(at 180.34 120.65 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "587-1714-1-ND"
@@ -10227,15 +10823,6 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "FIXED IND 10UH 80MA 360 MOHM SMD"
-			(at 180.34 120.65 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
 		(pin "1"
 			(uuid "6424335d-a3fc-43e9-a0b3-f395df802adf")
 		)
@@ -10246,6 +10833,71 @@
 			(project ""
 				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
 					(reference "L101")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+VSW")
+		(at 35.56 107.95 0)
+		(mirror x)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "03ccad8d-5fd0-4dec-8810-78d76f1fa930")
+		(property "Reference" "#PWR0175"
+			(at 35.56 104.14 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+VSW"
+			(at 33.02 111.76 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 35.56 107.95 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 35.56 107.95 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 35.56 107.95 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "1f875239-0c61-4f25-90b3-3c9cfefa113f")
+		)
+		(instances
+			(project "SignalSnagger"
+				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
+					(reference "#PWR0175")
 					(unit 1)
 				)
 			)
@@ -10364,12 +11016,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES SMD 49.9 OHM 1% 1/10W 0603"
 			(at 50.8 157.48 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "P49.9HCT-ND"
@@ -10391,15 +11044,6 @@
 			)
 		)
 		(property "Manufacturer PN" "ERJ-3EKF49R9V"
-			(at 50.8 157.48 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES SMD 49.9 OHM 1% 1/10W 0603"
 			(at 50.8 157.48 0)
 			(effects
 				(font
@@ -10466,12 +11110,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 227.33 92.71 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -10502,15 +11147,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 227.33 92.71 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 227.33 92.71 0)
 			(effects
 				(font
@@ -10577,12 +11213,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 266.7 128.27 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -10613,15 +11250,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 266.7 128.27 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 266.7 128.27 0)
 			(effects
 				(font
@@ -10691,12 +11319,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 147.32 191.77 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "490-9666-1-ND"
@@ -10718,15 +11347,6 @@
 			)
 		)
 		(property "Manufacturer PN" "GRM1885C1H103JA01D"
-			(at 147.32 191.77 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 147.32 191.77 0)
 			(effects
 				(font
@@ -10872,12 +11492,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
-			(at 252.73 104.14 0)
+		(property "Description" "IC CMOS 2 CIRCUIT 8SOIC"
+			(at 87.63 57.15 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "497-6618-1-ND"
@@ -10908,15 +11529,6 @@
 			)
 		)
 		(property "Manufacturer PN" "TS912IDT"
-			(at 87.63 57.15 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "IC CMOS 2 CIRCUIT 8SOIC"
 			(at 87.63 57.15 0)
 			(effects
 				(font
@@ -11001,12 +11613,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 184.15 127 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -11037,15 +11650,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 184.15 127 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 184.15 127 0)
 			(effects
 				(font
@@ -11114,12 +11718,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 120.65 186.69 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-10.0KHRCT-ND"
@@ -11150,15 +11755,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-0710KL"
-			(at 120.65 186.69 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 120.65 186.69 0)
 			(effects
 				(font
@@ -11587,6 +12183,76 @@
 		)
 	)
 	(symbol
+		(lib_id "Jumper:Jumper_2_Open")
+		(at 76.2 102.87 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(dnp no)
+		(uuid "272ad86c-8af0-48b8-9a8f-2d36e3a88610")
+		(property "Reference" "JP107"
+			(at 73.152 106.172 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "Jumper_2_Open"
+			(at 73.66 101.6001 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+				(hide yes)
+			)
+		)
+		(property "Footprint" ""
+			(at 76.2 102.87 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 76.2 102.87 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Jumper, 2-pole, open"
+			(at 76.2 102.87 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "8fcfaa0b-117d-4cd1-ad2b-6fa296889e0a")
+		)
+		(pin "2"
+			(uuid "18611e85-a68d-4c02-aea7-deb15c25ec38")
+		)
+		(instances
+			(project "SignalSnagger"
+				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
+					(reference "JP107")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:Coilcraft_PWB-4-CLC")
 		(at 167.64 93.98 180)
 		(unit 1)
@@ -11774,12 +12440,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 10 OHM 1% 1/10W 0603"
 			(at 182.88 76.2 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-10.0HRCT-ND"
@@ -11810,15 +12477,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-0710RL"
-			(at 182.88 76.2 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 10 OHM 1% 1/10W 0603"
 			(at 182.88 76.2 0)
 			(effects
 				(font
@@ -11887,12 +12545,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0603 47NF 16V X7R 5%"
 			(at 210.82 72.39 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "399-C0603X473J4RECAUTO7411CT-ND"
@@ -11914,15 +12573,6 @@
 			)
 		)
 		(property "Manufacturer PN" "C0603X473J4RECAUTO7411"
-			(at 210.82 72.39 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0603 47NF 16V X7R 5%"
 			(at 210.82 72.39 0)
 			(effects
 				(font
@@ -11993,12 +12643,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "IC MUX/DEMUX 2 X 4:1 16QSOP"
 			(at 199.39 54.61 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "PI5C3253QEXDICT-ND"
@@ -12029,15 +12680,6 @@
 			)
 		)
 		(property "Manufacturer PN" "PI5C3253QEX"
-			(at 199.39 54.61 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "IC MUX/DEMUX 2 X 4:1 16QSOP"
 			(at 199.39 54.61 0)
 			(effects
 				(font
@@ -12148,12 +12790,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 15K OHM 1% 1/10W 0603"
 			(at 158.75 146.05 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-15.0KHRCT-ND"
@@ -12175,15 +12818,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-0715KL"
-			(at 158.75 146.05 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 15K OHM 1% 1/10W 0603"
 			(at 158.75 146.05 0)
 			(effects
 				(font
@@ -12252,12 +12886,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 22K OHM 1% 1/10W 0603"
 			(at 120.65 151.13 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-22.0KHRCT-ND"
@@ -12288,15 +12923,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-0722KL"
-			(at 120.65 151.13 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 22K OHM 1% 1/10W 0603"
 			(at 120.65 151.13 0)
 			(effects
 				(font
@@ -12367,12 +12993,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "IC VREF SERIES 0.05% SOT23-5"
 			(at 199.39 93.98 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "296-REF4132B25DBVRCT-ND"
@@ -12403,15 +13030,6 @@
 			)
 		)
 		(property "Manufacturer PN" "REF4132B25DBVR"
-			(at 199.39 93.98 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "IC VREF SERIES 0.05% SOT23-5"
 			(at 199.39 93.98 0)
 			(effects
 				(font
@@ -12576,7 +13194,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 34.29 144.78 0)
+		(at 34.29 138.43 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -12585,7 +13203,7 @@
 		(fields_autoplaced yes)
 		(uuid "329c0f29-5910-4f36-93cc-7d27b244f704")
 		(property "Reference" "#PWR0101"
-			(at 34.29 151.13 0)
+			(at 34.29 144.78 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12594,7 +13212,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 34.7238 147.9549 90)
+			(at 34.7238 141.6049 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12604,7 +13222,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 34.29 144.78 0)
+			(at 34.29 138.43 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12613,7 +13231,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 34.29 144.78 0)
+			(at 34.29 138.43 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12622,7 +13240,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 34.29 144.78 0)
+			(at 34.29 138.43 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12707,33 +13325,36 @@
 		)
 	)
 	(symbol
-		(lib_id "Device:C_Trim_Small")
-		(at 90.17 95.25 90)
+		(lib_id "Jumper:Jumper_2_Open")
+		(at 39.37 102.87 270)
 		(mirror x)
 		(unit 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(dnp no)
-		(uuid "3ad8e564-13c0-45ed-b571-a8203aa9f7d4")
-		(property "Reference" "C103"
-			(at 90.17 90.17 90)
+		(uuid "365dab68-30a0-4cb0-a780-12e529931346")
+		(property "Reference" "JP103"
+			(at 42.418 105.918 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(justify left)
 			)
 		)
-		(property "Value" "8.5-100pF"
-			(at 90.17 92.71 90)
+		(property "Value" "Jumper_2_Open"
+			(at 41.91 101.6001 90)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(justify left)
+				(hide yes)
 			)
 		)
-		(property "Footprint" "Capacitor_THT:VC07B"
-			(at 90.17 95.25 0)
+		(property "Footprint" ""
+			(at 39.37 102.87 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12742,7 +13363,75 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 90.17 95.25 0)
+			(at 39.37 102.87 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Jumper, 2-pole, open"
+			(at 39.37 102.87 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "b7c1cc6e-e521-4e82-aa51-969fd9abdc5c")
+		)
+		(pin "2"
+			(uuid "beb5d1e4-f7be-4794-b255-005ec37a15d9")
+		)
+		(instances
+			(project ""
+				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
+					(reference "JP103")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:C_Trim_Small")
+		(at 92.71 95.25 90)
+		(mirror x)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "3ad8e564-13c0-45ed-b571-a8203aa9f7d4")
+		(property "Reference" "C103"
+			(at 92.71 90.17 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "8.5-100pF"
+			(at 92.71 92.71 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Capacitor_THT:VC07B"
+			(at 92.71 95.25 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 92.71 95.25 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12751,7 +13440,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 90.17 95.25 0)
+			(at 92.71 95.25 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12759,7 +13448,7 @@
 			)
 		)
 		(property "Link" "https://www.jameco.com/z/CTC07RB-100-Jameco-ValuePro-Capacitor-Ceramic-Trimmer-8mm-8-5-100pf-250-Volt-Color-Purple_94449.html"
-			(at 90.17 95.25 0)
+			(at 92.71 95.25 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12768,7 +13457,7 @@
 			)
 		)
 		(property "Manufacturer PN" "CTC07RB-100"
-			(at 90.17 95.25 0)
+			(at 92.71 95.25 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12777,7 +13466,7 @@
 			)
 		)
 		(property "Digi-Key Part No." "N/P"
-			(at 90.17 95.25 0)
+			(at 92.71 95.25 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12982,12 +13671,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 62.23 123.19 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -13018,15 +13708,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 62.23 123.19 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 62.23 123.19 0)
 			(effects
 				(font
@@ -13161,12 +13842,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 143.51 114.3 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -13197,15 +13879,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 143.51 114.3 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 143.51 114.3 0)
 			(effects
 				(font
@@ -13276,12 +13949,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "IC OPAMP GP 1 CIRCUIT SOT23-5"
 			(at 135.89 132.08 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "576-1314-1-ND"
@@ -13303,15 +13977,6 @@
 			)
 		)
 		(property "Manufacturer PN" "MIC6211YM5-TR"
-			(at 135.89 132.08 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "IC OPAMP GP 1 CIRCUIT SOT23-5"
 			(at 135.89 132.08 0)
 			(effects
 				(font
@@ -13407,6 +14072,74 @@
 			(project ""
 				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
 					(reference "#PWR0170")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 74.93 168.91 0)
+		(mirror y)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "496c97b1-bc98-4c68-842a-a4ecc274da51")
+		(property "Reference" "#PWR0174"
+			(at 74.93 175.26 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 74.4962 172.085 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+		(property "Footprint" ""
+			(at 74.93 168.91 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 74.93 168.91 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 74.93 168.91 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "d6903847-4a94-418f-8378-2656ffb6975b")
+		)
+		(instances
+			(project "SignalSnagger"
+				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
+					(reference "#PWR0174")
 					(unit 1)
 				)
 			)
@@ -13524,12 +14257,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 123.19 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "490-9666-1-ND"
@@ -13551,15 +14285,6 @@
 			)
 		)
 		(property "Manufacturer PN" "GRM1885C1H103JA01D"
-			(at 123.19 88.9 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 123.19 88.9 0)
 			(effects
 				(font
@@ -13632,12 +14357,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "TRANS NPN 40V 0.6A SOT23-3"
 			(at 40.64 149.86 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "SMMBT2222ALT1GOSCT-ND"
@@ -13668,15 +14394,6 @@
 			)
 		)
 		(property "Manufacturer PN" "SMMBT2222ALT1G"
-			(at 40.64 149.86 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "TRANS NPN 40V 0.6A SOT23-3"
 			(at 40.64 149.86 0)
 			(effects
 				(font
@@ -13840,7 +14557,7 @@
 	)
 	(symbol
 		(lib_id "Jumper:Jumper_2_Bridged_THT")
-		(at 62.23 152.4 90)
+		(at 62.23 148.59 90)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -13848,7 +14565,7 @@
 		(dnp no)
 		(uuid "5170ca02-dda1-4bb5-8bb3-5970dd0c5024")
 		(property "Reference" "JP105"
-			(at 63.5 152.4 90)
+			(at 63.5 148.59 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13857,7 +14574,7 @@
 			)
 		)
 		(property "Value" "Jumper_2_Bridged"
-			(at 60.4321 152.4 0)
+			(at 60.4321 148.59 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13866,7 +14583,7 @@
 			)
 		)
 		(property "Footprint" "Jumper:Jumper_THT-1x02_Bridged_Circular"
-			(at 62.23 152.4 0)
+			(at 62.23 148.59 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13875,7 +14592,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 62.23 152.4 0)
+			(at 62.23 148.59 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13884,7 +14601,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 62.23 152.4 0)
+			(at 62.23 148.59 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13892,7 +14609,7 @@
 			)
 		)
 		(property "Digi-Key Part No." "N/P"
-			(at 62.23 152.4 0)
+			(at 62.23 148.59 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14052,12 +14769,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 201.93 81.28 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -14096,15 +14814,6 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
-			(at 201.93 81.28 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
 		(pin "1"
 			(uuid "2e6f414e-6a6b-4792-9882-00a9603f3561")
 		)
@@ -14122,16 +14831,16 @@
 	)
 	(symbol
 		(lib_id "Device:C_Small")
-		(at 113.03 173.99 270)
+		(at 113.03 173.99 90)
+		(mirror x)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "56844006-f995-409d-a7c7-a742efeb48f3")
 		(property "Reference" "C105"
-			(at 113.0236 168.7281 90)
+			(at 113.0364 168.7281 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14139,7 +14848,7 @@
 			)
 		)
 		(property "Value" "10nF"
-			(at 113.0236 171.265 90)
+			(at 113.0364 171.265 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14164,12 +14873,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 113.03 173.99 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "490-9666-1-ND"
@@ -14191,15 +14901,6 @@
 			)
 		)
 		(property "Manufacturer PN" "GRM1885C1H103JA01D"
-			(at 113.03 173.99 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 113.03 173.99 0)
 			(effects
 				(font
@@ -14340,12 +15041,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 78.74 129.54 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -14376,15 +15078,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 78.74 129.54 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 78.74 129.54 0)
 			(effects
 				(font
@@ -14451,12 +15144,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 203.2 38.1 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -14487,15 +15181,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 203.2 38.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 203.2 38.1 0)
 			(effects
 				(font
@@ -14564,12 +15249,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 100 OHM 1% 1/10W 0603"
 			(at 129.54 83.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-100HRCT-ND"
@@ -14600,15 +15286,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-07100RL"
-			(at 129.54 83.82 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 100 OHM 1% 1/10W 0603"
 			(at 129.54 83.82 0)
 			(effects
 				(font
@@ -14675,12 +15352,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 254 95.25 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -14711,15 +15389,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 254 95.25 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 254 95.25 0)
 			(effects
 				(font
@@ -14786,12 +15455,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 46.99 143.51 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -14822,15 +15492,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 46.99 143.51 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 46.99 143.51 0)
 			(effects
 				(font
@@ -14899,12 +15560,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES SMD 49.9 OHM 1% 1/10W 0603"
 			(at 242.57 73.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "P49.9HCT-ND"
@@ -14934,15 +15596,6 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "RES SMD 49.9 OHM 1% 1/10W 0603"
-			(at 242.57 73.66 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
 		(pin "1"
 			(uuid "794767d3-3c02-4fd1-a561-87028d7b15d3")
 		)
@@ -14960,7 +15613,7 @@
 	)
 	(symbol
 		(lib_id "Device:R_US")
-		(at 26.67 140.97 90)
+		(at 27.94 134.62 90)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -14969,7 +15622,7 @@
 		(fields_autoplaced yes)
 		(uuid "6904eaf8-b0f1-4fde-b46a-a4fae9803e72")
 		(property "Reference" "R101"
-			(at 25.8353 139.319 0)
+			(at 27.1053 132.969 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14978,7 +15631,7 @@
 			)
 		)
 		(property "Value" "100k"
-			(at 28.3722 139.319 0)
+			(at 29.6422 132.969 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14987,7 +15640,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0603_1608Metric"
-			(at 26.924 139.954 90)
+			(at 28.194 133.604 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14996,51 +15649,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 26.67 140.97 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" ""
-			(at 26.67 140.97 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Digi-Key Part No." "311-100KHRCT-ND"
-			(at 26.67 140.97 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Link" "https://www.digikey.com/en/products/detail/yageo/RC0603FR-07100KL/726889"
-			(at 26.67 140.97 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer" "YAGEO"
-			(at 26.67 140.97 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer PN" "RC0603FR-07100KL"
-			(at 26.67 140.97 0)
+			(at 27.94 134.62 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -15049,7 +15658,43 @@
 			)
 		)
 		(property "Description" "RES 100K OHM 1% 1/10W 0603"
-			(at 26.67 140.97 0)
+			(at 27.94 134.62 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Digi-Key Part No." "311-100KHRCT-ND"
+			(at 27.94 134.62 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Link" "https://www.digikey.com/en/products/detail/yageo/RC0603FR-07100KL/726889"
+			(at 27.94 134.62 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "YAGEO"
+			(at 27.94 134.62 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer PN" "RC0603FR-07100KL"
+			(at 27.94 134.62 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -15117,12 +15762,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES SMD 49.9K OHM 1% 1/10W 0603"
 			(at 156.21 129.54 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-49.9KLDCT-ND"
@@ -15144,15 +15790,6 @@
 			)
 		)
 		(property "Manufacturer PN" "AC0603FR-0749K9L"
-			(at 156.21 129.54 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES SMD 49.9K OHM 1% 1/10W 0603"
 			(at 156.21 129.54 0)
 			(effects
 				(font
@@ -15550,12 +16187,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 10UF 16V X6S 0603"
 			(at 194.31 82.55 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "490-7198-1-ND"
@@ -15586,15 +16224,6 @@
 			)
 		)
 		(property "Manufacturer PN" "GRM188C81C106MA73D"
-			(at 194.31 82.55 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 10UF 16V X6S 0603"
 			(at 194.31 82.55 0)
 			(effects
 				(font
@@ -15685,7 +16314,7 @@
 	)
 	(symbol
 		(lib_id "Device:C_Small")
-		(at 21.59 130.81 0)
+		(at 21.59 82.55 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -15694,7 +16323,7 @@
 		(fields_autoplaced yes)
 		(uuid "790109b8-f3d9-45f6-a85c-f29d2ae3a721")
 		(property "Reference" "C101"
-			(at 23.9141 129.9816 0)
+			(at 23.9141 81.7216 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -15703,7 +16332,7 @@
 			)
 		)
 		(property "Value" "100pF"
-			(at 23.9141 132.5185 0)
+			(at 23.9141 84.2585 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -15712,7 +16341,7 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
-			(at 21.59 130.81 0)
+			(at 21.59 82.55 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -15721,51 +16350,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 21.59 130.81 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" ""
-			(at 21.59 130.81 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Digi-Key Part No." "311-1069-1-ND"
-			(at 21.59 130.81 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Link" "https://www.digikey.com/en/products/detail/yageo/CC0603JRNPO9BN101/302803"
-			(at 21.59 130.81 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer" "YAGEO"
-			(at 21.59 130.81 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer PN" "CC0603JRNPO9BN101"
-			(at 21.59 130.81 0)
+			(at 21.59 82.55 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -15774,7 +16359,43 @@
 			)
 		)
 		(property "Description" "CAP CER 100PF 50V C0G/NPO 0603"
-			(at 21.59 130.81 0)
+			(at 21.59 82.55 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Digi-Key Part No." "311-1069-1-ND"
+			(at 21.59 82.55 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Link" "https://www.digikey.com/en/products/detail/yageo/CC0603JRNPO9BN101/302803"
+			(at 21.59 82.55 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "YAGEO"
+			(at 21.59 82.55 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer PN" "CC0603JRNPO9BN101"
+			(at 21.59 82.55 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -15842,12 +16463,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 43K OHM 5% 1/10W 0603"
 			(at 270.51 106.68 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-43KGRCT-ND"
@@ -15878,15 +16500,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603JR-0743KL"
-			(at 270.51 106.68 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 43K OHM 5% 1/10W 0603"
 			(at 270.51 106.68 0)
 			(effects
 				(font
@@ -16088,12 +16701,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 224.79 85.09 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-10.0KHRCT-ND"
@@ -16124,15 +16738,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-0710KL"
-			(at 224.79 85.09 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 224.79 85.09 0)
 			(effects
 				(font
@@ -16294,7 +16899,7 @@
 	)
 	(symbol
 		(lib_id "Device:C_Small")
-		(at 90.17 102.87 270)
+		(at 92.71 102.87 270)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -16302,7 +16907,7 @@
 		(dnp no)
 		(uuid "820745a5-f77d-4917-954e-c71c2f02c075")
 		(property "Reference" "C104"
-			(at 90.17 100.33 90)
+			(at 92.71 100.33 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -16310,7 +16915,7 @@
 			)
 		)
 		(property "Value" "51pF"
-			(at 90.17 105.41 90)
+			(at 92.71 105.41 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -16318,7 +16923,7 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
-			(at 90.17 102.87 0)
+			(at 92.71 102.87 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -16327,51 +16932,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 90.17 102.87 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" ""
-			(at 90.17 102.87 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Digi-Key Part No." "1276-2310-1-ND"
-			(at 90.17 102.87 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Link" "https://www.digikey.com/short/1b7zj2f9"
-			(at 90.17 102.87 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 90.17 102.87 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer PN" "CL10C510JB8NNNC"
-			(at 90.17 102.87 0)
+			(at 92.71 102.87 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -16380,7 +16941,43 @@
 			)
 		)
 		(property "Description" "CAP CER 51PF 50V C0G/NP0 0603"
-			(at 90.17 102.87 0)
+			(at 92.71 102.87 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Digi-Key Part No." "1276-2310-1-ND"
+			(at 92.71 102.87 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Link" "https://www.digikey.com/short/1b7zj2f9"
+			(at 92.71 102.87 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 92.71 102.87 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer PN" "CL10C510JB8NNNC"
+			(at 92.71 102.87 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -16516,12 +17113,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0603 47NF 16V X7R 5%"
 			(at 236.22 72.39 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "399-C0603X473J4RECAUTO7411CT-ND"
@@ -16543,15 +17141,6 @@
 			)
 		)
 		(property "Manufacturer PN" "C0603X473J4RECAUTO7411"
-			(at 236.22 72.39 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0603 47NF 16V X7R 5%"
 			(at 236.22 72.39 0)
 			(effects
 				(font
@@ -16688,12 +17277,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CONN DIP HDR IDC 8POS VERT"
 			(at 68.58 92.71 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "609-3083-ND"
@@ -16715,15 +17305,6 @@
 			)
 		)
 		(property "Manufacturer PN" "69830-008LF"
-			(at 68.58 92.71 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CONN DIP HDR IDC 8POS VERT"
 			(at 68.58 92.71 0)
 			(effects
 				(font
@@ -16882,12 +17463,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 217.17 109.22 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -16918,15 +17500,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 217.17 109.22 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 217.17 109.22 0)
 			(effects
 				(font
@@ -16995,12 +17568,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 113.03 139.7 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-10.0KHRCT-ND"
@@ -17031,15 +17605,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-0710KL"
-			(at 113.03 139.7 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 113.03 139.7 0)
 			(effects
 				(font
@@ -17108,12 +17673,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CONN DIP HDR IDC 8POS VERT"
 			(at 44.45 92.71 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "609-3083-ND"
@@ -17135,15 +17701,6 @@
 			)
 		)
 		(property "Manufacturer PN" "69830-008LF"
-			(at 44.45 92.71 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CONN DIP HDR IDC 8POS VERT"
 			(at 44.45 92.71 0)
 			(effects
 				(font
@@ -17228,12 +17785,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 245.11 111.76 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -17264,15 +17822,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 245.11 111.76 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 245.11 111.76 0)
 			(effects
 				(font
@@ -17608,12 +18157,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 100 OHM 1% 1/10W 0603"
 			(at 273.05 154.94 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-100HRCT-ND"
@@ -17644,15 +18194,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-07100RL"
-			(at 273.05 154.94 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 100 OHM 1% 1/10W 0603"
 			(at 273.05 154.94 0)
 			(effects
 				(font
@@ -17790,12 +18331,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "IC SWITCH SPST-NOX1 3.2OHM 6TSOP"
 			(at 52.07 125.73 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "DG9422EDV-T1-GE3CT-ND"
@@ -17826,15 +18368,6 @@
 			)
 		)
 		(property "Manufacturer PN" "DG9422EDV-T1-GE3"
-			(at 52.07 125.73 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "IC SWITCH SPST-NOX1 3.2OHM 6TSOP"
 			(at 52.07 125.73 0)
 			(effects
 				(font
@@ -17914,12 +18447,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 10UF 16V X6S 0603"
 			(at 175.26 127 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "490-7198-1-ND"
@@ -17950,15 +18484,6 @@
 			)
 		)
 		(property "Manufacturer PN" "GRM188C81C106MA73D"
-			(at 175.26 127 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 10UF 16V X6S 0603"
 			(at 175.26 127 0)
 			(effects
 				(font
@@ -18028,12 +18553,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "FIXED IND 270NH 150MA 600MOHM SM"
 			(at 139.7 181.61 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "445-MLF1608DR27JT000CT-ND"
@@ -18072,15 +18598,6 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "FIXED IND 270NH 150MA 600MOHM SM"
-			(at 139.7 181.61 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
 		(pin "1"
 			(uuid "3ad3faf4-be00-4d18-81ad-cf64dd0410e0")
 		)
@@ -18098,15 +18615,15 @@
 	)
 	(symbol
 		(lib_id "Jumper:Jumper_2_Bridged_THT")
-		(at 39.37 102.87 90)
+		(at 35.56 102.87 90)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
 		(uuid "a02b79db-cd64-4fe6-a4ff-546efbbc5258")
-		(property "Reference" "JP103"
-			(at 40.64 105.41 90)
+		(property "Reference" "JP101"
+			(at 33.274 100.33 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -18115,7 +18632,7 @@
 			)
 		)
 		(property "Value" "Jumper_2_Bridged"
-			(at 37.5721 102.87 0)
+			(at 33.7621 102.87 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -18124,7 +18641,7 @@
 			)
 		)
 		(property "Footprint" "Jumper:Jumper_THT-1x02_Bridged_Circular"
-			(at 39.37 102.87 0)
+			(at 35.56 102.87 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -18133,7 +18650,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 39.37 102.87 0)
+			(at 35.56 102.87 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -18142,7 +18659,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 39.37 102.87 0)
+			(at 35.56 102.87 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -18150,7 +18667,7 @@
 			)
 		)
 		(property "Digi-Key Part No." "N/P"
-			(at 39.37 102.87 0)
+			(at 35.56 102.87 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -18167,7 +18684,7 @@
 		(instances
 			(project ""
 				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
-					(reference "JP103")
+					(reference "JP101")
 					(unit 1)
 				)
 			)
@@ -18219,12 +18736,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "IC SWITCH SPST-NOX1 3.2OHM 6TSOP"
 			(at 69.85 132.08 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "DG9422EDV-T1-GE3CT-ND"
@@ -18255,15 +18773,6 @@
 			)
 		)
 		(property "Manufacturer PN" "DG9422EDV-T1-GE3"
-			(at 69.85 132.08 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "IC SWITCH SPST-NOX1 3.2OHM 6TSOP"
 			(at 69.85 132.08 0)
 			(effects
 				(font
@@ -18344,12 +18853,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 137.16 146.05 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-10.0KHRCT-ND"
@@ -18380,15 +18890,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-0710KL"
-			(at 137.16 146.05 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 137.16 146.05 0)
 			(effects
 				(font
@@ -18525,12 +19026,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 251.46 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-10.0KHRCT-ND"
@@ -18561,15 +19063,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-0710KL"
-			(at 251.46 88.9 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 251.46 88.9 0)
 			(effects
 				(font
@@ -18638,12 +19131,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES SMD 49.9 OHM 1% 1/10W 0603"
 			(at 215.9 72.39 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "P49.9HCT-ND"
@@ -18665,15 +19159,6 @@
 			)
 		)
 		(property "Manufacturer PN" "ERJ-3EKF49R9V"
-			(at 215.9 72.39 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES SMD 49.9 OHM 1% 1/10W 0603"
 			(at 215.9 72.39 0)
 			(effects
 				(font
@@ -18834,85 +19319,8 @@
 		)
 	)
 	(symbol
-		(lib_id "Jumper:Jumper_2_Bridged_THT")
-		(at 77.47 102.87 90)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "a7598143-c189-4cf9-919e-4196ff6b9ca2")
-		(property "Reference" "JP107"
-			(at 69.85 101.6 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Value" "Jumper_2_Bridged"
-			(at 75.6721 102.87 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Footprint" "Jumper:Jumper_THT-1x02_Bridged_Circular"
-			(at 77.47 102.87 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 77.47 102.87 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" ""
-			(at 77.47 102.87 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Digi-Key Part No." "N/P"
-			(at 77.47 102.87 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "dc0ac108-c78a-4655-ad65-fbf1bb55e6a7")
-		)
-		(pin "2"
-			(uuid "cb719546-a26d-4803-ad50-6153ff54a1b1")
-		)
-		(instances
-			(project ""
-				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
-					(reference "JP107")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:R_US")
-		(at 43.18 138.43 0)
+		(at 43.18 135.89 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -18920,7 +19328,7 @@
 		(dnp no)
 		(uuid "aa333ba5-414e-42c1-9845-b061b0bb2a76")
 		(property "Reference" "R102"
-			(at 44.45 135.89 0)
+			(at 44.45 133.35 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -18929,7 +19337,7 @@
 			)
 		)
 		(property "Value" "1k"
-			(at 44.45 138.43 0)
+			(at 44.45 135.89 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -18938,7 +19346,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0603_1608Metric"
-			(at 44.196 138.684 90)
+			(at 44.196 136.144 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -18947,51 +19355,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 43.18 138.43 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" ""
-			(at 43.18 138.43 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Digi-Key Part No." "311-1.00KHRCT-ND"
-			(at 43.18 138.43 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Link" "https://www.digikey.com/en/products/detail/yageo/RC0603FR-071KL/726843"
-			(at 43.18 138.43 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer" "YAGEO"
-			(at 43.18 138.43 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer PN" "RC0603FR-071KL"
-			(at 43.18 138.43 0)
+			(at 43.18 135.89 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19000,7 +19364,43 @@
 			)
 		)
 		(property "Description" "RES 1K OHM 1% 1/10W 0603"
-			(at 43.18 138.43 0)
+			(at 43.18 135.89 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Digi-Key Part No." "311-1.00KHRCT-ND"
+			(at 43.18 135.89 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Link" "https://www.digikey.com/en/products/detail/yageo/RC0603FR-071KL/726843"
+			(at 43.18 135.89 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "YAGEO"
+			(at 43.18 135.89 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer PN" "RC0603FR-071KL"
+			(at 43.18 135.89 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19134,12 +19534,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 62K OHM 1% 1/10W 0603"
 			(at 243.84 134.62 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-62.0KHRCT-ND"
@@ -19169,15 +19570,6 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "RES 62K OHM 1% 1/10W 0603"
-			(at 243.84 134.62 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
 		(pin "1"
 			(uuid "f8100683-bfd6-4d61-869e-0dd3496852d2")
 		)
@@ -19195,7 +19587,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 77.47 107.95 0)
+		(at 76.2 107.95 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -19204,7 +19596,7 @@
 		(fields_autoplaced yes)
 		(uuid "ad464985-e3aa-4feb-9f4a-cedf9936497a")
 		(property "Reference" "#PWR0105"
-			(at 77.47 114.3 0)
+			(at 76.2 114.3 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19213,7 +19605,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 77.47 112.3934 0)
+			(at 76.2 112.3934 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19222,7 +19614,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 77.47 107.95 0)
+			(at 76.2 107.95 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19231,7 +19623,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 77.47 107.95 0)
+			(at 76.2 107.95 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19240,7 +19632,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 77.47 107.95 0)
+			(at 76.2 107.95 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19373,12 +19765,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "TRANS NPN 40V 0.6A SOT23-3"
 			(at 137.16 158.75 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "SMMBT2222ALT1GOSCT-ND"
@@ -19409,15 +19802,6 @@
 			)
 		)
 		(property "Manufacturer PN" "SMMBT2222ALT1G"
-			(at 137.16 158.75 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "TRANS NPN 40V 0.6A SOT23-3"
 			(at 137.16 158.75 0)
 			(effects
 				(font
@@ -19660,12 +20044,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 43K OHM 5% 1/10W 0603"
 			(at 243.84 143.51 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-43KGRCT-ND"
@@ -19696,15 +20081,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603JR-0743KL"
-			(at 243.84 143.51 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 43K OHM 5% 1/10W 0603"
 			(at 243.84 143.51 0)
 			(effects
 				(font
@@ -19773,12 +20149,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 10 OHM 1% 1/10W 0603"
 			(at 179.07 76.2 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-10.0HRCT-ND"
@@ -19809,15 +20186,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-0710RL"
-			(at 179.07 76.2 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 10 OHM 1% 1/10W 0603"
 			(at 179.07 76.2 0)
 			(effects
 				(font
@@ -19956,12 +20324,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
-			(at 226.06 101.6 0)
+		(property "Description" "IC CMOS 2 CIRCUIT 8SOIC"
+			(at 60.96 54.61 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "497-6618-1-ND"
@@ -19992,15 +20361,6 @@
 			)
 		)
 		(property "Manufacturer PN" "TS912IDT"
-			(at 60.96 54.61 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "IC CMOS 2 CIRCUIT 8SOIC"
 			(at 60.96 54.61 0)
 			(effects
 				(font
@@ -20044,7 +20404,7 @@
 	)
 	(symbol
 		(lib_id "Device:R_Potentiometer_US")
-		(at 34.29 140.97 180)
+		(at 34.29 134.62 180)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -20052,7 +20412,7 @@
 		(dnp no)
 		(uuid "c0687338-f6ed-4456-aad9-d29c3bd35909")
 		(property "Reference" "RV101"
-			(at 33.02 133.35 90)
+			(at 38.862 134.62 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -20060,7 +20420,7 @@
 			)
 		)
 		(property "Value" "10k 10T"
-			(at 36.83 140.97 90)
+			(at 36.83 134.62 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -20068,7 +20428,7 @@
 			)
 		)
 		(property "Footprint" "Potentiometer_THT:Potentiometer_Bourns_3362P_Vertical"
-			(at 34.29 140.97 0)
+			(at 34.29 134.62 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -20077,51 +20437,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 34.29 140.97 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" ""
-			(at 34.29 140.97 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Digi-Key Part No." "3362P-103LF-ND"
-			(at 34.29 140.97 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Link" "https://www.digikey.com/en/products/detail/bourns-inc/3362P-1-103LF/1088412?s=N4IgTCBcDaIMxwGxgAoFoCMAGOAZAYmgHIAiIAugL5A"
-			(at 34.29 140.97 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer" "Bourns Inc."
-			(at 34.29 140.97 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer PN" "3362P-1-103LF"
-			(at 34.29 140.97 0)
+			(at 34.29 134.62 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -20130,7 +20446,43 @@
 			)
 		)
 		(property "Description" "TRIMMER 10K OHM 0.5W PC PIN TOP"
-			(at 34.29 140.97 0)
+			(at 34.29 134.62 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Digi-Key Part No." "3362P-103LF-ND"
+			(at 34.29 134.62 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Link" "https://www.digikey.com/en/products/detail/bourns-inc/3362P-1-103LF/1088412?s=N4IgTCBcDaIMxwGxgAoFoCMAGOAZAYmgHIAiIAugL5A"
+			(at 34.29 134.62 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "Bourns Inc."
+			(at 34.29 134.62 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer PN" "3362P-1-103LF"
+			(at 34.29 134.62 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -20151,6 +20503,82 @@
 			(project ""
 				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
 					(reference "RV101")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Transistor_FET:BF545B")
+		(at 72.39 151.13 0)
+		(mirror x)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "c6ba3bdc-cbd5-49cf-a4e9-a221e5a263fa")
+		(property "Reference" "Q104"
+			(at 77.47 152.4001 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MBFJ310"
+			(at 75.692 147.828 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
+			(at 77.47 149.225 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+					(italic yes)
+				)
+				(justify left)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "https://www.nxp.com/docs/en/data-sheet/BF545A_BF545B_BF545C.pdf"
+			(at 77.47 147.32 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+				(hide yes)
+			)
+		)
+		(property "Description" "15mA Idss, 30V Vgs, N-Channel JFET, SOT-23"
+			(at 72.39 151.13 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "2a207ddf-1ac7-4ff5-baad-5f6c464485f4")
+		)
+		(pin "2"
+			(uuid "652f1280-7b9c-44c8-b7c3-5c3f68371408")
+		)
+		(pin "3"
+			(uuid "1c51ceb5-d094-4076-8e73-439017ef5777")
+		)
+		(instances
+			(project ""
+				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
+					(reference "Q104")
 					(unit 1)
 				)
 			)
@@ -20265,12 +20693,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 266.7 154.94 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -20309,15 +20738,6 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
-			(at 266.7 154.94 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
 		(pin "1"
 			(uuid "383689d6-4147-4d41-acc8-30810dd98d3c")
 		)
@@ -20334,8 +20754,114 @@
 		)
 	)
 	(symbol
+		(lib_id "Device:C_Small")
+		(at 81.28 163.83 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "c8e5bf6d-add1-4ddb-bb55-44fc6b18a4d1")
+		(property "Reference" "C109"
+			(at 83.82 162.5662 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "1nF"
+			(at 83.82 165.1062 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
+			(at 81.28 163.83 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 81.28 163.83 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "CAP CER 100PF 50V C0G/NPO 0603"
+			(at 81.28 163.83 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Digi-Key Part No." "311-1069-1-ND"
+			(at 81.28 163.83 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Link" "https://www.digikey.com/en/products/detail/yageo/CC0603JRNPO9BN101/302803"
+			(at 81.28 163.83 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "YAGEO"
+			(at 81.28 163.83 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer PN" "CC0603JRNPO9BN101"
+			(at 81.28 163.83 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "68b7513a-6d58-4e26-86c0-963c21d8c711")
+		)
+		(pin "2"
+			(uuid "8b62efb8-b12d-41e1-8b3e-bf67deefee9b")
+		)
+		(instances
+			(project "SignalSnagger"
+				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
+					(reference "C109")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:+VSW")
-		(at 43.18 132.08 0)
+		(at 34.29 124.46 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -20343,7 +20869,7 @@
 		(dnp no)
 		(uuid "cd0f4a3b-6e4b-41cb-b87a-48a48452dfd6")
 		(property "Reference" "#PWR0103"
-			(at 43.18 135.89 0)
+			(at 34.29 128.27 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -20352,7 +20878,7 @@
 			)
 		)
 		(property "Value" "+VSW"
-			(at 40.64 128.27 0)
+			(at 31.75 120.65 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -20360,7 +20886,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 43.18 132.08 0)
+			(at 34.29 124.46 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -20369,7 +20895,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 43.18 132.08 0)
+			(at 34.29 124.46 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -20378,7 +20904,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 43.18 132.08 0)
+			(at 34.29 124.46 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -20785,7 +21311,7 @@
 	)
 	(symbol
 		(lib_id "Connector_Generic:Conn_01x01")
-		(at 26.67 121.92 0)
+		(at 26.67 73.66 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -20793,7 +21319,7 @@
 		(dnp no)
 		(uuid "d7d31544-a2bf-4ba0-8307-8924e326bbdf")
 		(property "Reference" "J108"
-			(at 24.13 119.38 0)
+			(at 24.13 71.12 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -20802,7 +21328,7 @@
 			)
 		)
 		(property "Value" "36-5005-ND"
-			(at 19.05 125.73 0)
+			(at 19.05 77.47 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -20811,7 +21337,7 @@
 			)
 		)
 		(property "Footprint" "Connector_Pin:Pin_D1.6mm_L8.5mm_W2.8mm_FlatFork"
-			(at 26.67 121.92 0)
+			(at 26.67 73.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -20820,7 +21346,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 26.67 121.92 0)
+			(at 26.67 73.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -20829,7 +21355,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 26.67 121.92 0)
+			(at 26.67 73.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -20837,7 +21363,7 @@
 			)
 		)
 		(property "Digi-Key Part No." "N/P"
-			(at 26.67 121.92 0)
+			(at 26.67 73.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -20902,12 +21428,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 1M OHM 1% 1/10W 0603"
 			(at 147.32 123.19 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-1.00MHRCT-ND"
@@ -20937,15 +21464,6 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "RES 1M OHM 1% 1/10W 0603"
-			(at 147.32 123.19 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
 		(pin "1"
 			(uuid "e2333eae-9ff9-4561-a932-8d9fef0404f9")
 		)
@@ -20956,6 +21474,84 @@
 			(project ""
 				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
 					(reference "R120")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Jumper:Jumper_2_Bridged_THT")
+		(at 80.01 102.87 270)
+		(mirror x)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "d8f57bf1-b28c-4ee5-b8b0-ed037635f906")
+		(property "Reference" "JP102"
+			(at 82.296 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "Jumper_2_Bridged"
+			(at 81.8079 102.87 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Footprint" "Jumper:Jumper_THT-1x02_Bridged_Circular"
+			(at 80.01 102.87 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 80.01 102.87 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 80.01 102.87 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Digi-Key Part No." "N/P"
+			(at 80.01 102.87 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "1b650fa0-4ccd-48bb-93ea-5d36c81af640")
+		)
+		(pin "2"
+			(uuid "0fb7c191-a016-417f-a6a3-b9b31dd01ad9")
+		)
+		(instances
+			(project "SignalSnagger"
+				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
+					(reference "JP102")
 					(unit 1)
 				)
 			)
@@ -21141,12 +21737,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 100 OHM 1% 1/10W 0603"
 			(at 273.05 128.27 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-100HRCT-ND"
@@ -21185,15 +21782,6 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "RES 100 OHM 1% 1/10W 0603"
-			(at 273.05 128.27 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
 		(pin "1"
 			(uuid "1f1578b0-8a8c-42fe-a88e-c823256ede79")
 		)
@@ -21219,7 +21807,7 @@
 		(dnp no)
 		(uuid "ddb06994-986b-4c62-b6b5-f2ee0d80bb9e")
 		(property "Reference" "JP104"
-			(at 44.45 101.6 90)
+			(at 45.72 108.204 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -21331,12 +21919,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 200PF 50V C0G/NP0 0603"
 			(at 100.33 181.61 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "399-C0603X103J4HACAUTOCT-ND"
@@ -21367,15 +21956,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10C201JB8NNNC"
-			(at 100.33 181.61 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 200PF 50V C0G/NP0 0603"
 			(at 100.33 181.61 0)
 			(effects
 				(font
@@ -21745,6 +22325,111 @@
 	)
 	(symbol
 		(lib_id "Device:R_US")
+		(at 74.93 162.56 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "e23272cc-3b89-4623-bbb9-05d7a87b77fb")
+		(property "Reference" "R114"
+			(at 76.2 160.02 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "1k"
+			(at 76.2 162.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0603_1608Metric"
+			(at 75.946 162.814 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 74.93 162.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "RES 1K OHM 1% 1/10W 0603"
+			(at 74.93 162.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Digi-Key Part No." "311-1.00KHRCT-ND"
+			(at 74.93 162.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Link" "https://www.digikey.com/en/products/detail/yageo/RC0603FR-071KL/726843"
+			(at 74.93 162.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "YAGEO"
+			(at 74.93 162.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer PN" "RC0603FR-071KL"
+			(at 74.93 162.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "15094295-d896-43d2-9ce0-b1bdacfada1c")
+		)
+		(pin "2"
+			(uuid "9f7c9c35-3043-4d09-a522-1d1fe195fb9f")
+		)
+		(instances
+			(project "SignalSnagger"
+				(path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
+					(reference "R114")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R_US")
 		(at 120.65 166.37 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -21788,12 +22473,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 120.65 166.37 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-10.0KHRCT-ND"
@@ -21824,15 +22510,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-0710KL"
-			(at 120.65 166.37 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 10K OHM 1% 1/10W 0603"
 			(at 120.65 166.37 0)
 			(effects
 				(font
@@ -22237,12 +22914,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 129.54 162.56 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "490-9666-1-ND"
@@ -22264,15 +22942,6 @@
 			)
 		)
 		(property "Manufacturer PN" "GRM1885C1H103JA01D"
-			(at 129.54 162.56 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 10000PF 50V C0G/NP0 0603"
 			(at 129.54 162.56 0)
 			(effects
 				(font
@@ -22342,12 +23011,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "FIXED IND 10UH 80MA 360 MOHM SMD"
 			(at 104.14 181.61 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "587-1714-1-ND"
@@ -22378,15 +23048,6 @@
 			)
 		)
 		(property "Manufacturer PN" "LBMF1608T100K"
-			(at 104.14 181.61 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "FIXED IND 10UH 80MA 360 MOHM SMD"
 			(at 104.14 181.61 0)
 			(effects
 				(font
@@ -22455,12 +23116,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 200 OHM 1% 1/10W 0603"
 			(at 139.7 190.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "13-RC0603FR-13200RLCT-ND"
@@ -22491,15 +23153,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-13200RL"
-			(at 139.7 190.5 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 200 OHM 1% 1/10W 0603"
 			(at 139.7 190.5 0)
 			(effects
 				(font
@@ -22566,12 +23219,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 186.69 99.06 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1006-1-ND"
@@ -22602,15 +23256,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10B104KA8NNNC"
-			(at 186.69 99.06 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 0.1UF 25V X7R 0603"
 			(at 186.69 99.06 0)
 			(effects
 				(font
@@ -22681,12 +23326,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "IC DAC 12BIT V-OUT SOT23-6"
 			(at 180.34 139.7 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "MCP4726A2T-E/CHCT-ND"
@@ -22708,15 +23354,6 @@
 			)
 		)
 		(property "Manufacturer PN" "MCP4726A2T-E/CH"
-			(at 180.34 139.7 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "IC DAC 12BIT V-OUT SOT23-6"
 			(at 180.34 139.7 0)
 			(effects
 				(font
@@ -22796,12 +23433,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 1000PF 50V C0G/NP0 0603"
 			(at 251.46 82.55 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1091-1-ND"
@@ -22823,15 +23461,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10C102JB8NNNC"
-			(at 251.46 82.55 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 1000PF 50V C0G/NP0 0603"
 			(at 251.46 82.55 0)
 			(effects
 				(font
@@ -22898,12 +23527,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "RES 62K OHM 1% 1/10W 0603"
 			(at 270.51 97.79 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "311-62.0KHRCT-ND"
@@ -22925,15 +23555,6 @@
 			)
 		)
 		(property "Manufacturer PN" "RC0603FR-0762KL"
-			(at 270.51 97.79 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "RES 62K OHM 1% 1/10W 0603"
 			(at 270.51 97.79 0)
 			(effects
 				(font
@@ -23006,12 +23627,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "TRANS NPN 40V 0.6A SOT23-3"
 			(at 137.16 173.99 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "SMMBT2222ALT1GOSCT-ND"
@@ -23042,15 +23664,6 @@
 			)
 		)
 		(property "Manufacturer PN" "SMMBT2222ALT1G"
-			(at 137.16 173.99 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "TRANS NPN 40V 0.6A SOT23-3"
 			(at 137.16 173.99 0)
 			(effects
 				(font
@@ -23121,12 +23734,13 @@
 				(hide yes)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "CAP CER 1000PF 50V C0G/NP0 0603"
 			(at 224.79 78.74 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
 			)
 		)
 		(property "Digi-Key Part No." "1276-1091-1-ND"
@@ -23148,15 +23762,6 @@
 			)
 		)
 		(property "Manufacturer PN" "CL10C102JB8NNNC"
-			(at 224.79 78.74 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "CAP CER 1000PF 50V C0G/NP0 0603"
 			(at 224.79 78.74 0)
 			(effects
 				(font
