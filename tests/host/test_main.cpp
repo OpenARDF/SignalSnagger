@@ -1,9 +1,15 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <type_traits>
 
 #include "CircularStringBuff.h"
 #include "receiver_frequency.h"
+
+static_assert(!std::is_copy_constructible<CircularStringBuff>::value,
+              "CircularStringBuff must not copy its owning buffer pointer");
+static_assert(!std::is_copy_assignable<CircularStringBuff>::value,
+              "CircularStringBuff must not copy its owning buffer pointer");
 
 namespace {
 

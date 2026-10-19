@@ -25,9 +25,12 @@ class CircularStringBuff {
   public:
     ~CircularStringBuff();
     CircularStringBuff(size_t);
+    /* This class owns a malloc-backed buffer; copying would double-free it. */
+    CircularStringBuff(const CircularStringBuff&) = delete;
+    CircularStringBuff& operator=(const CircularStringBuff&) = delete;
 
     void put(char item);
-    /** Queue a null-terminated string atomically. Returns true on failure. */
+    /** Queue a complete null-terminated string without a partial write. Returns true on failure. */
     bool putString(const char* string);
     char get(void);
     /** Copy one framed string. Returns true on failure and does not consume it. */

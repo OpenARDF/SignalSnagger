@@ -108,6 +108,7 @@ extern uint16_t g_clock_calibration;
 
 static volatile bool g_go_to_sleep_now = false;
 static volatile bool g_sleeping = false;
+static volatile bool g_led_reinit_requested = false;
 static volatile time_t g_time_to_wake_up = 0;
 static volatile Awakened_t g_awakenedBy = POWER_UP_START;
 static volatile SleepType g_sleepType = SLEEP_FOREVER;
@@ -147,7 +148,7 @@ Enunciation_t g_enunciator = LED_ONLY;
 
 Display display = Display();
 leds LEDS = leds();
-CircularStringBuff g_text_buff = CircularStringBuff(TEXT_BUFF_SIZE);
+CircularStringBuff g_text_buff(TEXT_BUFF_SIZE);
 
 EepromManager g_ee_mgr;
 
@@ -274,7 +275,8 @@ ISR(TCB0_INT_vect)
 					{
 						if(!LEDS.active())
 						{
-							LEDS.init();
+							/* Defer buffer reset and LED reconfiguration to foreground code. */
+							g_led_reinit_requested = true;
 						}
 						else
 						{
@@ -304,7 +306,7 @@ ISR(TCB0_INT_vect)
 					{
 						if(!LEDS.active())
 						{
-							LEDS.init();
+							g_led_reinit_requested = true;
 						}
 						else
 						{
@@ -334,7 +336,7 @@ ISR(TCB0_INT_vect)
 					{
 						if(!LEDS.active())
 						{
-							LEDS.init();
+							g_led_reinit_requested = true;
 						}
 						else
 						{
@@ -719,6 +721,11 @@ int main(void)
 	g_text_buff.putString((char*)g_tempStr);
 
 	while (1) {
+		if(atomicExchangeBool(&g_led_reinit_requested, false))
+		{
+			LEDS.init();
+		}
+
 		if(g_display_active)
 		{
 			if(splash_displayed)
