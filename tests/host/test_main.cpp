@@ -9,8 +9,11 @@
 #include "datetime_utils.h"
 #include "memory_channels.h"
 #include "periodic_countdown.h"
+#include "receiver.h"
 #include "receiver_frequency.h"
+#include "receiver_test_stubs.h"
 #include "signal_score.h"
+#include "status_wait.h"
 #include "text_utils.h"
 
 static_assert(!std::is_copy_constructible<Goertzel>::value,
@@ -35,6 +38,26 @@ static_assert(SATURATION == (9 * ADCCENTER / 5), "preserve released clipping thr
 namespace {
 
 int failures = 0;
+
+uint8_t statusReadsRemaining = 0;
+bool timeoutPending = true;
+
+uint8_t readTestStatus()
+{
+	if (statusReadsRemaining == 0) {
+		return 0;
+	}
+	--statusReadsRemaining;
+	return 1;
+}
+
+bool pollTestTimeout(uint32_t timeoutMs)
+{
+	if (timeoutMs == 0) {
+		return false;
+	}
+	return timeoutPending;
+}
 
 #define CHECK(condition) check((condition), #condition, __FILE__, __LINE__)
 
@@ -219,6 +242,101 @@ void testReceiverFrequencyStepProducesValidatedResult()
 	CHECK(!receiverFrequencyStep(result, 1, 0, &result));
 	CHECK(!receiverFrequencyStep(result, 2, 100, &result));
 	CHECK(!receiverFrequencyStep(result, 1, 100, 0));
+}
+
+void testReceiverAppliesInclusiveBandEdges()
+{
+	resetReceiverHardwareStubs();
+	Frequency_Hz frequency = RECEIVER_FREQUENCY_MIN_HZ;
+	CHECK(!rxSetFrequency(&frequency, false));
+	CHECK(receiverSetFrequencyCalls() == 1);
+	CHECK(receiverLastFrequency() == RECEIVER_FREQUENCY_MIN_HZ);
+
+	frequency = RECEIVER_FREQUENCY_MAX_HZ;
+	CHECK(!rxSetFrequency(&frequency, false));
+	CHECK(receiverSetFrequencyCalls() == 2);
+	CHECK(receiverLastFrequency() == RECEIVER_FREQUENCY_MAX_HZ);
+}
+
+void testReceiverRejectsInvalidFrequencyAndPropagatesHardwareFailure()
+{
+	resetReceiverHardwareStubs();
+	Frequency_Hz frequency = RECEIVER_FREQUENCY_MIN_HZ - 1;
+	CHECK(rxSetFrequency(&frequency, false));
+	CHECK(receiverSetFrequencyCalls() == 0);
+	CHECK(rxSetFrequency(0, false));
+
+	frequency = UINT32_C(3570500);
+	setReceiverFrequencyResult(ERROR_CODE_CLKGEN_NONRESPONSIVE);
+	CHECK(rxSetFrequency(&frequency, false));
+	CHECK(receiverSetFrequencyCalls() == 1);
+}
+
+void testReceiverInitializationRejectsInvalidFrequency()
+{
+	resetReceiverHardwareStubs();
+	CHECK(init_receiver(RECEIVER_FREQUENCY_MIN_HZ) == ERROR_CODE_NO_ERROR);
+	CHECK(receiverInitializeQuadratureCalls() == 1);
+	CHECK(receiverLastFrequency() == RECEIVER_FREQUENCY_MIN_HZ);
+	CHECK(rxIsInitialized());
+	shutdown_receiver();
+	CHECK(!rxIsInitialized());
+
+	resetReceiverHardwareStubs();
+	CHECK(init_receiver(RECEIVER_FREQUENCY_MAX_HZ + 1) == ERROR_CODE_SW_LOGIC_ERROR);
+	CHECK(receiverInitializeQuadratureCalls() == 0);
+	CHECK(!rxIsInitialized());
+}
+
+void testMemoryFrequencyStepTunesReceiverBeforeCommittingValues()
+{
+	resetReceiverHardwareStubs();
+	Frequency_Hz receiverFrequency = UINT32_C(3550000);
+	Frequency_Hz memoryFrequency = UINT32_C(3570500);
+
+	CHECK(rxTuneMemoryStep(&receiverFrequency, &memoryFrequency, 1, 100));
+	CHECK(receiverSetFrequencyCalls() == 1);
+	CHECK(receiverLastFrequency() == UINT32_C(3570600));
+	CHECK(receiverFrequency == UINT32_C(3570600));
+	CHECK(memoryFrequency == UINT32_C(3570600));
+
+	setReceiverFrequencyResult(ERROR_CODE_CLKGEN_NONRESPONSIVE);
+	CHECK(!rxTuneMemoryStep(&receiverFrequency, &memoryFrequency, -1, 100));
+	CHECK(receiverSetFrequencyCalls() == 2);
+	CHECK(receiverFrequency == UINT32_C(3570600));
+	CHECK(memoryFrequency == UINT32_C(3570600));
+}
+
+void testMemoryFrequencyStepRejectsInvalidInputWithoutRetuning()
+{
+	resetReceiverHardwareStubs();
+	Frequency_Hz receiverFrequency = RECEIVER_FREQUENCY_MAX_HZ;
+	Frequency_Hz memoryFrequency = receiverFrequency;
+
+	CHECK(!rxTuneMemoryStep(&receiverFrequency, &memoryFrequency, 1, 100));
+	CHECK(!rxTuneMemoryStep(0, &memoryFrequency, -1, 100));
+	CHECK(!rxTuneMemoryStep(&receiverFrequency, 0, -1, 100));
+	CHECK(receiverSetFrequencyCalls() == 0);
+	CHECK(receiverFrequency == RECEIVER_FREQUENCY_MAX_HZ);
+	CHECK(memoryFrequency == RECEIVER_FREQUENCY_MAX_HZ);
+}
+
+void testStatusWaitCompletesOrTimesOut()
+{
+	statusReadsRemaining = 0;
+	timeoutPending = true;
+	CHECK(waitForStatusClear(readTestStatus, pollTestTimeout, 500));
+
+	statusReadsRemaining = 3;
+	timeoutPending = true;
+	CHECK(waitForStatusClear(readTestStatus, pollTestTimeout, 500));
+
+	statusReadsRemaining = 3;
+	timeoutPending = false;
+	CHECK(!waitForStatusClear(readTestStatus, pollTestTimeout, 500));
+	CHECK(!waitForStatusClear(0, pollTestTimeout, 500));
+	CHECK(!waitForStatusClear(readTestStatus, 0, 500));
+	CHECK(!waitForStatusClear(readTestStatus, pollTestTimeout, 0));
 }
 
 void testMemoryChannelSelectionWrapsAndSkipsEmptyChannels()
@@ -409,6 +527,12 @@ int main()
 	testReceiverFrequencyBoundsAreInclusive();
 	testReceiverFrequencyStepRejectsOutOfBandResult();
 	testReceiverFrequencyStepProducesValidatedResult();
+	testReceiverAppliesInclusiveBandEdges();
+	testReceiverRejectsInvalidFrequencyAndPropagatesHardwareFailure();
+	testReceiverInitializationRejectsInvalidFrequency();
+	testMemoryFrequencyStepTunesReceiverBeforeCommittingValues();
+	testMemoryFrequencyStepRejectsInvalidInputWithoutRetuning();
+	testStatusWaitCompletesOrTimesOut();
 	testMemoryChannelSelectionWrapsAndSkipsEmptyChannels();
 	testMemoryChannelSelectionRejectsInvalidOrEmptyInputs();
 	testSignalScoreRejectsInvalidLogarithmInputs();

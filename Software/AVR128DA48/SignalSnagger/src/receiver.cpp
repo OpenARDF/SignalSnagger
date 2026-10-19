@@ -31,15 +31,15 @@
 #include "dac0.h"
 #include "binio.h"
 #include "port.h"
+#include "receiver_frequency.h"
 
-extern volatile AntConnType g_antenna_connect_state;
-
-static volatile bool g_rx_initialized = false;
-volatile Frequency_Hz g_rx_frequency = EEPROM_TX_80M_FREQUENCY_DEFAULT;
-volatile Frequency_Hz g_frequency_low = EEPROM_TX_80M_FREQUENCY_DEFAULT;
-volatile Frequency_Hz g_frequency_med = EEPROM_TX_80M_FREQUENCY_DEFAULT;
-volatile Frequency_Hz g_frequency_hi = EEPROM_TX_80M_FREQUENCY_DEFAULT;
-volatile Frequency_Hz g_frequency_beacon = EEPROM_TX_80M_FREQUENCY_DEFAULT;
+/* Receiver configuration is owned by foreground code, not an ISR. */
+static bool g_rx_initialized = false;
+Frequency_Hz g_rx_frequency = EEPROM_TX_80M_FREQUENCY_DEFAULT;
+Frequency_Hz g_frequency_low = EEPROM_TX_80M_FREQUENCY_DEFAULT;
+Frequency_Hz g_frequency_med = EEPROM_TX_80M_FREQUENCY_DEFAULT;
+Frequency_Hz g_frequency_hi = EEPROM_TX_80M_FREQUENCY_DEFAULT;
+Frequency_Hz g_frequency_beacon = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 
 Frequency_Hz g_channel_frequency[NUMBER_OF_FREQUENCY_CHANNELS];
 
@@ -48,100 +48,114 @@ Frequency_Hz g_channel_frequency[NUMBER_OF_FREQUENCY_CHANNELS];
  *       and the VFO configuration in effect. The VFO  frequency might be above or below the intended  frequency, depending on the VFO
  *       configuration setting in effect for the radio band of the frequency.
  */
-	bool rxSetFrequency(Frequency_Hz *freq, bool leaveClockOff)
+bool rxSetFrequency(Frequency_Hz *freq, bool leaveClockOff)
+{
+	/* The released implementation does not yet support leaving clocks off. */
+	(void)leaveClockOff;
+
+	if(!freq || !receiverFrequencyIsSupported(*freq)) return(true);
+
+	return(si5351_set_quad_frequency(*freq) != ERROR_CODE_NO_ERROR);
+}
+
+bool rxTuneMemoryStep(Frequency_Hz *receiverFrequency,
+	Frequency_Hz *memoryFrequency,
+	int8_t direction,
+	uint32_t stepHz)
+{
+	if(!receiverFrequency || !memoryFrequency) return false;
+
+	/* The displayed memory is authoritative when entering from VFO mode. */
+	Frequency_Hz requestedFrequency = *memoryFrequency;
+	if(!receiverFrequencyStep(*memoryFrequency, direction, stepHz, &requestedFrequency)) return false;
+
+	/* Do not save or display a frequency that the clock generator rejected. */
+	if(rxSetFrequency(&requestedFrequency, false)) return false;
+
+	*receiverFrequency = requestedFrequency;
+	*memoryFrequency = requestedFrequency;
+	return true;
+}
+
+Frequency_Hz rxGetFrequencty(void)
+{
+	return(g_rx_frequency);
+}
+
+bool rxIsInitialized(void)
+{
+	return g_rx_initialized;
+}
+
+EC rxSetParameters(void)
+{
+	return(ERROR_CODE_NO_ERROR);
+}
+
+void shutdown_receiver(void)
+{
+	si5351_shutdown();
+	si5351_shutdown_comms();
+	g_rx_initialized = false;
+}
+
+void restart_receiver(void)
+{
+	si5351_start_comms();
+}
+
+EC init_receiver(Frequency_Hz freq)
+{
+	g_rx_initialized = false;
+	if(!receiverFrequencyIsSupported(freq)) return(ERROR_CODE_SW_LOGIC_ERROR);
+
+	g_rx_frequency = freq;
+	return init_receiver();
+}
+
+EC init_receiver(void)
+{
+	EC code = ERROR_CODE_NO_ERROR;
+	g_rx_initialized = false;
+
+	/* Validate before touching the experimentally established clock setup. */
+	if(!receiverFrequencyIsSupported(g_rx_frequency))
 	{
-		bool err = true;
-		/* The released implementation does not yet support leaving clocks off. */
-		(void)leaveClockOff;
-
-		if(!freq) return(err);
-		
-		if((*freq < RX_MAXIMUM_80M_FREQUENCY) && (*freq > RX_MINIMUM_80M_FREQUENCY))    /* 80m */
-		{
-			si5351_set_quad_frequency(*freq);
-		}
-
-		return(err);
+		return(ERROR_CODE_SW_LOGIC_ERROR);
 	}
 
-	Frequency_Hz rxGetFrequencty(void)
+	DAC0_init();
+
+	if(si5351_init(SI5351_CRYSTAL_LOAD_6PF, 0))
 	{
-		return(g_rx_frequency);
-	}
-		
-	bool rxIsInitialized(void)
-	{
-		return g_rx_initialized;
+		return(ERROR_CODE_RF_OSCILLATOR_ERROR);
 	}
 
-	EC __attribute__((optimize("O0"))) rxSetParameters(void)
-/*	EC rxSetParameters(void) */
+	if((code = si5351_drive_strength(SI5351_CLK0, SI5351_DRIVE_8MA)))
 	{
-		EC code = ERROR_CODE_NO_ERROR;
 		return(code);
 	}
 
-	void shutdown_receiver(void)
+	if((code = si5351_clock_enable(SI5351_CLK0, SI5351_CLK_DISABLED)))
 	{
-		si5351_shutdown();
-		si5351_shutdown_comms();	
-	}
-	
-	void restart_receiver(void)
-	{
-		si5351_start_comms();
+		return(code);
 	}
 
-	EC init_receiver(Frequency_Hz freq)
+	if((code = si5351_drive_strength(SI5351_CLK1, SI5351_DRIVE_8MA)))
 	{
-		g_rx_frequency = freq;
-		return init_receiver();
+		return(code);
 	}
-	
-	EC init_receiver(void)
+
+	if((code = si5351_clock_enable(SI5351_CLK1, SI5351_CLK_DISABLED)))
 	{
-		EC code = ERROR_CODE_NO_ERROR;
-		bool err;
-		
-		DAC0_init();
-
-		if((err = si5351_init(SI5351_CRYSTAL_LOAD_6PF, 0)))
-		{
-			return(ERROR_CODE_RF_OSCILLATOR_ERROR);
-		}
-
-		if((code = si5351_drive_strength(SI5351_CLK0, SI5351_DRIVE_8MA)))
-		{
-			return( code);
-		}
-
-		if((code = si5351_clock_enable(SI5351_CLK0, SI5351_CLK_DISABLED)))
-		{
-			return( code);
-		}
-
-		if((code = si5351_drive_strength(SI5351_CLK1, SI5351_DRIVE_8MA)))
-		{
-			return( code);
-		}
-
-		if((code = si5351_clock_enable(SI5351_CLK1, SI5351_CLK_DISABLED)))
-		{
-			return( code);
-		}
-
-		if((g_rx_frequency < RX_MAXIMUM_80M_FREQUENCY) && (g_rx_frequency > RX_MINIMUM_80M_FREQUENCY))    /* 80m */
-		{
-			if((code = si5351_init_for_quad(g_rx_frequency)))
-			{
-				return(code);
-			}
-		}
-
-		if(!err)
-		{
-			g_rx_initialized = true;
-		}
-
-		return( code);
+		return(code);
 	}
+
+	if((code = si5351_init_for_quad(g_rx_frequency)))
+	{
+		return(code);
+	}
+
+	g_rx_initialized = true;
+	return(ERROR_CODE_NO_ERROR);
+}

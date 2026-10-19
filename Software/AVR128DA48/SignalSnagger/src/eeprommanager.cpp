@@ -207,38 +207,38 @@ const struct EE_prom EEMEM EepromManager::ee_vars
 };
 
 bool g_isMaster = UNUSED_VAR;
-volatile Fox_t g_fox[EVENT_NUMBER_OF_EVENTS] = {FOX_1, FOX_1, SPRINT_S1, FOXORING_FOX1, INVALID_FOX}; /* none, classic, sprint, foxoring, blind */
-volatile int8_t g_utc_offset;
+Fox_t g_fox[EVENT_NUMBER_OF_EVENTS] = {FOX_1, FOX_1, SPRINT_S1, FOXORING_FOX1, INVALID_FOX}; /* none, classic, sprint, foxoring, blind */
+int8_t g_utc_offset;
 uint8_t g_unlockCode[UNLOCK_CODE_SIZE + 2];
 Frequency_Hz g_rtty_offset;
 
-volatile Event_t g_event = EVENT_NONE; // unused
-extern volatile Frequency_Hz g_rx_frequency;
-extern volatile Frequency_Hz g_frequency_low;
-extern volatile Frequency_Hz g_frequency_med;
-extern volatile Frequency_Hz g_frequency_hi;
-extern volatile Frequency_Hz g_frequency_beacon;
+Event_t g_event = EVENT_NONE; // unused
+extern Frequency_Hz g_rx_frequency;
+extern Frequency_Hz g_frequency_low;
+extern Frequency_Hz g_frequency_med;
+extern Frequency_Hz g_frequency_hi;
+extern Frequency_Hz g_frequency_beacon;
 extern Frequency_Hz g_channel_frequency[NUMBER_OF_FREQUENCY_CHANNELS];
 extern uint8_t g_channel_name[NUMBER_OF_FREQUENCY_CHANNELS];
-volatile FrequencyMode_t g_frequency_mode = MODE_VFO;
-volatile BatteryCapacity_t g_battery_capacity = MAH_450mAh;
-volatile BatteryWarnThreshold_t g_battery_warning_threshold = 10;
-volatile uint8_t g_active_memory = 0;
+FrequencyMode_t g_frequency_mode = MODE_VFO;
+BatteryCapacity_t g_battery_capacity = MAH_450mAh;
+BatteryWarnThreshold_t g_battery_warning_threshold = 10;
+uint8_t g_active_memory = 0;
 
 char g_messages_text[STATION_ID+1][MAX_PATTERN_TEXT_LENGTH + 1];
-volatile time_t g_event_start_epoch;
-volatile time_t g_event_finish_epoch;
+time_t g_event_start_epoch;
+time_t g_event_finish_epoch;
 uint16_t g_80m_power_level_mW;
-volatile uint8_t g_id_codespeed;
-volatile uint8_t g_pattern_codespeed;
-volatile uint8_t g_foxoring_pattern_codespeed;
-volatile int16_t g_off_air_seconds;
-volatile int16_t g_on_air_seconds;
-volatile int16_t g_ID_period_seconds;
-volatile int16_t g_intra_cycle_delay_time;
-volatile float g_voltage_threshold = UNUSED_VAR;
+uint8_t g_id_codespeed;
+uint8_t g_pattern_codespeed;
+uint8_t g_foxoring_pattern_codespeed;
+int16_t g_off_air_seconds;
+int16_t g_on_air_seconds;
+int16_t g_ID_period_seconds;
+int16_t g_intra_cycle_delay_time;
+float g_voltage_threshold = UNUSED_VAR;
 extern uint16_t g_clock_calibration;
-volatile uint8_t g_days_to_run = UNUSED_VAR;
+uint8_t g_days_to_run = UNUSED_VAR;
 uint16_t g_i2c_failure_count = UNUSED_VAR;
 #define MAX_TX_POWER_80M_MW 5000U
 #define EEPROM_RTTY_OFFSET_FREQUENCY_DEFAULT 70

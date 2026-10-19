@@ -69,18 +69,12 @@ else
 fi
 
 while IFS= read -r source; do
-	if [[ "$(basename "$source")" == "linkbus.cpp" ]]; then
-		continue
-	fi
 	relative="src\\$(basename "$source")"
 	if ! rg -Fq "Compile Include=\"$relative\"" "$firmware_root/SignalSnagger.cppproj"; then
 		fail "firmware project omits source: $relative"
 	fi
 done < <(printf '%s\n' "$firmware_root"/src/*.cpp)
 
-if ! rg -q '`src/linkbus\.cpp` is a dormant legacy import' "$repo_root/CODEX_WORKFLOW.md"; then
-	fail "the intentionally excluded legacy linkbus source must remain documented"
-fi
 if ! rg -q '^release-preflight:' "$repo_root/Justfile"; then
 	fail "Justfile is missing the release-preflight gate"
 fi

@@ -13,8 +13,10 @@ trap 'rm -f "$test_binary"' EXIT
 	-Wextra \
 	-Werror \
 	-pedantic \
+	-I"$repo_root/tests/host/stubs" \
 	-I"$firmware_root/include" \
 	"$repo_root/tests/host/test_main.cpp" \
+	"$repo_root/tests/host/receiver_test_stubs.cpp" \
 	"$firmware_root/src/CircularFloatBuff.cpp" \
 	"$firmware_root/src/CircularStringBuff.cpp" \
 	"$firmware_root/src/CircularUintBuff.cpp" \
@@ -22,8 +24,10 @@ trap 'rm -f "$test_binary"' EXIT
 	"$firmware_root/src/datetime_utils.cpp" \
 	"$firmware_root/src/memory_channels.cpp" \
 	"$firmware_root/src/periodic_countdown.cpp" \
+	"$firmware_root/src/receiver.cpp" \
 	"$firmware_root/src/receiver_frequency.cpp" \
 	"$firmware_root/src/signal_score.cpp" \
+	"$firmware_root/src/status_wait.cpp" \
 	"$firmware_root/src/text_utils.cpp" \
 	-o "$test_binary"
 

@@ -28,12 +28,12 @@
 #ifndef __RTC_H__
 #define __RTC_H__
 
-void RTC_init(void);
-void RTC_init(uint16_t cal);
-void RTC_init_backup(void);
-void RTC_init_backup(uint16_t cal);
-void RTC_set_calibration(uint16_t cal);
+bool RTC_init(void);
+bool RTC_init(uint16_t cal);
+bool RTC_init_backup(void);
+bool RTC_init_backup(uint16_t cal);
+bool RTC_set_calibration(uint16_t cal);
 uint16_t RTC_get_cal(void);
-void RTC_zero(void);
+bool RTC_zero(void);
 
 #endif //__RTC_H__

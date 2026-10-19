@@ -30,9 +30,9 @@
 - Treat Microchip START output, `Config/`, `utils/`, generated makefiles,
   `SignalSnagger.cppproj`, and component metadata as generated or
   vendor-managed. Make only targeted edits and preserve license blocks.
-- `src/linkbus.cpp` is a dormant legacy import with no matching `linkbus.h` and
-  is intentionally excluded from `SignalSnagger.cppproj`. Do not build it unless
-  the feature is deliberately restored with tests and its missing interface.
+- The orphaned LinkBus import was removed because it had no matching interface
+  and was never part of the firmware build. Restore that feature only from
+  history as a deliberate, tested implementation.
 - The Si5351 quadrature configuration is an experimentally validated strategy,
   not a sequence derived from Si5351 documentation. Preserve its feedback
   divider, phase relationship, `P3` values, register-write order, and reset

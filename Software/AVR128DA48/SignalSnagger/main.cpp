@@ -135,77 +135,64 @@ uint8_t g_channel_name[NUMBER_OF_FREQUENCY_CHANNELS] = {};
 #define TEMPSTR_SIZE 100
 static char g_tempStr[TEMPSTR_SIZE] = { '\0' };
 
-static volatile bool g_battery_measurements_active = false;
-static volatile uint16_t g_maximum_battery = 0;
-
+/* RTC ISR owns the decrement; foreground accesses this 16-bit value atomically. */
 static volatile uint16_t g_powerdown_seconds = INACTIVITY_POWER_DOWN_DELAY_SECONDS;
 static volatile bool g_headphones_detected = false;
-static volatile bool g_powering_off = false;
 
-static volatile int g_sendID_seconds_countdown = 0;
-static volatile uint16_t g_code_throttle = 50;
-static volatile uint16_t g_enunciation_code_throttle = 50;
-static volatile uint8_t g_WiFi_shutdown_seconds = 120;
-static volatile uint16_t g_hardware_error = (uint16_t)HARDWARE_OK;
+static uint16_t g_hardware_error = (uint16_t)HARDWARE_OK;
 
 static volatile bool g_rotary_enable = false;
+/* ISR-produced multi-byte rotary values are consumed atomically by foreground. */
 static volatile int g_rotary_count = 0;
 static volatile int g_rotary_edges = 0;
 #define ROTARY_SYNC_DELAY 75
 
 static uint8_t g_rf_gain_setting = MAX_PWM_SETTING/2;
 
-extern volatile Frequency_Hz g_rx_frequency;
-extern volatile Frequency_Hz g_frequency_low;
-extern volatile Frequency_Hz g_frequency_med;
-extern volatile Frequency_Hz g_frequency_hi;
-extern volatile Frequency_Hz g_frequency_beacon;
+extern Frequency_Hz g_rx_frequency;
+extern Frequency_Hz g_frequency_low;
+extern Frequency_Hz g_frequency_med;
+extern Frequency_Hz g_frequency_hi;
+extern Frequency_Hz g_frequency_beacon;
 extern Frequency_Hz g_channel_frequency[NUMBER_OF_FREQUENCY_CHANNELS];
 extern FrequencyMode_t g_frequency_mode;
-extern volatile BatteryCapacity_t g_battery_capacity;
-extern volatile BatteryWarnThreshold_t g_battery_warning_threshold;
-extern volatile uint8_t g_active_memory;
+extern BatteryCapacity_t g_battery_capacity;
+extern BatteryWarnThreshold_t g_battery_warning_threshold;
+extern uint8_t g_active_memory;
 
-volatile bool g_seconds_transition = false;
-volatile time_t g_seconds_since_poweron = 0;
+static time_t g_seconds_since_poweron = 0; /* Read and written only by RTC_CNT_vect. */
 volatile uint8_t g_display_active_countdown = false;
 
-static volatile bool g_sufficient_power_detected = false;
-static volatile bool g_enableHardwareWDResets = false;
 extern uint16_t g_clock_calibration;
 
-static volatile bool g_go_to_sleep_now = false;
-static volatile bool g_sleeping = false;
-static volatile time_t g_time_to_wake_up = 0;
-static volatile Awakened_t g_awakenedBy = POWER_UP_START;
-static volatile SleepType g_sleepType = SLEEP_FOREVER;
+/* Sleep state is foreground-owned; the dormant button-wake ISR path is disabled. */
+static bool g_go_to_sleep_now = false;
+static bool g_sleeping = false;
+static Awakened_t g_awakenedBy = POWER_UP_START;
 
 #define NUMBER_OF_POLLED_ADC_CHANNELS 1
 #define TOTAL_OF_ALL_ADC_CHANNELS 8
-static const uint16_t g_adcChannelConversionPeriod_ticks[NUMBER_OF_POLLED_ADC_CHANNELS] = { 3000 };
-static volatile uint16_t g_adcCountdownCount[NUMBER_OF_POLLED_ADC_CHANNELS] = { 3000 };
-static volatile bool g_adcUpdated[NUMBER_OF_POLLED_ADC_CHANNELS] = { false };
-static volatile int16_t g_adcChannel2Slot[TOTAL_OF_ALL_ADC_CHANNELS] = { -1, -1, -1, -1, -1, -1, -1, 0 };
-static volatile uint16_t g_lastConversionResult[NUMBER_OF_POLLED_ADC_CHANNELS] = { 0 };
-static volatile ADC_Active_Channel_t g_active_ADC_sample = ADC_I_AMPED;
+static const int16_t g_adcChannel2Slot[TOTAL_OF_ALL_ADC_CHANNELS] = { -1, -1, -1, -1, -1, -1, -1, 0 };
+static uint16_t g_lastConversionResult[NUMBER_OF_POLLED_ADC_CHANNELS] = { 0 };
 
 extern Goertzel g_goertzel;
 uint16_t g_goertzel_rssi = 0;
 
-static volatile uint16_t g_leftsense_closed_time = 0;
-static volatile uint16_t g_rightsense_closed_time = 0;
-static volatile uint16_t g_encoder_closed_time = 0;
-static volatile uint16_t g_doublesense_closed_time = 0;
+/* These counters are private to TCB0_INT_vect. */
+static uint16_t g_leftsense_closed_time = 0;
+static uint16_t g_rightsense_closed_time = 0;
+static uint16_t g_encoder_closed_time = 0;
+static uint16_t g_doublesense_closed_time = 0;
 
 static volatile uint16_t g_handle_counted_leftsense_presses = 0;
 static volatile uint16_t g_handle_counted_rightsense_presses = 0;
 static volatile uint16_t g_handle_counted_encoder_presses = 0;
 static volatile uint16_t g_handle_counted_doublesense_presses = 0;
 
-static volatile uint16_t g_leftsense_presses_count = 0;
-static volatile uint16_t g_rightsense_presses_count = 0;
-static volatile uint16_t g_encoder_presses_count = 0;
-static volatile uint16_t g_doublesense_presses_count = 0;
+static uint16_t g_leftsense_presses_count = 0;
+static uint16_t g_rightsense_presses_count = 0;
+static uint16_t g_encoder_presses_count = 0;
+static uint16_t g_doublesense_presses_count = 0;
 
 static volatile bool g_long_leftsense_press = false;
 static volatile bool g_long_rightsense_press = false;
@@ -220,10 +207,6 @@ static volatile bool g_encoderswitch_pressed = false;
 /* Values are 1..10; keeping this byte-sized makes ISR/foreground access atomic. */
 volatile uint8_t g_audio_gain = 4;
 volatile bool g_enable_audio_feedthrough = true;
-
-volatile uint16_t g_check_temperature = 0;
-
-Enunciation_t g_enunciator = LED_ONLY;
 
 Display display = Display();
 leds LEDS = leds();
@@ -300,7 +283,6 @@ ISR(RTC_CNT_vect)
     {
         system_tick();
 		if(g_powerdown_seconds) g_powerdown_seconds--;
-		g_seconds_transition = true;
 		g_seconds_since_poweron++;
 		if(g_seconds_since_poweron == 2) g_rotary_enable = true;
 		if(g_display_active_countdown) g_display_active_countdown--;
@@ -506,8 +488,6 @@ ISR(TCB0_INT_vect)
 			if(holdSwitch != nowSwitch) /* Change detected */
 			{
 				int8_t changed = nowSwitch ^ holdSwitch;
-				
-				g_active_ADC_sample = ADCBatteryVoltage;
 				
 				if(g_headphones_detected)
 				{
@@ -861,7 +841,8 @@ ISR(PORTA_PORT_vect)
 
 
 // Previous state of the encoder (both pins)
-volatile uint8_t prev_state = 0;
+/* Encoder state is private to PORTF_PORT_vect. */
+static uint8_t prev_state = 0;
 
 /**
 PORTF Interrupts
@@ -1035,17 +1016,20 @@ int main(void)
 		g_hardware_error |= (int)HARDWARE_NO_SI5351;
 	}
 		
-	RTC_set_calibration(g_clock_calibration);
+	bool rtc_initialized = RTC_set_calibration(g_clock_calibration);
 					
 	/* Check that the RTC is running */
 	set_system_time(YEAR_2000_EPOCH);
 	time_t now = time(null);
- 	while((util_delay_ms(2000)) && (now == time(null)));
+	if(rtc_initialized)
+	{
+		while((util_delay_ms(2000)) && (now == time(null)));
+	}
 	
-	if(now == time(null))
+	if(!rtc_initialized || now == time(null))
 	{
 		g_hardware_error |= (int)HARDWARE_NO_RTC;
- 		RTC_init_backup();
+		(void)RTC_init_backup();
 	}
 	
 	display.begin(DOGS104);
@@ -1910,14 +1894,11 @@ int main(void)
 					
 						case MenuSetMemFreq:
 						{
-							Frequency_Hz requested_frequency = g_rx_frequency;
 							uint32_t step_hz = g_encoderswitch_pressed ? 1000 : 100;
-							if(receiverFrequencyStep(g_rx_frequency, 1, step_hz, &requested_frequency))
-							{
-								g_rx_frequency = requested_frequency;
-							}
-
-							g_channel_frequency[g_active_memory] = g_rx_frequency;
+							(void)rxTuneMemoryStep(&g_rx_frequency,
+								&g_channel_frequency[g_active_memory],
+								1,
+								step_hz);
 						}
 						break;
 					
@@ -2058,13 +2039,11 @@ int main(void)
 					
 						case MenuSetMemFreq:
 						{
-							Frequency_Hz requested_frequency = g_rx_frequency;
 							uint32_t step_hz = g_encoderswitch_pressed ? 1000 : 100;
-							if(receiverFrequencyStep(g_rx_frequency, -1, step_hz, &requested_frequency))
-							{
-								g_rx_frequency = requested_frequency;
-								g_channel_frequency[g_active_memory] = g_rx_frequency;
-							}
+							(void)rxTuneMemoryStep(&g_rx_frequency,
+								&g_channel_frequency[g_active_memory],
+								-1,
+								step_hz);
 						}
 						break;
 					

@@ -10,7 +10,6 @@
 #include "leds.h"
 #include "CircularStringBuff.h"
 #include "shared_state.h"
-#include <string.h>
 
 #define FAST_ON 25
 #define FAST_OFF 25
@@ -20,16 +19,13 @@
 #define BRIEF_OFF 50
 #define LED_TIMEOUT_DELAY 60000
 
-extern volatile bool g_event_enabled;
-extern volatile bool g_enable_LED_enunciations;
 extern CircularStringBuff g_text_buff;
-extern Enunciation_t g_enunciator;
 
 static volatile bool timer_red_blink_inhibit = false; /* disable blinking by timer */
 static volatile bool timer_green_blink_inhibit = false; /* disable blinking by timer */
-static volatile Blink_t lastRedBlinkSetting = LEDS_OFF;
-static volatile Blink_t lastGreenBlinkSetting = LEDS_OFF;
-static volatile Blink_t lastBothBlinkSetting = LEDS_OFF;
+static Blink_t lastRedBlinkSetting = LEDS_OFF;
+static Blink_t lastGreenBlinkSetting = LEDS_OFF;
+static Blink_t lastBothBlinkSetting = LEDS_OFF;
 static volatile uint32_t led_timeout_count = LED_TIMEOUT_DELAY;
 static volatile int16_t red_blink_on_period = 0;
 static volatile int16_t red_blink_off_period = 0;
@@ -37,8 +33,11 @@ static volatile int16_t green_blink_on_period = 0;
 static volatile int16_t green_blink_off_period = 0;
 static volatile int16_t red_blink_count = 0;
 static volatile int16_t green_blink_count = 0;
-static volatile bool red_led_configured = false;
-static volatile bool green_led_configured = false;
+
+/*
+ * blink() disables TCB3 while replacing the 16-bit periods and counters. The
+ * ISR may therefore update them without additional atomic blocks.
+ */
 
 // default constructor
 leds::leds()
@@ -100,11 +99,6 @@ ISR(TCB3_INT_vect)
 				}
 				
 			}
-// 			else if(red_led_configured)
-// 			{
-// 				LED_set_RED_level(OFF);
-// 			}
-			
 			if(green_blink_count && !timer_green_blink_inhibit)
 			{
 				if(green_blink_count > 1)
@@ -134,10 +128,6 @@ ISR(TCB3_INT_vect)
 					green_blink_count = green_blink_on_period;
 				}
 			}
-// 			else if(green_led_configured)
-// 			{
-// 				LED_set_GREEN_level(OFF);
-// 			}
 		}
 	}
 		
@@ -219,25 +209,6 @@ void leds::init(Blink_t setBlink)
 	if(setBlink != LEDS_OFF) blink(setBlink, true);
 }
 
-void leds::sendCode(const char* str)
-{
-	if(!atomicReadU32(&led_timeout_count)) return;
-	if(g_text_buff.isBusy()) return;
-	
-	if(!str || !strlen(str))
-	{
-		return;
-	}
-
-	if(g_text_buff.putString(str))
-	{
-		return;
-	}
-
-	g_enable_LED_enunciations = false; /* simple thread collision avoidance */
-	timer_red_blink_inhibit = true; /* Prevent timer from controlling LED */
-}
-
 void leds::blink(Blink_t blinkMode)
 {
 	blink(blinkMode, false);
@@ -272,8 +243,6 @@ void leds::blink(Blink_t blinkMode, bool resetTimeout)
 				green_blink_count = 0;
 				LED_set_RED_level(OFF);
 				LED_set_GREEN_level(OFF);
-				red_led_configured = false;
-				green_led_configured = false;
 			}
 			break;
 			
@@ -281,7 +250,6 @@ void leds::blink(Blink_t blinkMode, bool resetTimeout)
 			{
 				LED_set_RED_level(OFF);
 				red_blink_count = 0;
-				red_led_configured = false;
 			}
 			break;
 			
@@ -289,7 +257,6 @@ void leds::blink(Blink_t blinkMode, bool resetTimeout)
 			{
 				LED_set_GREEN_level(OFF);
 				green_blink_count = 0;
-				green_led_configured = false;
 			}
 			break;
 			
@@ -298,7 +265,6 @@ void leds::blink(Blink_t blinkMode, bool resetTimeout)
 				red_blink_on_period = BRIEF_ON;
 				red_blink_off_period = BRIEF_OFF;
 				red_blink_count = red_blink_on_period;	
-				red_led_configured = true;			
 				timer_red_blink_inhibit = false; /* Enable timer LED control */
 			}
 			break;
@@ -308,7 +274,6 @@ void leds::blink(Blink_t blinkMode, bool resetTimeout)
 				green_blink_on_period = BRIEF_ON;
 				green_blink_off_period = BRIEF_OFF;	
 				green_blink_count = green_blink_on_period;			
-				green_led_configured = true;			
 				timer_green_blink_inhibit = false; /* Enable timer LED control */
 			}
 			break;
@@ -318,7 +283,6 @@ void leds::blink(Blink_t blinkMode, bool resetTimeout)
 				red_blink_on_period = SLOW_ON;
 				red_blink_off_period = SLOW_OFF;
 				red_blink_count = red_blink_on_period;				
-				red_led_configured = true;			
 				timer_red_blink_inhibit = false; /* Enable timer LED control */
 			}
 			break;
@@ -328,7 +292,6 @@ void leds::blink(Blink_t blinkMode, bool resetTimeout)
 				green_blink_on_period = SLOW_ON;
 				green_blink_off_period = SLOW_OFF;	
 				green_blink_count = green_blink_on_period;			
-				green_led_configured = true;			
 				timer_green_blink_inhibit = false; /* Enable timer LED control */
 			}
 			break;
@@ -341,8 +304,6 @@ void leds::blink(Blink_t blinkMode, bool resetTimeout)
 				red_blink_on_period = SLOW_ON;
 				red_blink_off_period = SLOW_OFF;
 				red_blink_count = red_blink_on_period;				
-				red_led_configured = true;			
-				green_led_configured = true;			
 				timer_red_blink_inhibit = timer_green_blink_inhibit = false; /* Enable timer LED control */
 			}
 			break;
@@ -355,8 +316,6 @@ void leds::blink(Blink_t blinkMode, bool resetTimeout)
 				red_blink_on_period = FAST_ON;
 				red_blink_off_period = FAST_OFF;
 				red_blink_count = red_blink_on_period;				
-				red_led_configured = true;			
-				green_led_configured = true;			
 				timer_red_blink_inhibit = timer_green_blink_inhibit = false; /* Enable timer LED control */
 			}
 			break;
@@ -369,8 +328,6 @@ void leds::blink(Blink_t blinkMode, bool resetTimeout)
 				red_blink_on_period = SLOW_ON;
 				red_blink_off_period = SLOW_OFF;
 				red_blink_count = red_blink_on_period;				
-				red_led_configured = true;			
-				green_led_configured = true;			
 				timer_red_blink_inhibit = timer_green_blink_inhibit = false; /* Enable timer LED control */
 			}
 			break;
@@ -383,8 +340,6 @@ void leds::blink(Blink_t blinkMode, bool resetTimeout)
 				red_blink_on_period = FAST_ON;
 				red_blink_off_period = FAST_OFF;
 				red_blink_count = red_blink_on_period;				
-				red_led_configured = true;			
-				green_led_configured = true;			
 				timer_red_blink_inhibit = timer_green_blink_inhibit = false; /* Enable timer LED control */
 			}
 			break;
@@ -394,7 +349,6 @@ void leds::blink(Blink_t blinkMode, bool resetTimeout)
 				red_blink_on_period = SLOW_ON;
 				red_blink_off_period = 0;
 				red_blink_count = red_blink_on_period;
-				red_led_configured = true;			
 				timer_red_blink_inhibit = false; /* Enable timer LED control */
 			}
 			break;
@@ -404,7 +358,6 @@ void leds::blink(Blink_t blinkMode, bool resetTimeout)
 				green_blink_on_period = SLOW_ON;
 				green_blink_off_period = 0;
 				green_blink_count = green_blink_on_period;
-				green_led_configured = true;			
 				timer_green_blink_inhibit = false; /* Enable timer LED control */
 			}
 			break;

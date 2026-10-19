@@ -42,7 +42,6 @@ const float sampling_freq = SAMPLE_RATE;
 #define FREE_RUNNING true
 #define SINGLE_CONVERSION false
 	
-volatile int16_t g_adcVal;
 Goertzel g_goertzel(N, sampling_freq);
 
 static void PORT_init(void);

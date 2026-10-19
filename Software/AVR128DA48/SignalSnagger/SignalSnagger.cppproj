@@ -232,6 +232,9 @@
     <Compile Include="include\shared_state.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="include\status_wait.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="include\text_utils.h">
       <SubType>compile</SubType>
     </Compile>
@@ -392,6 +395,9 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\signal_score.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\status_wait.cpp">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\text_utils.cpp">
