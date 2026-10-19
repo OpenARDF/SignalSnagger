@@ -32,9 +32,10 @@ All receiver entry points use `receiverFrequencyIsSupported`; 3.500000 MHz and
 4.000000 MHz are valid inclusive limits. The experimentally established Si5351
 quadrature function and register sequence are a protected hardware boundary.
 
-## Candidate hardware smoke test
+## Hardware smoke-test menu
 
-After programming a new candidate, verify:
+`RELEASE_WORKFLOW.md` defines which checks are required according to release
+maturity and change risk. The complete functional smoke test is:
 
 1. No 32 kHz or Si5351 startup error is displayed.
 2. Startup and signal LEDs behave as in the released 0.38 firmware.
@@ -44,5 +45,8 @@ After programming a new candidate, verify:
 5. Removing headphones shows the full 60-second countdown and then powers down.
 6. Reconnecting headphones starts the receiver normally.
 
-Follow `RELEASE_WORKFLOW.md` for memory backup, programming, and independent
-flash/configuration readback requirements.
+For pre-1.0 development firmware, always test boot/version and the behavior
+directly affected by the change; document every omitted item as not performed.
+For versions `1.0.0` and later, complete every applicable item unless an
+explicit waiver is recorded. Follow `RELEASE_WORKFLOW.md` for memory backup,
+programming, and independent flash/configuration readback requirements.

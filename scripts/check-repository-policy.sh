@@ -84,6 +84,12 @@ fi
 if ! rg -q '`main` contains the deployed 0\.38 release baseline' "$repo_root/CODEX_WORKFLOW.md"; then
 	fail "CODEX_WORKFLOW.md must identify the recovered integration baseline"
 fi
+if ! rg -q '^## Pre-1\.0 development releases$' "$repo_root/RELEASE_WORKFLOW.md"; then
+	fail "RELEASE_WORKFLOW.md must define the pre-1.0 development-release policy"
+fi
+if ! rg -q '^## 1\.0\.0 and later releases$' "$repo_root/RELEASE_WORKFLOW.md"; then
+	fail "RELEASE_WORKFLOW.md must define the 1.0.0-and-later release policy"
+fi
 
 i2c1_read_wait="$(sed -n '/static uint8_t I2C_1_WaitR/,/Returns how many bytes have been sent/p' "$firmware_root/src/i2c.cpp")"
 if [[ "$i2c1_read_wait" == *"g_i2c0_timeout_ticks"* ||
