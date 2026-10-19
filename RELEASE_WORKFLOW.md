@@ -2,7 +2,7 @@
 
 ## Branch and version policy
 
-- `Development` contains the deployed 0.38 release baseline and is the active
+- `main` contains the deployed 0.38 release baseline and is the active
   integration branch for the current firmware line. Release work is prepared on
   a focused topic branch and reviewed before integration.
 - The legacy deployed version string `0.38` is retained while reproducing the

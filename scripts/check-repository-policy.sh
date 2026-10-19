@@ -81,7 +81,7 @@ fi
 if ! rg -q 'experimentally validated' "$repo_root/CODEX_WORKFLOW.md"; then
 	fail "CODEX_WORKFLOW.md must protect the experimentally validated Si5351 strategy"
 fi
-if ! rg -q '`Development` contains the deployed 0\.38 release baseline' "$repo_root/CODEX_WORKFLOW.md"; then
+if ! rg -q '`main` contains the deployed 0\.38 release baseline' "$repo_root/CODEX_WORKFLOW.md"; then
 	fail "CODEX_WORKFLOW.md must identify the recovered integration baseline"
 fi
 

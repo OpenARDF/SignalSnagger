@@ -3,10 +3,10 @@
 ## Branch discipline
 
 - Announce the current branch before editing.
-- `Development` contains the deployed 0.38 release baseline and is the active
+- `main` contains the deployed 0.38 release baseline and is the active
   integration branch for this recovery and hardening effort.
 - Start implementation on a focused `codex/<topic>` branch from a clean,
-  synchronized `Development` unless the user explicitly requests otherwise.
+  synchronized `main` unless the user explicitly requests otherwise.
 - Leave changes uncommitted and unpushed unless the user explicitly authorizes
   those actions. Use a reviewed pull request for integration.
 - Keep unrelated KiCad changes outside firmware commits. Use `just
