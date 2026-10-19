@@ -50,6 +50,12 @@
 - Do not waive all hardware validation for a firmware-bearing development
   release. Documentation-only or workflow-only releases do not require device
   testing when they cannot alter the built artifact.
+- An unsuffixed pre-1.0 release may inherit hardware evidence from its
+  immediately preceding suffixed candidate when the only changed firmware input
+  is the canonical version string. The final artifact must pass the common gate,
+  its embedded version must be verified statically, and the release notes must
+  identify both the inherited evidence and final-image checks not performed.
+  Any other firmware-input change invalidates this promotion exception.
 - Keep passed, failed, and not-performed checks distinct. A skipped or waived
   check must never be reported as passed.
 

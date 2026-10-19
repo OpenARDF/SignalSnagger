@@ -90,6 +90,9 @@ fi
 if ! rg -q '^## 1\.0\.0 and later releases$' "$repo_root/RELEASE_WORKFLOW.md"; then
 	fail "RELEASE_WORKFLOW.md must define the 1.0.0-and-later release policy"
 fi
+if ! rg -q 'immediately preceding suffixed candidate' "$repo_root/RELEASE_WORKFLOW.md"; then
+	fail "RELEASE_WORKFLOW.md must define qualification inheritance for version-only pre-1.0 promotion"
+fi
 
 i2c1_read_wait="$(sed -n '/static uint8_t I2C_1_WaitR/,/Returns how many bytes have been sent/p' "$firmware_root/src/i2c.cpp")"
 if [[ "$i2c1_read_wait" == *"g_i2c0_timeout_ticks"* ||
