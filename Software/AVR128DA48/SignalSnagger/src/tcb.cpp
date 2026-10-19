@@ -23,11 +23,11 @@
  */
 
 #include <tcb.h>
+#include "shared_state.h"
 
-static uint32_t g_ms_counter = 0;
-extern volatile uint16_t g_i2c0_timeout_ticks;
-extern volatile uint16_t g_serial_timeout_ticks;
-extern volatile uint16_t g_i2c1_timeout_ticks;
+static volatile uint32_t g_ms_counter = 0;
+extern volatile uint8_t g_i2c0_timeout_ticks;
+extern volatile uint8_t g_i2c1_timeout_ticks;
 
 /**
  * \brief Initialize tcb interface
@@ -129,7 +129,7 @@ bool util_delay_ms(uint32_t delayValue)
 	{
 		if(counting)
 		{
-			if(!g_ms_counter)
+			if(!atomicReadU32(&g_ms_counter))
 			{
 				TCB1.INTCTRL = 0 << TCB_CAPT_bp   /* Capture or Timeout: disabled */
 				| 0 << TCB_OVF_bp; /* OverFlow Interrupt: disabled */
@@ -142,15 +142,15 @@ bool util_delay_ms(uint32_t delayValue)
 			{
 				TCB1.CNT = 0x0000;
 				countdownValue = delayValue;
-				g_ms_counter = delayValue;
-				return(false);
+				atomicWriteU32(&g_ms_counter, delayValue);
+				return(true);
 			}
 		}
 		else if(delayValue != countdownValue)
 		{
 			TCB1.CNT = 0x0000;
 			countdownValue = delayValue;
-			g_ms_counter = delayValue;
+			atomicWriteU32(&g_ms_counter, delayValue);
 			counting = true;
 		}
 	}
@@ -161,7 +161,7 @@ bool util_delay_ms(uint32_t delayValue)
 
 		counting = false;
 		countdownValue = 0;
-		g_ms_counter = 0;
+		atomicWriteU32(&g_ms_counter, 0);
 		return(false); /* timer reset */
 	}
 	
@@ -169,6 +169,15 @@ bool util_delay_ms(uint32_t delayValue)
 	| 0 << TCB_OVF_bp; /* OverFlow Interrupt: disabled */
 	
 	return(true);
+}
+
+void util_wait_ms(uint32_t delayValue)
+{
+	/* Foreground-only: TCB1 interrupts must be enabled for the wait to finish. */
+	util_delay_ms(0);
+	while(util_delay_ms(delayValue))
+	{
+	}
 }
 
 ISR(TCB2_INT_vect)

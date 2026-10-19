@@ -25,10 +25,20 @@
 #include "tca.h"
 #include "display.h"
 #include "dac0.h"
+#include "memory_channels.h"
+#include "periodic_countdown.h"
+#include "receiver_frequency.h"
+#include "shared_state.h"
+#include "signal_score.h"
 
 #include <cpuint.h>
 #include <ccp.h>
 #include <atomic.h>
+
+static_assert(RECEIVER_FREQUENCY_MIN_HZ == RX_MINIMUM_80M_FREQUENCY,
+	"receiver frequency lower bounds must agree");
+static_assert(RECEIVER_FREQUENCY_MAX_HZ == RX_MAXIMUM_80M_FREQUENCY,
+	"receiver frequency upper bounds must agree");
 
 
 /***********************************************************************
@@ -207,7 +217,8 @@ static volatile bool g_rightsense_pressed = false;
 static volatile bool g_doublesense_pressed = false;
 static volatile bool g_encoderswitch_pressed = false;
 
-volatile uint16_t g_audio_gain = 4;
+/* Values are 1..10; keeping this byte-sized makes ISR/foreground access atomic. */
+volatile uint8_t g_audio_gain = 4;
 volatile bool g_enable_audio_feedthrough = true;
 
 volatile uint16_t g_check_temperature = 0;
@@ -216,13 +227,13 @@ Enunciation_t g_enunciator = LED_ONLY;
 
 Display display = Display();
 leds LEDS = leds();
-CircularStringBuff g_text_buff = CircularStringBuff(TEXT_BUFF_SIZE);
+CircularStringBuff g_text_buff(TEXT_BUFF_SIZE);
 
 #define NOMINAL_BUFF_SIZE 30
 #define HIGH_WATER_BUFF_SIZE 10
-static CircularFloatBuff g_nominal_buff = CircularFloatBuff(NOMINAL_BUFF_SIZE);
-static CircularFloatBuff g_high_water_buff = CircularFloatBuff(HIGH_WATER_BUFF_SIZE);
-static CircularUintBuff g_rssi_buff = CircularUintBuff(HIGH_WATER_BUFF_SIZE);
+static CircularFloatBuff g_nominal_buff(NOMINAL_BUFF_SIZE);
+static CircularFloatBuff g_high_water_buff(HIGH_WATER_BUFF_SIZE);
+static CircularUintBuff g_rssi_buff(HIGH_WATER_BUFF_SIZE);
 
 EepromManager EEPromMgr;
 
@@ -273,6 +284,7 @@ char* batteryPercentString(float adcCounts, float* result);
 char* batteryTimeLeftString(float* adcCounts);
 
 uint8_t nextActiveMemory(uint8_t currentChan, bool up);
+bool advanceActiveMemory(bool up);
 MenuState_t setMenu(MenuState_t menu);
 // char* centerHorizontally(const char* text, uint8_t row);
 
@@ -362,7 +374,7 @@ ISR(ADC0_RESRDY_vect)
 				if(g_beep)
 				{
 					result += sineWave[sineIndex++];
-					if(sineIndex == g_sine_period_steps) sineIndex = 0;
+					if(sineIndex >= g_sine_period_steps) sineIndex = 0;
 					g_beep--;
 				}
 				DAC0_setVal(result);
@@ -374,7 +386,7 @@ ISR(ADC0_RESRDY_vect)
 			if(g_beep)
 			{
 				result += sineWave[sineIndex++];
-				if(sineIndex == g_sine_period_steps) sineIndex = 0;
+				if(sineIndex >= g_sine_period_steps) sineIndex = 0;
 				g_beep--;
 			}
 			else if(g_tick)
@@ -407,7 +419,7 @@ Periodic tasks not requiring precise timing. Rate = 300 Hz
 */
 ISR(TCB0_INT_vect)
 {
-	static uint8_t fiftyMS = 6;
+	static uint8_t switchScanTicksRemaining = 6;
 	static uint8_t headphones_filter = 100;
 	
 	uint8_t x = TCB0.INTFLAGS;
@@ -424,8 +436,7 @@ ISR(TCB0_INT_vect)
 		
 		if(g_rssi_countdown) g_rssi_countdown--;
 		
-		fiftyMS++;
-		if(!(fiftyMS % 6))
+		if(periodicCountdownTick(&switchScanTicksRemaining, 6))
 		{
 			bool leftSense_pressed = false;
 			bool rightSense_pressed = false;
@@ -906,7 +917,7 @@ static void sineWaveInit(int sine_period_steps)
 {
     uint8_t i;
 	
-	if((sine_period_steps > 10) && (sine_period_steps < 256))
+	if((sine_period_steps > 10) && (sine_period_steps <= MAX_SINE_PERIOD_STEPS))
 	{
 		bool hold_at = g_audio_test;
 		
@@ -996,7 +1007,7 @@ int main(void)
 	Frequency_Hz hold_rx_frequency = 0;
 	uint8_t hold_rf_gain_setting = 255;
 //	uint16_t hold_assi_result = 0;
-	uint16_t hold_audio_gain = 0;
+	uint8_t hold_audio_gain = 0;
 	uint16_t hold_goertzel_rssi = 0;
 	bool hold_headphone_state = true;
 	bool refresh_display = true;
@@ -1043,15 +1054,15 @@ int main(void)
 	{
  		LEDS.blink(LEDS_RED_AND_GREEN_BLINK_FAST, true);
 
-		g_text_buff.putString((char*)"00Error:");
+		g_text_buff.putString("00Error:");
 		if(g_hardware_error & (int)HARDWARE_NO_SI5351)
 		{
-			g_text_buff.putString((char*)"11SI5351");
+			g_text_buff.putString("11SI5351");
 		}
 		
 		if(g_hardware_error & (int)HARDWARE_NO_RTC)
 		{
-			g_text_buff.putString((char*)"2132kCLK");
+			g_text_buff.putString("2132kCLK");
 		}
 		
 		g_display_active_countdown = 15;
@@ -1063,35 +1074,43 @@ int main(void)
 		uint16_t result = 0;		
 		ADC0_SYSTEM_init(ADC12BIT, false);
 		
+		bool batteryReadingValid = true;
 		for(int i=0; i<10; i++)
 		{
 			ADC0_startConversion();
-			while(!ADC0_conversionDone());
+			if(!ADC0_waitForConversion())
+			{
+				batteryReadingValid = false;
+				break;
+			}
 			result = ADC0.RES;
 			temp_float += result;
 		}
-		
-		temp_float /= 10;
-		batteryPercentString(temp_float, &percent);
-		
-		if(percent <= (float)g_battery_warning_threshold)
+
+		if(batteryReadingValid)
 		{
-			g_text_buff.putString((char*)"00BATTERY\0");
-			g_text_buff.putString((char*)"10  WARNING!\0");
-			snprintf(g_tempStr, 13, "20%s Volts", batteryVoltsString(true, &temp_float));
-			g_text_buff.putString(g_tempStr);
-			snprintf(g_tempStr, 13, "30min: %s  ", batteryTimeLeftString(&temp_float));
-			g_beep = 5000;
-			g_display_active_countdown = 30;
-		}
-		else
-		{
-			g_display_active_countdown = 0;
+			temp_float /= 10;
+			batteryPercentString(temp_float, &percent);
+
+			if(percent <= (float)g_battery_warning_threshold)
+			{
+				g_text_buff.putString("00BATTERY");
+				g_text_buff.putString("10  WARNING!");
+				snprintf(g_tempStr, 13, "20%s Volts", batteryVoltsString(true, &temp_float));
+				g_text_buff.putString(g_tempStr);
+				snprintf(g_tempStr, 13, "30min: %s  ", batteryTimeLeftString(&temp_float));
+				atomicWriteU16(&g_beep, 5000);
+				g_display_active_countdown = 30;
+			}
+			else
+			{
+				g_display_active_countdown = 0;
+			}
 		}
 	}
 	
 	LEDS.blink(LEDS_OFF);
-	g_text_buff.putString((char*)g_tempStr);
+	g_text_buff.putString(g_tempStr);
 	
 	/* Start audio flow */
 	ADC0.MUXPOS = ADC_I_AMPED; 
@@ -1225,7 +1244,10 @@ int main(void)
 					static float filtered_float = 0.;
 		
 						ADC0_startConversion();
-						while(!ADC0_conversionDone());
+						if(!ADC0_waitForConversion())
+						{
+							break;
+						}
 						result = ADC0.RES;
 						
 						if(filtered_float < 1.)
@@ -1266,7 +1288,7 @@ int main(void)
 				case MenuFreqMemories:
 				case MenuSetMemName:
 				{
-					if(g_active_memory > NUMBER_OF_FREQUENCY_CHANNELS)
+					if(g_active_memory >= NUMBER_OF_FREQUENCY_CHANNELS)
 					{
 						g_active_memory = 0;
 					}
@@ -1344,7 +1366,7 @@ int main(void)
 				{
 					sprintf(g_tempStr, "00HEADPHONES");
 					g_text_buff.putString(g_tempStr);
-					sprintf(g_tempStr, "10    %u ", g_powerdown_seconds);
+					sprintf(g_tempStr, "10    %u ", atomicReadU16(&g_powerdown_seconds));
 					g_text_buff.putString(g_tempStr);
 				}
 				break;
@@ -1354,8 +1376,8 @@ int main(void)
 					if(hold_menuRow != menuRow)
 					{
 						hold_menuRow = menuRow;
-						g_text_buff.putString((char*)"00Signal");
-						g_text_buff.putString((char*)"12Snagger!");
+						g_text_buff.putString("00Signal");
+						g_text_buff.putString("12Snagger!");
 						sprintf(g_tempStr, "20Ver:%s", SW_REVISION);
 						g_text_buff.putString(g_tempStr);
 					}
@@ -1374,7 +1396,7 @@ int main(void)
 		{
 			EC err;
 			size_t s;
-			g_text_buff.getString(g_tempStr, &s);
+			g_text_buff.getString(g_tempStr, sizeof(g_tempStr), &s);
 			
 			while(s > 2)
 			{
@@ -1400,7 +1422,7 @@ int main(void)
 					}
 				}
 				
- 				g_text_buff.getString(g_tempStr, &s);
+				g_text_buff.getString(g_tempStr, sizeof(g_tempStr), &s);
 			}
 		}
 		
@@ -1416,7 +1438,7 @@ int main(void)
 					setMenu(MenuNoHeadphones);
 				}
 				
-				g_powerdown_seconds = 60;
+				atomicWriteU16(&g_powerdown_seconds, 60);
 			}
 			else
 			{
@@ -1425,11 +1447,11 @@ int main(void)
 					setMenu(MenuOperational);
 				}
 				
-				g_powerdown_seconds = INACTIVITY_POWER_DOWN_DELAY_SECONDS;
+				atomicWriteU16(&g_powerdown_seconds, INACTIVITY_POWER_DOWN_DELAY_SECONDS);
 			}
 		}
 		
-		if(!g_powerdown_seconds)
+		if(!atomicReadU16(&g_powerdown_seconds))
 		{
 			if(g_headphones_detected) /* Inactivity power down */
 			{
@@ -1463,21 +1485,19 @@ int main(void)
 		if(hold_headphone_state)
 		{
 			/* Both sense switches pressed simultaneously */
-			if(g_handle_counted_doublesense_presses)
+			uint16_t doublesense_presses = atomicExchangeU16(&g_handle_counted_doublesense_presses, 0);
+			if(doublesense_presses)
 			{
-				if(g_handle_counted_doublesense_presses == 1)
+				if(doublesense_presses == 1)
 				{
 				}
-				else if(g_handle_counted_doublesense_presses == 2)
+				else if(doublesense_presses == 2)
 				{
 				}
-			
-				g_handle_counted_doublesense_presses = 0;
 			}
 		
-			if(g_long_doublesense_press)
+			if(atomicExchangeBool(&g_long_doublesense_press, false))
 			{
-				g_long_doublesense_press = false;
 				if(setMenu(MenuGetCurrent) == MenuOperational) 
 				{
 					setMenu(MenuMain);
@@ -1492,12 +1512,13 @@ int main(void)
 			/*********************************
 			* Left sense switch pressed 
 			*********************************/
-			if(g_handle_counted_leftsense_presses)
+			uint16_t leftsense_presses = atomicExchangeU16(&g_handle_counted_leftsense_presses, 0);
+			if(leftsense_presses)
 			{
-				if(g_handle_counted_leftsense_presses == 1)
+				if(leftsense_presses == 1)
 				{
 				}
-				else if (g_handle_counted_leftsense_presses == 2)
+				else if (leftsense_presses == 2)
 				{
 				}
 			
@@ -1513,11 +1534,10 @@ int main(void)
 
 					if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
 					{
-						g_active_memory = nextActiveMemory(g_active_memory, UP);
-				
-						if(g_active_memory == INVALID_CHANNEL)
+						if(!advanceActiveMemory(UP))
 						{
 							g_frequency_mode = MODE_VFO;
+							g_active_memory = 0;
 						}
 						else if(g_frequency_mode == MODE_MEMORY)
 						{
@@ -1537,7 +1557,6 @@ int main(void)
 					}
 				}
 			
-				g_handle_counted_leftsense_presses = 0;
 			}
 		
 	// 		if(g_leftsense_closed_time >= 200)
@@ -1545,7 +1564,7 @@ int main(void)
 	// 			g_audio_test = false;
 	// 		}
 		
-			if(g_long_leftsense_press)
+			if(atomicExchangeBool(&g_long_leftsense_press, false))
 			{
 				if(setMenu(MenuGetCurrent) != MenuOperational)
 				{
@@ -1557,11 +1576,10 @@ int main(void)
 
 					if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
 					{
-						g_active_memory = nextActiveMemory(g_active_memory, UP);
-				
-						if(g_active_memory == INVALID_CHANNEL)
+						if(!advanceActiveMemory(UP))
 						{
 							g_frequency_mode = MODE_VFO;
+							g_active_memory = 0;
 						}
 						else if(g_frequency_mode == MODE_MEMORY)
 						{
@@ -1581,19 +1599,19 @@ int main(void)
 					}
 				}
 			
-				g_long_leftsense_press = false;
 			}
 		
 			/*********************************
 			* Right sense switch pressed 
 			*********************************/
-			if(g_handle_counted_rightsense_presses)
+			uint16_t rightsense_presses = atomicExchangeU16(&g_handle_counted_rightsense_presses, 0);
+			if(rightsense_presses)
 			{
-				if(g_handle_counted_rightsense_presses == 1)
+				if(rightsense_presses == 1)
 				{
 					LEDS.blink(LEDS_OFF, true);
 				}
-				else if (g_handle_counted_rightsense_presses == 2)
+				else if (rightsense_presses == 2)
 				{
 					if(g_encoderswitch_pressed)
 					{
@@ -1613,11 +1631,10 @@ int main(void)
 
 					if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
 					{
-						g_active_memory = nextActiveMemory(g_active_memory, UP);
-				
-						if(g_active_memory == INVALID_CHANNEL)
+						if(!advanceActiveMemory(UP))
 						{
 							g_frequency_mode = MODE_VFO;
+							g_active_memory = 0;
 						}
 						else if(g_frequency_mode == MODE_MEMORY)
 						{
@@ -1637,7 +1654,6 @@ int main(void)
 					}
 				}
 			
-				g_handle_counted_rightsense_presses = 0;
 			}
 		
 	// 		if(g_rightsense_closed_time >= 200)
@@ -1645,7 +1661,7 @@ int main(void)
 	// 			g_audio_test = true;
 	// 		}
 		
-			if(g_long_rightsense_press)
+			if(atomicExchangeBool(&g_long_rightsense_press, false))
 			{
 				if(setMenu(MenuGetCurrent) != MenuOperational)
 				{
@@ -1657,11 +1673,10 @@ int main(void)
 
 					if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
 					{
-						g_active_memory = nextActiveMemory(g_active_memory, UP);
-				
-						if(g_active_memory == INVALID_CHANNEL)
+						if(!advanceActiveMemory(UP))
 						{
 							g_frequency_mode = MODE_VFO;
+							g_active_memory = 0;
 						}
 						else if(g_frequency_mode == MODE_MEMORY)
 						{
@@ -1681,17 +1696,17 @@ int main(void)
 					}
 				}
 			
-				g_long_rightsense_press = false;
 			}
 		
 			/*********************************
 			* Encoder switch pressed 
 			*********************************/
-			if(g_handle_counted_encoder_presses)
+			uint16_t encoder_presses = atomicExchangeU16(&g_handle_counted_encoder_presses, 0);
+			if(encoder_presses)
 			{
-				if(g_handle_counted_encoder_presses == 1)
+				if(encoder_presses == 1)
 				{
-					if((g_frequency_mode == MODE_VFO) && (nextActiveMemory(g_active_memory, UP) != 0xFF))
+					if((g_frequency_mode == MODE_VFO) && advanceActiveMemory(UP))
 					{
 						g_frequency_mode = MODE_MEMORY;
 						g_rx_frequency = g_channel_frequency[g_active_memory];
@@ -1704,7 +1719,7 @@ int main(void)
 				
 					refresh_display = true;
 				}
-				else if (g_handle_counted_encoder_presses == 2)
+				else if (encoder_presses == 2)
 				{
 					switch(setMenu(MenuGetCurrent))
 					{
@@ -1784,7 +1799,7 @@ int main(void)
 						break;
 					}
 				}
-				else if (g_handle_counted_encoder_presses == 3)
+				else if (encoder_presses == 3)
 				{
 					if(setMenu(MenuGetCurrent) == MenuSetMemFreq)
 					{
@@ -1794,17 +1809,10 @@ int main(void)
 					}
 				}
 			
-				g_handle_counted_encoder_presses = 0;
 			}
 		
-			if(g_encoder_closed_time >= 1000)
+			if(atomicExchangeBool(&g_long_encoder_press, false))
 			{
-			}
-		
-			if(g_long_encoder_press)
-			{
-				g_long_encoder_press = false;
-
 				if(!inhibit_long_encoder_press)
 				{
 				}
@@ -1815,14 +1823,15 @@ int main(void)
 			*********************************/
 			if(!g_encoderswitch_pressed) inhibit_long_encoder_press = false;
 		
-			if(g_rotary_count)
+			int rotary_step = atomicConsumeIntStep(&g_rotary_count);
+			if(rotary_step)
 			{
 				uint8_t pwm = g_rf_gain_setting;
 			
-				g_powerdown_seconds = INACTIVITY_POWER_DOWN_DELAY_SECONDS;
+				atomicWriteU16(&g_powerdown_seconds, INACTIVITY_POWER_DOWN_DELAY_SECONDS);
 				inhibit_long_encoder_press = g_encoderswitch_pressed;
 			
-				if(g_rotary_count < 0)
+				if(rotary_step < 0)
 				{
 					switch(setMenu(MenuGetCurrent))
 					{
@@ -1836,22 +1845,24 @@ int main(void)
 							{
 								if(g_frequency_mode == MODE_VFO)
 								{
-									if(g_rx_frequency < RX_MAXIMUM_80M_FREQUENCY)
+									Frequency_Hz requested_frequency = g_rx_frequency;
+									uint32_t step_hz = g_encoderswitch_pressed ? 1000 : 100;
+									if(receiverFrequencyStep(g_rx_frequency, 1, step_hz, &requested_frequency))
 									{
-										if(g_encoderswitch_pressed)
-										{
-											g_rx_frequency += 1000;
-										}
-										else
-										{
-											g_rx_frequency += 100;
-										}
+										g_rx_frequency = requested_frequency;
 									}
 								}
 								else
 								{
-									g_active_memory = nextActiveMemory(g_active_memory, UP);
-									g_rx_frequency = g_channel_frequency[g_active_memory];
+									if(advanceActiveMemory(UP))
+									{
+										g_rx_frequency = g_channel_frequency[g_active_memory];
+									}
+									else
+									{
+										g_frequency_mode = MODE_VFO;
+										g_active_memory = 0;
+									}
 								}
 
 								si5351_set_quad_frequency(g_rx_frequency);
@@ -1899,16 +1910,11 @@ int main(void)
 					
 						case MenuSetMemFreq:
 						{
-							if(g_rx_frequency < RX_MAXIMUM_80M_FREQUENCY)
+							Frequency_Hz requested_frequency = g_rx_frequency;
+							uint32_t step_hz = g_encoderswitch_pressed ? 1000 : 100;
+							if(receiverFrequencyStep(g_rx_frequency, 1, step_hz, &requested_frequency))
 							{
-								if(g_encoderswitch_pressed)
-								{
-									g_rx_frequency += 1000;
-								}
-								else
-								{
-									g_rx_frequency += 100;
-								}
+								g_rx_frequency = requested_frequency;
 							}
 
 							g_channel_frequency[g_active_memory] = g_rx_frequency;
@@ -1966,7 +1972,6 @@ int main(void)
 						break;
 					}
 				
-					g_rotary_count++;
 				}
 				else
 				{
@@ -1982,22 +1987,24 @@ int main(void)
 							{
 								if(g_frequency_mode == MODE_VFO)
 								{
-									if(g_rx_frequency > RX_MINIMUM_80M_FREQUENCY)
+									Frequency_Hz requested_frequency = g_rx_frequency;
+									uint32_t step_hz = g_encoderswitch_pressed ? 1000 : 100;
+									if(receiverFrequencyStep(g_rx_frequency, -1, step_hz, &requested_frequency))
 									{
-										if(g_encoderswitch_pressed)
-										{
-											g_rx_frequency -= 1000;
-										}
-										else
-										{
-											g_rx_frequency -= 100;
-										}				
+										g_rx_frequency = requested_frequency;
 									}
 								}
 								else
 								{
-									g_active_memory = nextActiveMemory(g_active_memory, !UP);
-									g_rx_frequency = g_channel_frequency[g_active_memory];
+									if(advanceActiveMemory(!UP))
+									{
+										g_rx_frequency = g_channel_frequency[g_active_memory];
+									}
+									else
+									{
+										g_frequency_mode = MODE_VFO;
+										g_active_memory = 0;
+									}
 								}
 
 								si5351_set_quad_frequency(g_rx_frequency);
@@ -2051,17 +2058,11 @@ int main(void)
 					
 						case MenuSetMemFreq:
 						{
-							if(g_rx_frequency > RX_MINIMUM_80M_FREQUENCY)
+							Frequency_Hz requested_frequency = g_rx_frequency;
+							uint32_t step_hz = g_encoderswitch_pressed ? 1000 : 100;
+							if(receiverFrequencyStep(g_rx_frequency, -1, step_hz, &requested_frequency))
 							{
-								if(g_encoderswitch_pressed)
-								{
-									g_rx_frequency -= 1000;
-								}
-								else
-								{
-									g_rx_frequency -= 100;
-								}
-						
+								g_rx_frequency = requested_frequency;
 								g_channel_frequency[g_active_memory] = g_rx_frequency;
 							}
 						}
@@ -2136,13 +2137,12 @@ int main(void)
 						break;
 					}
 
-					g_rotary_count--;
 				}		
 			}
 		}
 		
 //======================================================		
-		if(g_goertzel.SamplesReady() && !g_rssi_countdown)
+		if(g_goertzel.SamplesReady() && !atomicReadU16(&g_rssi_countdown))
 		{
 			static uint8_t init = NOMINAL_BUFF_SIZE;
 			float level, levelA, levelB, levelC; //, minLevel, maxLevel;
@@ -2154,7 +2154,7 @@ int main(void)
 			static uint8_t holdPWM = 255;
 			bool sigDetected = false;
 								
-			g_rssi_countdown = 5;
+			atomicWriteU16(&g_rssi_countdown, 5);
 
 			int clipCount = 0;
 
@@ -2164,6 +2164,7 @@ int main(void)
 			levelB = g_goertzel.Magnitude2(&clipCount);     /* Check samples for presence of the target frequency */
 			g_goertzel.SetTargetFrequency(pitch_frequencies[2]);    /* Initialize the object with the sampling frequency, # of samples and target freq */
 			levelC = g_goertzel.Magnitude2(&clipCount);     /* Check samples for presence of the target frequency */
+			g_goertzel.ReleaseSamples();
 
 			level = (levelA + levelB + levelC);
 
@@ -2211,7 +2212,7 @@ int main(void)
 						g_nominal_buff.put(low_water);
 					}
 										
-					g_rssi_buff.put((uint16_t)(100. * (log10f(highSigDetectThreshold) - log10f(nominal + 20.))));
+					g_rssi_buff.put(receiverSignalScore(highSigDetectThreshold, nominal));
 					signal_to_noise = g_rssi_buff.olympic();
 
 					if(sigDetected)
@@ -2234,7 +2235,7 @@ int main(void)
 								if(signal_to_noise > g_goertzel_rssi)
 								{
 									g_goertzel_rssi++;
-									g_rssi_countdown = 0;
+									atomicWriteU16(&g_rssi_countdown, 0);
 								}
 							}				
 							else
@@ -2319,7 +2320,8 @@ int main(void)
 
 void wdt_init(WDReset resetType)
 {
-	
+	/* Watchdog control is not implemented in the released 0.38 firmware. */
+	(void)resetType;
 }
 
 EC hw_init()
@@ -2481,50 +2483,21 @@ char *trimwhitespace(char *str)
 
 uint8_t nextActiveMemory(uint8_t currentChan, bool up)
 {
-	uint8_t i = currentChan;
-	uint8_t count = 0;
-	bool done = false;
-	
-	if(up)
-	{	
-		while(!done && (count < NUMBER_OF_FREQUENCY_CHANNELS))
-		{
-			count++;
-			i++;
-			
-			if(i >= NUMBER_OF_FREQUENCY_CHANNELS)
-			{
-				i = 0;
-			}
-			
-			if(g_channel_frequency[i])
-			{
-				done = true;
-			}
-		}
-	}
-	else
+	return findNextActiveMemory(g_channel_frequency,
+		NUMBER_OF_FREQUENCY_CHANNELS,
+		currentChan,
+		up,
+		INVALID_CHANNEL);
+}
+
+bool advanceActiveMemory(bool up)
+{
+	const uint8_t nextChannel = nextActiveMemory(g_active_memory, up);
+	if(nextChannel == INVALID_CHANNEL)
 	{
-		while(!done && (count < NUMBER_OF_FREQUENCY_CHANNELS))
-		{
-			count++;
-			if(i)
-			{
-				i--;
-			}
-			else
-			{
-				i = NUMBER_OF_FREQUENCY_CHANNELS - 1;
-			}
-			
-			if(g_channel_frequency[i])
-			{
-				done = true;
-			}
-		}
+		return false;
 	}
-	
-	if(!done) i = INVALID_CHANNEL;
-	
-	return(i);
+
+	g_active_memory = nextChannel;
+	return true;
 }

@@ -8,9 +8,7 @@
 
 #include "CircularUintBuff.h"
 #include <stdlib.h>
-#include <ctype.h>
 #include <stdint.h>
-#include "defs.h"
 
 CircularUintBuff::CircularUintBuff(size_t size)
 {
@@ -103,6 +101,11 @@ size_t CircularUintBuff::remaining() const
  */
 void CircularUintBuff::put(uint16_t item)
 {
+  if (!buf_ || !max_size_)
+  {
+    return;
+  }
+
   buf_[head_] = item;
 
   if (full_)
@@ -135,7 +138,7 @@ uint16_t CircularUintBuff::pop()
 	  head_ = (max_size_-1);
   }
   
-  float val = buf_[head_];
+  uint16_t val = buf_[head_];
   
   full_ = false;
 
@@ -145,7 +148,7 @@ uint16_t CircularUintBuff::pop()
 /** 
  * Return the FIFO entry and delete it from the buffer
  */
-float CircularUintBuff::get()
+uint16_t CircularUintBuff::get()
 {
   if (empty())
   {
@@ -153,7 +156,7 @@ float CircularUintBuff::get()
   }
 
   /* Read data and advance the tail (we now have a free space) */
-  float val = buf_[tail_];
+  uint16_t val = buf_[tail_];
   full_ = false;
   tail_ = (tail_ + 1) % max_size_;
 
@@ -162,17 +165,27 @@ float CircularUintBuff::get()
 
 uint16_t CircularUintBuff::olympic()
 {
-	uint32_t accum=0., max=0., min=0.;
-	
-	for(uint8_t i = 0; i < max_size_; ++i)
+	size_t count = size();
+	if (!buf_ || !count)
 	{
-		accum += buf_[i];
-		min = MIN(buf_[i], min);
-		max = MAX(buf_[i], max);
+		return 0;
 	}
-	  
-	accum -= min;
-	accum -= max;
-	
-	return(accum/((uint16_t)(max_size_-2)));
+
+	uint16_t first = buf_[tail_];
+	uint32_t accum = 0;
+	uint16_t minimum = first;
+	uint16_t maximum = first;
+	for (size_t i = 0; i < count; ++i)
+	{
+		uint16_t value = buf_[(tail_ + i) % max_size_];
+		accum += value;
+		if (value < minimum) minimum = value;
+		if (value > maximum) maximum = value;
+	}
+
+	if (count > 2)
+	{
+		return (uint16_t)((accum - minimum - maximum) / (count - 2));
+	}
+	return (uint16_t)(accum / count);
 }

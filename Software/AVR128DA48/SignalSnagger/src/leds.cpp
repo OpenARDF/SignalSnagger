@@ -9,6 +9,7 @@
 #include "atmel_start_pins.h"
 #include "leds.h"
 #include "CircularStringBuff.h"
+#include "shared_state.h"
 #include <string.h>
 
 #define FAST_ON 25
@@ -146,7 +147,7 @@ ISR(TCB3_INT_vect)
 
 bool leds::active(void)
 {
-	return(led_timeout_count && (TCB3.INTCTRL & (1 << TCB_CAPT_bp)));
+	return(atomicReadU32(&led_timeout_count) && (TCB3.INTCTRL & (1 << TCB_CAPT_bp)));
 }
 
 void leds::deactivate(void)
@@ -156,12 +157,12 @@ void leds::deactivate(void)
 	LED_set_GREEN_level(OFF);
 	g_text_buff.reset();
 	timer_red_blink_inhibit = timer_green_blink_inhibit = true; /* Disable timer LED control */
-	led_timeout_count = 0;
+	atomicWriteU32(&led_timeout_count, 0);
 }
 
 void leds::setRed(bool on)
 {
-	if(!led_timeout_count) return;
+	if(!atomicReadU32(&led_timeout_count)) return;
 
 //	TCB3.INTCTRL &= ~TCB_CAPT_bm;   /* Capture or Timeout: disabled */
 
@@ -179,7 +180,7 @@ void leds::setRed(bool on)
 
 void leds::setGreen(bool on)
 {
-	if(!led_timeout_count) return;
+	if(!atomicReadU32(&led_timeout_count)) return;
 
 //	TCB3.INTCTRL &= ~TCB_CAPT_bm;   /* Capture or Timeout: disabled */
 
@@ -201,7 +202,7 @@ void leds::reset(void)
 	blink(LEDS_OFF);
 	g_text_buff.reset();
 	timer_red_blink_inhibit = timer_green_blink_inhibit = false; /* Enable timer LED control */
-	led_timeout_count = LED_TIMEOUT_DELAY;
+	atomicWriteU32(&led_timeout_count, LED_TIMEOUT_DELAY);
 }
 
 /* Disables LED timer while resetting settings for interrupt safety. */
@@ -218,9 +219,9 @@ void leds::init(Blink_t setBlink)
 	if(setBlink != LEDS_OFF) blink(setBlink, true);
 }
 
-void leds::sendCode(char* str)
+void leds::sendCode(const char* str)
 {
-	if(!led_timeout_count) return;
+	if(!atomicReadU32(&led_timeout_count)) return;
 	if(g_text_buff.isBusy()) return;
 	
 	if(!str || !strlen(str))
@@ -228,16 +229,12 @@ void leds::sendCode(char* str)
 		return;
 	}
 
-	int lenstr = strlen(str);					
-	int i = 0;
+	if(g_text_buff.putString(str))
+	{
+		return;
+	}
 
 	g_enable_LED_enunciations = false; /* simple thread collision avoidance */
-	
-	while(!g_text_buff.full() && i<lenstr && i<TEXT_BUFF_SIZE)
-	{
-		g_text_buff.put(str[i++]);
-	}
-	
 	timer_red_blink_inhibit = true; /* Prevent timer from controlling LED */
 }
 
@@ -254,10 +251,10 @@ void leds::blink(Blink_t blinkMode, bool resetTimeout)
 {
 	if(resetTimeout)
 	{
-		led_timeout_count = LED_TIMEOUT_DELAY;
+		atomicWriteU32(&led_timeout_count, LED_TIMEOUT_DELAY);
 	}
 	
-	if(!led_timeout_count && (blinkMode != LEDS_OFF)) return;
+	if(!atomicReadU32(&led_timeout_count) && (blinkMode != LEDS_OFF)) return;
 	
 	isRed = ((blinkMode == LEDS_RED_OFF) || (blinkMode == LEDS_RED_BLINK_FAST) || (blinkMode == LEDS_RED_BLINK_SLOW) || (blinkMode == LEDS_RED_ON_CONSTANT));
 	isGreen = ((blinkMode == LEDS_GREEN_OFF) || (blinkMode == LEDS_GREEN_BLINK_FAST) || (blinkMode == LEDS_GREEN_BLINK_SLOW) || (blinkMode == LEDS_GREEN_ON_CONSTANT));

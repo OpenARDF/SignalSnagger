@@ -27,6 +27,7 @@
 #include "i2c.h"
 #include "receiver.h"
 #include <avr/pgmspace.h>
+#include <stddef.h>
 #include <string.h>
 
 #ifdef ATMEL_STUDIO_7
@@ -35,6 +36,53 @@
 #include <string.h>
 #include <math.h>
 #endif  /* ATMEL_STUDIO_7 */
+
+#define ASSERT_EEPROM_OFFSET(member, address) \
+	static_assert(offsetof(EE_prom, member) == (address), "EEPROM layout mismatch: " #member)
+
+ASSERT_EEPROM_OFFSET(eeprom_initialization_flag, Eeprom_initialization_flag);
+ASSERT_EEPROM_OFFSET(event_start_epoch, Event_start_epoch);
+ASSERT_EEPROM_OFFSET(event_finish_epoch, Event_finish_epoch);
+ASSERT_EEPROM_OFFSET(pattern_text, Pattern_text);
+ASSERT_EEPROM_OFFSET(foxoring_pattern_text, Foxoring_pattern_text);
+ASSERT_EEPROM_OFFSET(stationID_text, StationID_text);
+ASSERT_EEPROM_OFFSET(unlockCode, UnlockCode);
+ASSERT_EEPROM_OFFSET(fox_setting_none, Fox_setting_none);
+ASSERT_EEPROM_OFFSET(fox_setting_classic, Fox_setting_classic);
+ASSERT_EEPROM_OFFSET(fox_setting_sprint, Fox_setting_sprint);
+ASSERT_EEPROM_OFFSET(fox_setting_foxoring, Fox_setting_foxoring);
+ASSERT_EEPROM_OFFSET(fox_setting_blind, Fox_setting_blind);
+ASSERT_EEPROM_OFFSET(utc_offset, Utc_offset);
+ASSERT_EEPROM_OFFSET(rtty_offset, RTTY_offset);
+ASSERT_EEPROM_OFFSET(rf_power, RF_Power);
+ASSERT_EEPROM_OFFSET(id_codespeed, Id_codespeed);
+ASSERT_EEPROM_OFFSET(pattern_codespeed, Pattern_Code_Speed);
+ASSERT_EEPROM_OFFSET(foxoring_pattern_codespeed, Foxoring_Pattern_Code_Speed);
+ASSERT_EEPROM_OFFSET(off_air_seconds, Off_Air_Seconds);
+ASSERT_EEPROM_OFFSET(on_air_seconds, On_Air_Seconds);
+ASSERT_EEPROM_OFFSET(ID_period_seconds, ID_Period_Seconds);
+ASSERT_EEPROM_OFFSET(intra_cycle_delay_time, Intra_Cycle_Delay_Seconds);
+ASSERT_EEPROM_OFFSET(event_setting, Event_setting);
+ASSERT_EEPROM_OFFSET(frequency, Frequency);
+ASSERT_EEPROM_OFFSET(frequency_low, Frequency_Low);
+ASSERT_EEPROM_OFFSET(frequency_med, Frequency_Med);
+ASSERT_EEPROM_OFFSET(frequency_high, Frequency_Hi);
+ASSERT_EEPROM_OFFSET(frequency_beacon, Frequency_Beacon);
+ASSERT_EEPROM_OFFSET(master_setting, Master_setting);
+ASSERT_EEPROM_OFFSET(voltage_threshold, Voltage_threshold);
+ASSERT_EEPROM_OFFSET(clock_calibration, Clock_calibration);
+ASSERT_EEPROM_OFFSET(days_to_run, Days_to_run);
+ASSERT_EEPROM_OFFSET(i2c_failure_count, I2C_failure_count);
+ASSERT_EEPROM_OFFSET(channel_frequency, Frequency_Memory);
+ASSERT_EEPROM_OFFSET(channel_name, Channel_Name);
+ASSERT_EEPROM_OFFSET(frequency_mode, Frequency_Mode);
+ASSERT_EEPROM_OFFSET(battery_capacity, Battery_Capacity);
+ASSERT_EEPROM_OFFSET(battery_threshold, Battery_Threshold);
+ASSERT_EEPROM_OFFSET(active_memory, Active_Memory);
+static_assert(sizeof(EE_prom) == Active_Memory + sizeof(uint8_t),
+	"EEPROM layout size must end after active_memory");
+
+#undef ASSERT_EEPROM_OFFSET
 
 /***********************************************************************
  * Global Variables & String Constants
@@ -215,32 +263,49 @@ EepromManager::~EepromManager()
 
 typedef uint16_t eeprom_addr_t;
 
+#define EEPROM_READY_SPIN_GUARD UINT32_C(2000000)
+
+static bool eepromWaitReady(void)
+{
+	uint32_t spinGuard = EEPROM_READY_SPIN_GUARD;
+	while((NVMCTRL.STATUS & NVMCTRL_EEBUSY_bm) && spinGuard)
+	{
+		spinGuard--;
+	}
+
+	return !(NVMCTRL.STATUS & NVMCTRL_EEBUSY_bm);
+}
+
 // to write
 void avr_eeprom_write_byte(eeprom_addr_t index, uint8_t in) {
-	while (NVMCTRL.STATUS & NVMCTRL_EEBUSY_bm);
+	if(!eepromWaitReady()) return;
 	_PROTECTED_WRITE_SPM(NVMCTRL.CTRLA, NVMCTRL_CMD_EEERWR_gc);
 	*(uint8_t*)(eeprom_addr_t)(MAPPED_EEPROM_START+index) = in;
+	(void)eepromWaitReady();
 	_PROTECTED_WRITE_SPM(NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
 }
 
 void avr_eeprom_write_word(eeprom_addr_t index, uint16_t in) {
-	while (NVMCTRL.STATUS & NVMCTRL_EEBUSY_bm);
+	if(!eepromWaitReady()) return;
 	_PROTECTED_WRITE_SPM(NVMCTRL.CTRLA, NVMCTRL_CMD_EEERWR_gc);
 	*(uint16_t*)(eeprom_addr_t)(MAPPED_EEPROM_START+index) = in;
+	(void)eepromWaitReady();
 	_PROTECTED_WRITE_SPM(NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
 }
 
 void avr_eeprom_write_dword(eeprom_addr_t index, uint32_t in) {
-	while (NVMCTRL.STATUS & NVMCTRL_EEBUSY_bm);
+	if(!eepromWaitReady()) return;
 	_PROTECTED_WRITE_SPM(NVMCTRL.CTRLA, NVMCTRL_CMD_EEERWR_gc);
 	*(uint32_t*)(eeprom_addr_t)(MAPPED_EEPROM_START+index) = in;
+	(void)eepromWaitReady();
 	_PROTECTED_WRITE_SPM(NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
 }
 
 void avr_eeprom_write_float(eeprom_addr_t index, float in) {
-	while (NVMCTRL.STATUS & NVMCTRL_EEBUSY_bm);
+	if(!eepromWaitReady()) return;
 	_PROTECTED_WRITE_SPM(NVMCTRL.CTRLA, NVMCTRL_CMD_EEERWR_gc);
 	*(float*)(eeprom_addr_t)(MAPPED_EEPROM_START+index) = in;
+	(void)eepromWaitReady();
 	_PROTECTED_WRITE_SPM(NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
 }
 
@@ -616,7 +681,7 @@ void EepromManager::updateEEPROMVar(EE_var_t v, void* val)
 		{
 			if(*(uint16_t*)val != eeprom_read_word(&(EepromManager::ee_vars.i2c_failure_count)))
 			{
-				avr_eeprom_write_byte(I2C_failure_count, *(uint8_t*)val);
+				avr_eeprom_write_word(I2C_failure_count, *(uint16_t*)val);
 			}
 		}
 		break;
@@ -624,24 +689,21 @@ void EepromManager::updateEEPROMVar(EE_var_t v, void* val)
 		
 		case Frequency_Memory:
 		{
-			int cnt = 0;
+			uint8_t cnt = 0;
 			Frequency_Hz* freq_addr = (Frequency_Hz*)val;
-			Frequency_Hz f = *freq_addr;
-			Frequency_Hz q;
 			
 			eeprom_addr_t j = (eeprom_addr_t)Frequency_Memory;
 
 			while(cnt<NUMBER_OF_FREQUENCY_CHANNELS)
 			{
-				q = (Frequency_Hz)eeprom_read_dword((uint32_t*)j);
+				const Frequency_Hz f = freq_addr[cnt];
+				const Frequency_Hz q = (Frequency_Hz)eeprom_read_dword((uint32_t*)j);
 				if(f != q)
 				{
 					avr_eeprom_write_dword(j, f);
 				}
 
 				cnt++;
-				freq_addr++;
-				f = *freq_addr;
 				j += 4;
 			}
 		}
@@ -650,24 +712,21 @@ void EepromManager::updateEEPROMVar(EE_var_t v, void* val)
 		
 		case Channel_Name:
 		{
-			int cnt = 0;
+			uint8_t cnt = 0;
 			uint8_t* name_addr = (uint8_t*)val;
-			uint8_t n = *name_addr;
-			uint8_t q;
 			
 			eeprom_addr_t j = (eeprom_addr_t)Channel_Name;
 
 			while(cnt<NUMBER_OF_FREQUENCY_CHANNELS)
 			{
-				q = (uint8_t)eeprom_read_byte((uint8_t*)j);
+				const uint8_t n = name_addr[cnt];
+				const uint8_t q = (uint8_t)eeprom_read_byte((uint8_t*)j);
 				if(n != q)
 				{
-					avr_eeprom_write_dword(j, n);
+					avr_eeprom_write_byte(j, n);
 				}
 
 				cnt++;
-				name_addr++;
-				n = *name_addr;
 				j++;
 			}
 		}
@@ -782,11 +841,11 @@ bool EepromManager::readNonVols(void)
 		g_frequency_med = CLAMP(RX_MINIMUM_80M_FREQUENCY, eeprom_read_dword(&(EepromManager::ee_vars.frequency_med)), RX_MAXIMUM_80M_FREQUENCY);
 		g_frequency_hi = CLAMP(RX_MINIMUM_80M_FREQUENCY, eeprom_read_dword(&(EepromManager::ee_vars.frequency_high)), RX_MAXIMUM_80M_FREQUENCY);
 		g_frequency_beacon = CLAMP(RX_MINIMUM_80M_FREQUENCY, eeprom_read_dword(&(EepromManager::ee_vars.frequency_beacon)), RX_MAXIMUM_80M_FREQUENCY);
-		g_fox[EVENT_NONE] = (Fox_t)(CLAMP(BEACON, eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.fox_setting_none)), SPRINT_F5));
-		g_fox[EVENT_CLASSIC] = (Fox_t)(CLAMP(BEACON, eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.fox_setting_classic)), FOX_5));
-		g_fox[EVENT_SPRINT] = (Fox_t)(CLAMP(BEACON, eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.fox_setting_sprint)), SPRINT_F5));
-		g_fox[EVENT_FOXORING] = (Fox_t)(CLAMP(BEACON, eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.fox_setting_foxoring)), FOXORING_FOX3));
-		g_fox[EVENT_BLIND_ARDF] = (Fox_t)(CLAMP(BEACON, eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.fox_setting_blind)), FOX_5));
+	g_fox[EVENT_NONE] = (Fox_t)(CLAMP((uint8_t)BEACON, eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.fox_setting_none)), (uint8_t)SPRINT_F5));
+	g_fox[EVENT_CLASSIC] = (Fox_t)(CLAMP((uint8_t)BEACON, eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.fox_setting_classic)), (uint8_t)FOX_5));
+	g_fox[EVENT_SPRINT] = (Fox_t)(CLAMP((uint8_t)BEACON, eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.fox_setting_sprint)), (uint8_t)SPRINT_F5));
+	g_fox[EVENT_FOXORING] = (Fox_t)(CLAMP((uint8_t)BEACON, eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.fox_setting_foxoring)), (uint8_t)FOXORING_FOX3));
+	g_fox[EVENT_BLIND_ARDF] = (Fox_t)(CLAMP((uint8_t)BEACON, eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.fox_setting_blind)), (uint8_t)FOX_5));
 		g_event_start_epoch = eeprom_read_dword(&(EepromManager::ee_vars.event_start_epoch));
 		g_event_finish_epoch = eeprom_read_dword(&(EepromManager::ee_vars.event_finish_epoch));
 		g_utc_offset = (int8_t)eeprom_read_byte(&(EepromManager::ee_vars.utc_offset));
@@ -802,6 +861,7 @@ bool EepromManager::readNonVols(void)
 				break;
 			}
 		}
+		g_messages_text[PATTERN_TEXT][MAX_PATTERN_TEXT_LENGTH] = '\0';
 
 		for(i = 0; i < MAX_PATTERN_TEXT_LENGTH; i++)
 		{
@@ -813,6 +873,7 @@ bool EepromManager::readNonVols(void)
 				break;
 			}
 		}
+		g_messages_text[FOXORING_PATTERN_TEXT][MAX_PATTERN_TEXT_LENGTH] = '\0';
 
 		for(i = 0; i < MAX_PATTERN_TEXT_LENGTH; i++)
 		{
@@ -824,6 +885,7 @@ bool EepromManager::readNonVols(void)
 				break;
 			}
 		}
+		g_messages_text[STATION_ID][MAX_PATTERN_TEXT_LENGTH] = '\0';
 
 		for(i = 0; i < MAX_UNLOCK_CODE_LENGTH; i++)
 		{
@@ -835,6 +897,7 @@ bool EepromManager::readNonVols(void)
 				break;
 			}
 		}
+		g_unlockCode[MAX_UNLOCK_CODE_LENGTH] = '\0';
 		
 		g_rtty_offset =eeprom_read_dword(&(EepromManager::ee_vars.rtty_offset));
  		g_80m_power_level_mW = CLAMP(MIN_RF_POWER_MW, (uint16_t)eeprom_read_word(&(EepromManager::ee_vars.rf_power)), MAX_TX_POWER_80M_MW);
@@ -878,13 +941,13 @@ bool EepromManager::readNonVols(void)
 		if(g_frequency_mode != MODE_MEMORY) g_frequency_mode = MODE_VFO;
 		
 		g_battery_capacity = (BatteryCapacity_t)eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.battery_capacity));
-		if((uint8_t)g_battery_capacity > NUMBER_OF_BATTERY_CAPACITY_VALUES) g_battery_capacity = MAH_450mAh;
+		if((uint8_t)g_battery_capacity >= NUMBER_OF_BATTERY_CAPACITY_VALUES) g_battery_capacity = MAH_450mAh;
 		
 		g_battery_warning_threshold = (BatteryWarnThreshold_t)eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.battery_threshold));
-		if((uint8_t)g_battery_warning_threshold > 100) g_battery_warning_threshold = 10;
+		if((uint8_t)g_battery_warning_threshold > 99) g_battery_warning_threshold = 10;
 		
 		g_active_memory = (uint8_t)eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.active_memory));
-		if((uint8_t)g_active_memory > NUMBER_OF_FREQUENCY_CHANNELS) g_active_memory = 0;
+		if((uint8_t)g_active_memory >= NUMBER_OF_FREQUENCY_CHANNELS) g_active_memory = 0;
 
 		failure = false;
 	}
@@ -990,7 +1053,7 @@ bool EepromManager::readNonVols(void)
 			avr_eeprom_write_dword(RTTY_offset, g_rtty_offset);
 
 			g_80m_power_level_mW = EEPROM_TX_80M_POWER_MW_DEFAULT;
-			avr_eeprom_write_dword(RF_Power, g_80m_power_level_mW);
+			avr_eeprom_write_word(RF_Power, g_80m_power_level_mW);
 			
 			g_pattern_codespeed = EEPROM_PATTERN_CODE_SPEED_DEFAULT;
 			avr_eeprom_write_byte(Pattern_Code_Speed, g_pattern_codespeed);
@@ -1022,7 +1085,7 @@ bool EepromManager::readNonVols(void)
 			avr_eeprom_write_byte(Days_to_run, g_days_to_run);
 			
 			g_i2c_failure_count = 0;
-			avr_eeprom_write_dword(I2C_failure_count, g_i2c_failure_count);
+			avr_eeprom_write_word(I2C_failure_count, g_i2c_failure_count);
 
 			i = Frequency_Memory;
 			for(j = 0; j < NUMBER_OF_FREQUENCY_CHANNELS; j++)

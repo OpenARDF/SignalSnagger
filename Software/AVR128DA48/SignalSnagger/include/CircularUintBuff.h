@@ -10,15 +10,17 @@
 #define __CIRCULARUINTBUFF_H__
 
 #include <stddef.h>
-#include "defs.h"
+#include <stdint.h>
 
 class CircularUintBuff {
 	public:
 	~CircularUintBuff();
 	CircularUintBuff(size_t);
+	CircularUintBuff(const CircularUintBuff&) = delete;
+	CircularUintBuff& operator=(const CircularUintBuff&) = delete;
 
 	void put(uint16_t item);
-	float get(void);
+	uint16_t get(void);
 	void reset(void);
 	bool empty(void) const;
 	bool full(void) const;

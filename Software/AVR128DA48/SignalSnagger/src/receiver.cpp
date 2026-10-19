@@ -51,6 +51,8 @@ Frequency_Hz g_channel_frequency[NUMBER_OF_FREQUENCY_CHANNELS];
 	bool rxSetFrequency(Frequency_Hz *freq, bool leaveClockOff)
 	{
 		bool err = true;
+		/* The released implementation does not yet support leaving clocks off. */
+		(void)leaveClockOff;
 
 		if(!freq) return(err);
 		

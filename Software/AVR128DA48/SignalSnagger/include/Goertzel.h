@@ -30,13 +30,10 @@
 #ifndef Goertzel_h
 #define Goertzel_h
 
-/* include types & constants of Wiring core API */
-#include "defs.h"
-
-#if !INIT_EEPROM_ONLY
+#if !defined(INIT_EEPROM_ONLY) || !INIT_EEPROM_ONLY
 
 #include <math.h>
-#include <stdlib.h>
+#include <stdint.h>
 
 #define MAXN 209
 #define MINN 21
@@ -54,18 +51,38 @@ class Goertzel
 {
 public:
 Goertzel(float, float);
-~Goertzel();
+~Goertzel() = default;
+Goertzel(const Goertzel&) = delete;
+Goertzel& operator=(const Goertzel&) = delete;
 void SetTargetFrequency(float);
 bool DataPoint(int);
 float Magnitude2(int *highCount);
 bool SamplesReady(void);
+/** Release the analyzed block so the ISR can publish the next completed block. */
+void ReleaseSamples(void);
 void Flush(void);
 
 private:
 void ProcessSample(int);
-void ResetGoertzel(void);
+void ResetAnalysis(void);
+void PublishCapturedBlock(void);
+
+float samplingFrequency_;
+float targetFrequency_;
+uint8_t sampleCount_;
+float coefficient_;
+float q1_;
+float q2_;
+volatile uint8_t captureIndex_;
+volatile uint8_t captureBuffer_;
+volatile uint8_t readyBuffer_;
+/* One-byte readiness is written by the ADC ISR and foreground code. */
+volatile bool samplesReady_;
+int highValueCount_;
+/* Two buffers keep the published block immutable during foreground analysis. */
+int testData_[2][MAXN];
 };
 
-#endif // !INIT_EEPROM_ONLY
+#endif // !defined(INIT_EEPROM_ONLY) || !INIT_EEPROM_ONLY
 
 #endif

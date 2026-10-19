@@ -15,12 +15,29 @@ The mechanical design is optimized for simplicity, ruggedness, and ergonomic com
 
 <b>Electronics Design</b>
 
-The electronics design is optimized to avoid part obsolescence and to provide high performance. SignalSlinger uses a Software Defined Radio design, utilizing a quadrature sampling detector to provide high dynamic range and to maximize software-upgradable features. A 25-MHz processor capable of sampling the baseband signal can filter and process the audio to achieve reliable signal strength indication and signal detection and supports DSP algorithms to achieve unparalleled SNR performance to detect weak signals deep in the noise.
+The electronics design is optimized to avoid part obsolescence and to provide high performance. SignalSnagger uses a Software Defined Radio design, utilizing a quadrature sampling detector to provide high dynamic range and to maximize software-upgradable features. A 25-MHz processor capable of sampling the baseband signal can filter and process the audio to achieve reliable signal strength indication and signal detection and supports DSP algorithms to achieve unparalleled SNR performance to detect weak signals deep in the noise.
 
 <b>Free and Open Design</b>
 
-The SignalSlinger project is 100% Open Source. All software and hardware design documents can be downloaded from this GitHub repository.
+The SignalSnagger project is 100% Open Source. All software and hardware design documents can be downloaded from this GitHub repository.
 
 BOM: https://docs.google.com/spreadsheets/d/1Z3T1SeX6hfT8fjVtJgXu2S2YWHPFD_kywdSzAihOS8g/edit?usp=sharing
 
 Also, check out SignalSnagger's sibling transmitter project: <a href="https://github.com/OpenARDF/SignalSlinger">SignalSlinger</a>.
+
+## Firmware development
+
+Firmware source lives in
+[`Software/AVR128DA48/SignalSnagger`](Software/AVR128DA48/SignalSnagger).
+Development and release work follows the same core OpenARDF policy used by
+SignalSlinger, adapted for SignalSnagger's single AVR128DA48 target:
+
+- [Codex workflow](CODEX_WORKFLOW.md)
+- [Build environment](BUILD_ENVIRONMENT.md)
+- [Release workflow](RELEASE_WORKFLOW.md)
+
+Start repository work with `just --list`. Use `just check` for the complete
+local change gate and `just release-preflight` for deterministic
+release-candidate verification. The Si5351 quadrature strategy is experimentally
+established and must not be changed without focused regression tests and
+representative hardware measurements.

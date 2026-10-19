@@ -116,6 +116,11 @@ size_t CircularStringBuff::remaining() const
  */
 void CircularStringBuff::put(char item)
 {
+  if (!buf_ || !max_size_)
+  {
+    return;
+  }
+
   buf_[head_] = item;
 
   if (full_)
@@ -138,8 +143,7 @@ char CircularStringBuff::pop()
 	  return ('\0');
   }
 
-  /*Read data and decrement the head (we now have one more free space) */
-  char val = buf_[head_];
+  /* head_ identifies the next write slot, so move back before reading. */
   if(head_) 
   {
 	  head_--;
@@ -148,6 +152,7 @@ char CircularStringBuff::pop()
   {
 	  head_ = (max_size_-1);
   }
+  char val = buf_[head_];
   
   full_ = false;
 
@@ -172,47 +177,63 @@ char CircularStringBuff::get()
   return (val);
 }
 
-bool CircularStringBuff::putString(char* string)
+bool CircularStringBuff::putString(const char* string)
 {
 	bool fail = true;
 	
-	if(full_) return(fail);
+	if(!string || !buf_ || !max_size_ || full_) return(fail);
 
 	size_t size = strlen(string);
-	if(size > remaining()) return(fail);
+	/* Every queued string owns a terminator; reject before mutating on overflow. */
+	if(size >= remaining()) return(fail);
 
-	uint8_t i = 0;
+	size_t i = 0;
 	
-	while((i < size) && !full_)
+	while(i < size)
 	{
 		put(string[i++]);
 	}
 	
-	if(!full_) put('\0');
+	put('\0');
 	
-	return(full_);
+	return(false);
 }
 
-void CircularStringBuff::getString(char* str, size_t *length)
+bool CircularStringBuff::getString(char* str, size_t capacity, size_t *length)
 {
+	if(length) *length = 0;
+	if(!str || !capacity || !buf_)
+	{
+		return true;
+	}
+
 	if(empty())
 	{
-		 str[0] = '\0';
-		 if(length) *length = 0;
-		 return;
+		str[0] = '\0';
+		return false;
 	}
-	
-	char c;
-	uint8_t i = 0;
-	
-	while((c = get()))
+
+	/* Measure the next framed string before consuming anything. */
+	size_t available = size();
+	size_t stringLength = 0;
+	int index = tail_;
+	while(stringLength < available && buf_[index] != '\0')
 	{
-		str[i++] = c;		
+		++stringLength;
+		index = (index + 1) % max_size_;
 	}
-	
-	str[i] = '\0';
-	
-	if(length) *length = i;
-	
-	return;
+
+	if(stringLength == available || stringLength + 1 > capacity)
+	{
+		return true;
+	}
+
+	for(size_t i = 0; i < stringLength; ++i)
+	{
+		str[i] = get();
+	}
+	(void)get(); /* Consume the framing terminator. */
+	str[stringLength] = '\0';
+	if(length) *length = stringLength;
+	return false;
 }

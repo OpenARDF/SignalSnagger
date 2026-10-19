@@ -32,6 +32,7 @@
 
 #define SAMPLE_RATE 96154
 #define Goertzel_N 101
+#define ADC_CONVERSION_SPIN_GUARD UINT32_C(100000)
 const int N = Goertzel_N;
 const float threshold = 500000. * (Goertzel_N / 100.);
 const float sampling_freq = SAMPLE_RATE;
@@ -71,6 +72,17 @@ bool ADC0_conversionDone(void)
 	return (ADC0.INTFLAGS & ADC_RESRDY_bm);
 }
 
+bool ADC0_waitForConversion(void)
+{
+	uint32_t spinGuard = ADC_CONVERSION_SPIN_GUARD;
+	while(!ADC0_conversionDone() && spinGuard)
+	{
+		spinGuard--;
+	}
+
+	return ADC0_conversionDone();
+}
+
 int ADC0_read(void)
 {
 	return ADC0.RES; 	/* Reading the result also clears the interrupt flag */
@@ -80,7 +92,6 @@ int16_t temperatureC(void)
 {
 	uint16_t sigrow_offset = SIGROW.TEMPSENSE1; // Read unsigned value from signature row
 	uint16_t sigrow_slope = SIGROW.TEMPSENSE0; // Read unsigned value from signature row
-	static uint32_t wait = 10000;
 	uint16_t adc_reading;
 	int16_t temperature_in_C = -273.15;
 	uint8_t holdMux;
@@ -91,9 +102,7 @@ int16_t temperatureC(void)
 	ADC0.MUXPOS = ADC_MUXPOS_TEMPSENSE_gc;
 	ADC0_startConversion();
 	
-	while((!ADC0_conversionDone()) && wait--);
-	
-	if(wait)
+	if(ADC0_waitForConversion())
 	{
 		adc_reading = ADC0.RES;
 		int32_t temp = sigrow_offset - adc_reading;
