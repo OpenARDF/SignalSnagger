@@ -30,3 +30,28 @@ fp-info-cache
 
 # Local host-test and AVR build outputs
 /build/
+__pycache__/
+*.pyc
+
+# Compiler and Microchip Studio outputs
+.vs/
+*.atsuo
+*.o
+*.d
+*.hex
+*.elf
+*.map
+*.mk
+*.eep
+*.lss
+*.srec
+*.obj
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.opendb
+
+# KiCad editor lock files
+~*.lck
