@@ -21,6 +21,7 @@
 #include "rtc.h"
 #include "tca.h"
 #include "display.h"
+#include "periodic_countdown.h"
 #include "shared_state.h"
 //#include "dac0.h"
 
@@ -197,7 +198,7 @@ Periodic tasks not requiring precise timing. Rate = 300 Hz
 */
 ISR(TCB0_INT_vect)
 {
-	static uint8_t fiftyMS = 6;
+	static uint8_t switchScanTicksRemaining = 6;
 	
 	uint8_t x = TCB0.INTFLAGS;
 	
@@ -212,8 +213,7 @@ ISR(TCB0_INT_vect)
 		static int holdRotaryEdges = 0;
 		static uint16_t rotaryNoMotionCountdown = 0;
 		
-		fiftyMS++;
-		if(!(fiftyMS % 6))
+		if(periodicCountdownTick(&switchScanTicksRemaining, 6))
 		{
 			uint8_t switch_bits = ((1 << SENSE_SWITCH_LEFT) | (1 << SENSE_SWITCH_RIGHT) | (1 << ENCODER_SWITCH));
 			holdSwitch = portAdebouncedVals() & switch_bits;

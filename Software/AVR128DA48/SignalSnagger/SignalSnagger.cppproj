@@ -217,6 +217,12 @@
     <Compile Include="include\CircularStringBuff.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="include\datetime_utils.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="include\periodic_countdown.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="include\receiver_frequency.h">
       <SubType>compile</SubType>
     </Compile>
@@ -350,6 +356,12 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\receiver.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\datetime_utils.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\periodic_countdown.cpp">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\receiver_frequency.cpp">
