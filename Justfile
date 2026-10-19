@@ -34,6 +34,22 @@ avr-build:
 avr-repeatability:
     ./scripts/check-avr-build-repeatability.sh
 
+# Build the deterministic single-target GitHub release package.
+release-package:
+    python3 ./scripts/package-avr-release.py
+
+# Independently validate a generated release package directory.
+release-package-validate package_dir:
+    python3 ./scripts/validate-avr-release-package.py --package-dir "{{package_dir}}" --require-clean
+
+# Build the complete release package twice and require byte-identical files.
+release-package-repeatability:
+    python3 ./scripts/check-avr-release-package-repeatability.py
+
+# Prove malformed, incomplete, and corrupted release packages are rejected.
+release-package-regression:
+    python3 ./scripts/test-avr-release-package.py
+
 # Scan the repository and history for secrets.
 secrets:
     gitleaks detect --source "{{repo_root}}" --no-banner --redact
@@ -42,7 +58,7 @@ secrets:
 check: doctor docs-check policy-check test avr-build
 
 # Complete deterministic release-candidate gate; hardware validation remains separate.
-release-preflight: check secrets avr-repeatability
+release-preflight: check secrets avr-repeatability release-package-repeatability release-package-regression
 
 # Preview every non-KiCad path that the staging helper would add.
 stage-preview:

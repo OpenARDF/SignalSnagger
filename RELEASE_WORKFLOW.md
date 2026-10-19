@@ -74,12 +74,24 @@
 
 - SignalSnagger publishes one AVR128DA48 firmware image and does not share
   SignalSlinger's hardware-specific bootloader/update packages.
-- Name the asset `SignalSnagger-vX.Y.Z.hex` and publish its SHA-256 checksum.
+- Run `just release-package`, then independently validate the generated
+  directory with `just release-package-validate
+  build/release-packages/SignalSnagger-X.Y.Z`.
+- Publish exactly these two public assets:
+  - `SignalSnagger-vX.Y.Z.hex`
+  - `SignalSnagger-vX.Y.Z-Release-Files.zip`
+- The ZIP contains the same firmware HEX plus release-info JSON, SHA-256
+  checksums, and a README for SignalSnagger's single AVR128DA48 target. It does
+  not contain bootloader, updater, first-install, or provisioning files.
+- Require the package release-info to identify the exact tagged commit and a
+  clean source tree. Record both public-asset SHA-256 checksums.
 - Create an annotated `vX.Y.Z` tag only after explicit authorization. Never move
   a published tag.
 - Use `release-notes/vX.Y.Z.md` as the GitHub release body.
-- After publication, download into a fresh directory and verify checksum, tag
-  target, release body, and embedded/displayed version.
+- After publication, download both assets into a fresh directory. Verify their
+  checksums, the ZIP's exact members and bytes, the tag target, the release
+  body, and the statically embedded version. Verify a displayed version only
+  when the exact released image was programmed on representative hardware.
 - Commit release evidence after the tag is fixed without moving the tag.
 
 ## Intentional differences from SignalSlinger

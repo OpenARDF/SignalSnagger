@@ -41,7 +41,11 @@ expect_eol() {
 }
 
 for policy_file in .editorconfig .gitattributes BUILD_ENVIRONMENT.md \
-	CODEX_WORKFLOW.md RELEASE_WORKFLOW.md; do
+	CODEX_WORKFLOW.md RELEASE_WORKFLOW.md \
+	scripts/package-avr-release.py \
+	scripts/validate-avr-release-package.py \
+	scripts/check-avr-release-package-repeatability.py \
+	scripts/test-avr-release-package.py; do
 	expect_file "$policy_file"
 done
 
@@ -77,6 +81,18 @@ done < <(printf '%s\n' "$firmware_root"/src/*.cpp)
 
 if ! rg -q '^release-preflight:' "$repo_root/Justfile"; then
 	fail "Justfile is missing the release-preflight gate"
+fi
+if ! rg -q '^release-package:' "$repo_root/Justfile"; then
+	fail "Justfile is missing deterministic release-package generation"
+fi
+if ! rg -q '^release-package-validate package_dir:' "$repo_root/Justfile"; then
+	fail "Justfile is missing independent release-package validation"
+fi
+if ! rg -q '^release-package-repeatability:' "$repo_root/Justfile"; then
+	fail "Justfile is missing release-package repeatability validation"
+fi
+if ! rg -q '^release-package-regression:' "$repo_root/Justfile"; then
+	fail "Justfile is missing release-package negative regression tests"
 fi
 if ! rg -q 'experimentally validated' "$repo_root/CODEX_WORKFLOW.md"; then
 	fail "CODEX_WORKFLOW.md must protect the experimentally validated Si5351 strategy"

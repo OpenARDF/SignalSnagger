@@ -39,6 +39,9 @@ SignalSlinger, adapted for SignalSnagger's single AVR128DA48 target:
 
 Start repository work with `just --list`. Use `just check` for the complete
 local change gate and `just release-preflight` for deterministic
-release-candidate verification. The Si5351 quadrature strategy is experimentally
-established and must not be changed without focused regression tests and
-representative hardware measurements.
+release-candidate and package verification. `just release-package` creates the
+single-target GitHub deliverables: a standalone AVR128DA48 firmware HEX and a
+matching release ZIP with metadata, checksums, and programming guidance. The
+Si5351 quadrature strategy is experimentally established and must not be
+changed without focused regression tests and representative hardware
+measurements.

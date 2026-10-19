@@ -6,7 +6,9 @@ Each file must include:
 
 - user-visible changes;
 - stability and reliability changes;
-- the exact firmware asset and checksum filenames;
+- the exact standalone firmware and release ZIP asset filenames;
+- the firmware SHA-256 checksum and where publication evidence records both
+  public-asset checksums;
 - hardware validation performed, with passed checks kept distinct from failed
   or not-performed checks;
 - every omitted hardware check and its reason; scoped omissions are expected
