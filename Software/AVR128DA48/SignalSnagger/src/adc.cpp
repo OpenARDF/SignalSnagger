@@ -182,7 +182,7 @@ int16_t temperatureC(void)
 {
 	uint16_t sigrow_offset = SIGROW.TEMPSENSE1; // Read unsigned value from signature row
 	uint16_t sigrow_slope = SIGROW.TEMPSENSE0; // Read unsigned value from signature row
-	static uint32_t wait = 10000;
+	uint32_t wait = 10000;
 	uint16_t adc_reading;
 	int16_t temperature_in_C = -273.15;
 	uint8_t holdMux;
@@ -192,9 +192,12 @@ int16_t temperatureC(void)
 	ADC0.MUXPOS = ADC_MUXPOS_TEMPSENSE_gc;
 	ADC0_startConversion();
 	
-	while((!ADC0_conversionDone()) && wait--);
+	while(!ADC0_conversionDone() && wait)
+	{
+		--wait;
+	}
 	
-	if(wait)
+	if(ADC0_conversionDone())
 	{
 		adc_reading = ADC0.RES;
 		int32_t temp = sigrow_offset - adc_reading;

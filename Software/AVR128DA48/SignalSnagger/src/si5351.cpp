@@ -40,6 +40,14 @@
 #include "include/si5351.h"
 
 #define SI5351_I2C_SLAVE_ADDR                            0xC0    /* I2C slave address */
+/*
+ * Hardware-proven quadrature invariant: this project intentionally uses 126
+ * as both the PLL feedback divider and CLK1 phase-offset step count. The
+ * technique was adapted from an experimental implementation rather than the
+ * Si5351 documentation and was made reliable through bench testing. Do not
+ * normalize these values or reorder the programming sequence without verifying
+ * quadrature phase and tuning behavior on SignalSnagger hardware.
+ */
 #define SI5351_EVEN_INTEGER_FEEDBACK					 126
 
 /*******************************
@@ -218,17 +226,17 @@ bool g_si5351_initialized = false;
 		Si5351_pll target_pll = SI5351_PLLA;
 		uint8_t data[2];
 
-		if(!g_si5351_initialized) return(ERROR_CODE_NO_ERROR);
+		if(!g_si5351_initialized) return(ERROR_CODE_CLKGEN_NONRESPONSIVE);
 				
 /******************************************************************************************/
 		
 		/* Block 1: Disable Outputs */
 		/* Set CLKx_DIS high; Reg. 3 = 0xFF */
  		data[0] = 0xFF; // ~enabledClocksMask | 0xF9;
-		si5351_write_bulk(SI5351_OUTPUT_ENABLE_CTRL, data, 1); /*  disable all clock outputs */
-
-		clock_out[SI5351_CLK0] = freq_Fout; /* store the value for quick reference */
-		clock_out[SI5351_CLK1] = freq_Fout;
+		if(si5351_write_bulk(SI5351_OUTPUT_ENABLE_CTRL, data, 1)) /* disable all clock outputs */
+		{
+			return ERROR_CODE_CLKGEN_NONRESPONSIVE;
+		}
 
 		/* https://www.skyworksinc.com/-/media/Skyworks/SL/documents/public/application-notes/AN619.pdf */
 		/* Page 19 */
@@ -242,14 +250,13 @@ bool g_si5351_initialized = false;
 		/* Power down all output drivers */
 		/* Reg. 16, 17, 18, 19, 20, 21, 22, 23 = 0x8C */
   		data[0] = 0x8C;
-		si5351_write_bulk(SI5351_CLK0_CTRL, data, 1); // power down all clocks */
-		si5351_write_bulk(SI5351_CLK1_CTRL, data, 1); 
-		si5351_write_bulk(SI5351_CLK2_CTRL, data, 1); 
-		si5351_write_bulk(SI5351_CLK3_CTRL, data, 1); 
-		si5351_write_bulk(SI5351_CLK4_CTRL, data, 1); 
-		si5351_write_bulk(SI5351_CLK5_CTRL, data, 1); 
-		si5351_write_bulk(SI5351_CLK6_CTRL, data, 1); 
-		si5351_write_bulk(SI5351_CLK7_CTRL, data, 1); 
+		for(uint8_t clock = 0; clock < 8; ++clock)
+		{
+			if(si5351_write_bulk(SI5351_CLK0_CTRL + clock, data, 1))
+			{
+				return ERROR_CODE_CLKGEN_NONRESPONSIVE;
+			}
+		}
 		/*   o Drive strength = 2 mA */
 		/*   o Input source = multisynth */
 		/*   o Output clock not inverted */
@@ -293,6 +300,7 @@ bool g_si5351_initialized = false;
 
 		/* Find best approximation for b/c = fVCO mod fIN */
 		b = 0;
+		/* P3=0 is part of the hardware-proven quadrature register sequence. */
 		c = 0;
 
 		bx128 = b << 7;
@@ -381,12 +389,17 @@ bool g_si5351_initialized = false;
 		
 /******************************************************************************************/	
 		
-		set_integer_mode(SI5351_CLK0, false);
-		set_integer_mode(SI5351_CLK1, false);
+		if(set_integer_mode(SI5351_CLK0, false) || set_integer_mode(SI5351_CLK1, false))
+		{
+			return ERROR_CODE_CLKGEN_NONRESPONSIVE;
+		}
 
 /******************************************************************************************/
 				
-		si5351_set_CLK1_phase(SI5351_EVEN_INTEGER_FEEDBACK); /* affects only SI5351_CLK1 */
+		if(si5351_set_CLK1_phase(SI5351_EVEN_INTEGER_FEEDBACK) != ERROR_CODE_NO_ERROR) /* affects only SI5351_CLK1 */
+		{
+			return ERROR_CODE_CLKGEN_NONRESPONSIVE;
+		}
 	
 /******************************************************************************************/
 		
@@ -419,7 +432,13 @@ bool g_si5351_initialized = false;
 		/*   o Integer mode off */
 		/*   o Clock powered up */
 
-		si5351_pll_reset(SI5351_PLLA);
+		if(si5351_pll_reset(SI5351_PLLA) != ERROR_CODE_NO_ERROR)
+		{
+			return ERROR_CODE_CLKGEN_NONRESPONSIVE;
+		}
+
+		clock_out[SI5351_CLK0] = freq_Fout;
+		clock_out[SI5351_CLK1] = freq_Fout;
 		return(ERROR_CODE_NO_ERROR);
 	}
 
@@ -432,12 +451,9 @@ bool g_si5351_initialized = false;
 		Union_si5351_regs ms_reg;
 		Frequency_Hz freq_VCO = 0;
 
-		if(!g_si5351_initialized) return(ERROR_CODE_NO_ERROR);
+		if(!g_si5351_initialized) return(ERROR_CODE_CLKGEN_NONRESPONSIVE);
 		
 		Frequency_Hz freq = freq_Fout;
-
-		clock_out[SI5351_CLK0] = freq_Fout; /* store the value for quick reference */
-		clock_out[SI5351_CLK1] = freq_Fout;
 
 		/* https://www.skyworksinc.com/-/media/Skyworks/SL/documents/public/application-notes/AN619.pdf */
 
@@ -496,6 +512,9 @@ bool g_si5351_initialized = false;
 			return(ERROR_CODE_CLKGEN_NONRESPONSIVE);
 		}
 
+		/* The cache is an acknowledged hardware setting, not merely the request. */
+		clock_out[SI5351_CLK0] = freq_Fout;
+		clock_out[SI5351_CLK1] = freq_Fout;
 		return(ERROR_CODE_NO_ERROR);
 	}
 
@@ -525,8 +544,11 @@ bool g_si5351_initialized = false;
  */
 	bool si5351_init(Si5351_Xtal_load_pF xtal_load_c, Frequency_Hz ref_osc_freq)
 	{
-		static bool err = false;
+		bool err = false;
 		uint8_t data[2];
+
+		/* A failed reinitialization must not preserve a prior successful state. */
+		g_si5351_initialized = false;
 		
 #ifndef DEBUG_WITHOUT_I2C
 			/* Start I2C comms */
@@ -635,7 +657,7 @@ EC si5351_pll_reset(Si5351_pll pll)
 		
 	if(si5351_read_bulk(SI5351_PLL_RESET, data, 1)) 
 	{
-		return ERROR_CODE_RTC_NONRESPONSIVE;
+		return ERROR_CODE_CLKGEN_NONRESPONSIVE;
 	}
 		
 	reg_val = data[0];
@@ -651,7 +673,7 @@ EC si5351_pll_reset(Si5351_pll pll)
 	}
 
 	data[0] = reg_val;
-	if(si5351_write_bulk(SI5351_PLL_RESET, data, 1)) return ERROR_CODE_RTC_NONRESPONSIVE;
+	if(si5351_write_bulk(SI5351_PLL_RESET, data, 1)) return ERROR_CODE_CLKGEN_NONRESPONSIVE;
 
 	return ERROR_CODE_NO_ERROR;
 }
@@ -672,7 +694,7 @@ EC si5351_pll_reset(Si5351_pll pll)
 		
 		if(si5351_read_bulk(SI5351_OUTPUT_ENABLE_CTRL, data, 1)) 
 		{
-			return ERROR_CODE_RTC_NONRESPONSIVE;
+			return ERROR_CODE_CLKGEN_NONRESPONSIVE;
 		}
 		
 		reg_val = data[0];
@@ -687,7 +709,7 @@ EC si5351_pll_reset(Si5351_pll pll)
 		}
 
 		data[0] = reg_val;
-		if(si5351_write_bulk(SI5351_OUTPUT_ENABLE_CTRL, data, 1)) return ERROR_CODE_RTC_NONRESPONSIVE;
+		if(si5351_write_bulk(SI5351_OUTPUT_ENABLE_CTRL, data, 1)) return ERROR_CODE_CLKGEN_NONRESPONSIVE;
 
 		return ERROR_CODE_NO_ERROR;
 	}

@@ -34,6 +34,9 @@ extern "C" {
 
 int8_t TIMERB_init();
 bool util_delay_ms(uint32_t delayValue);
+
+/** Wait in foreground context using the interrupt-driven millisecond timer. */
+void util_wait_ms(uint32_t delayValue);
 int8_t TIMERB_sleep();
 
 #ifdef __cplusplus

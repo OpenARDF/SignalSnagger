@@ -27,9 +27,11 @@ class CircularStringBuff {
     CircularStringBuff(size_t);
 
     void put(char item);
-	bool putString(char* string);
+    /** Queue a null-terminated string atomically. Returns true on failure. */
+    bool putString(const char* string);
     char get(void);
-	void getString(char* str, size_t *length);
+    /** Copy one framed string. Returns true on failure and does not consume it. */
+    bool getString(char* str, size_t capacity, size_t *length);
     void reset(void);
     bool empty(void) const;
     bool full(void) const;

@@ -44,16 +44,28 @@ volatile Frequency_Hz g_rx_frequency = EEPROM_TX_80M_FREQUENCY_DEFAULT;
  */
 	bool rxSetFrequency(Frequency_Hz *freq, bool leaveClockOff)
 	{
-		bool err = true;
-
-		if(!freq) return(err);
-		
-		if((*freq < RX_MAXIMUM_80M_FREQUENCY) && (*freq > RX_MINIMUM_80M_FREQUENCY))    /* 80m */
+		if(!freq || !receiverFrequencyIsSupported(*freq))
 		{
-			si5351_set_quad_frequency(*freq);
+			return true;
 		}
 
-		return(err);
+		if(si5351_set_quad_frequency(*freq) != ERROR_CODE_NO_ERROR)
+		{
+			return true;
+		}
+
+		/* Commit software state only after the clock generator accepted the update. */
+		g_rx_frequency = si5351_get_frequency(SI5351_CLK0);
+		*freq = g_rx_frequency;
+
+		if(leaveClockOff)
+		{
+			EC clk0Error = si5351_clock_enable(SI5351_CLK0, SI5351_CLK_DISABLED);
+			EC clk1Error = si5351_clock_enable(SI5351_CLK1, SI5351_CLK_DISABLED);
+			return clk0Error != ERROR_CODE_NO_ERROR || clk1Error != ERROR_CODE_NO_ERROR;
+		}
+
+		return false;
 	}
 
 	Frequency_Hz rxGetFrequencty(void)
@@ -85,6 +97,11 @@ volatile Frequency_Hz g_rx_frequency = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 
 	EC init_receiver(Frequency_Hz freq)
 	{
+		if(!receiverFrequencyIsSupported(freq))
+		{
+			return ERROR_CODE_SW_LOGIC_ERROR;
+		}
+
 		g_rx_frequency = freq;
 		return init_receiver();
 	}
@@ -93,6 +110,12 @@ volatile Frequency_Hz g_rx_frequency = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 	{
 		EC code = ERROR_CODE_NO_ERROR;
 		bool err;
+		g_rx_initialized = false;
+
+		if(!receiverFrequencyIsSupported(g_rx_frequency))
+		{
+			return ERROR_CODE_SW_LOGIC_ERROR;
+		}
 		
 		DAC0_init();
 
@@ -121,12 +144,9 @@ volatile Frequency_Hz g_rx_frequency = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 			return( code);
 		}
 
-		if((g_rx_frequency < RX_MAXIMUM_80M_FREQUENCY) && (g_rx_frequency > RX_MINIMUM_80M_FREQUENCY))    /* 80m */
+		if((code = si5351_init_for_quad(g_rx_frequency)))
 		{
-			if((code = si5351_init_for_quad(g_rx_frequency)))
-			{
-				return(code);
-			}
+			return(code);
 		}
 
 		if(!err)

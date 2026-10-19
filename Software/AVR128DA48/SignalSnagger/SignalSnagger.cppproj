@@ -217,6 +217,12 @@
     <Compile Include="include\CircularStringBuff.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="include\receiver_frequency.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="include\shared_state.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="include\clkctrl.h">
       <SubType>compile</SubType>
     </Compile>
@@ -344,6 +350,9 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\receiver.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\receiver_frequency.cpp">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\util.cpp">

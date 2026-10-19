@@ -156,7 +156,8 @@ bool mystrptime(char* s, struct tm* ltm) {
 uint32_t convertTimeStringToEpoch(char * s)
 {
   unsigned long result = 0;
-  struct tm ltm = {0};
+  struct tm ltm;
+  memset(&ltm, 0, sizeof(ltm));
 
   if (!mystrptime(s, &ltm)) {
     result = ltm.tm_sec + ltm.tm_min*60 + ltm.tm_hour*3600L + ltm.tm_yday*86400L +

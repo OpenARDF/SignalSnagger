@@ -192,6 +192,7 @@ void avr_eeprom_write_float(eeprom_addr_t index, float in) {
 
 void EepromManager::updateEEPROMVar(EE_var_t v, void* val)
 {
+	(void)v;
 	if(!val)
 	{
 		return;

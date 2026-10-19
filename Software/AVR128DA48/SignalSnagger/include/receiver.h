@@ -32,6 +32,7 @@
 
 #include "defs.h"
 #include "include/si5351.h"
+#include "include/receiver_frequency.h"
 
 typedef int16_t Attenuation;
 
@@ -51,8 +52,8 @@ typedef int16_t Attenuation;
 #define BUCK_5V 75
 #define BUCK_0V 0
 
-#define RX_MINIMUM_80M_FREQUENCY (uint32_t)3500000
-#define RX_MAXIMUM_80M_FREQUENCY (uint32_t)4000000
+#define RX_MINIMUM_80M_FREQUENCY RECEIVER_FREQUENCY_MIN_HZ
+#define RX_MAXIMUM_80M_FREQUENCY RECEIVER_FREQUENCY_MAX_HZ
 
 /**
  */

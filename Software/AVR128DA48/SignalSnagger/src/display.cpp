@@ -48,11 +48,11 @@ void Display::begin(display_t id) {
 }
 
 void Display::reset() {
-	util_delay_ms(50);
+	util_wait_ms(50);
 	PORTB_set_pin_level(LCD_RESET, LOW);
-	util_delay_ms(4);
+	util_wait_ms(4);
 	PORTB_set_pin_level(LCD_RESET, HIGH);
-	util_delay_ms(20);
+	util_wait_ms(20);
 }
 
 void Display::init() {

@@ -21,6 +21,7 @@
 #include "rtc.h"
 #include "tca.h"
 #include "display.h"
+#include "shared_state.h"
 //#include "dac0.h"
 
 #include <cpuint.h>
@@ -536,7 +537,7 @@ ISR(TCB0_INT_vect)
 			static uint16_t holdConversionResult;
 			uint16_t hold = ADC0_read(); //ADC;
 			
-			if((hold >= 0) && (hold < 4090))
+			if(hold < 4090)
 			{
 				holdConversionResult = hold; // (uint16_t)(((uint32_t)hold * ADC_REF_VOLTAGE_mV) >> 10);    /* millivolts at ADC pin */
 				uint16_t lastResult = g_lastConversionResult[indexConversionInProcess];
@@ -746,9 +747,10 @@ int main(void)
 				g_text_buff.putString(g_tempStr);
 			}
 			
-			if(hold_assi_result != g_lastConversionResult[0])
+			uint16_t assi_result = atomicReadU16(&g_lastConversionResult[0]);
+			if(hold_assi_result != assi_result)
 			{
-				hold_assi_result = g_lastConversionResult[0];
+				hold_assi_result = assi_result;
 				sprintf(g_tempStr, "30S=%d  ", hold_assi_result);
 				g_text_buff.putString(g_tempStr);
 			}
@@ -757,7 +759,7 @@ int main(void)
 		if(g_text_buff.size())
 		{
 			size_t s;
-			g_text_buff.getString(g_tempStr, &s);
+			g_text_buff.getString(g_tempStr, sizeof(g_tempStr), &s);
 			
 			while(s > 2)
 			{
@@ -770,85 +772,61 @@ int main(void)
 				s -= 2;
 				display.sendBuffer((uint8_t*)&g_tempStr[2], s);
 				
-				g_text_buff.getString(g_tempStr, &s);
+				g_text_buff.getString(g_tempStr, sizeof(g_tempStr), &s);
 			}
 		}
 		
-		if(g_handle_counted_leftsense_presses)
+		uint16_t leftsense_presses = atomicExchangeU16(&g_handle_counted_leftsense_presses, 0);
+		if(leftsense_presses)
 		{
-			if(g_handle_counted_leftsense_presses == 1)
+			if(leftsense_presses == 1)
 			{
 				LEDS.blink(LEDS_RED_BLINK_SLOW, true);
 			}
-			else if (g_handle_counted_leftsense_presses == 2)
+			else if (leftsense_presses == 2)
 			{
 				LEDS.blink(LEDS_RED_OFF);
 			}
-			
-			g_handle_counted_leftsense_presses = 0;
 		}
 		
-		if(g_leftsense_closed_time >= 1000)
+		if(atomicExchangeBool(&g_long_leftsense_press, false))
 		{
-			LEDS.blink(LEDS_GREEN_ON_CONSTANT);
-			LEDS.blink(LEDS_RED_ON_CONSTANT);
-		}
-		
-		if(g_long_leftsense_press)
-		{
-			g_long_leftsense_press = false;
 			LEDS.init(LEDS_RED_THEN_GREEN_BLINK_SLOW);
 		}
 		
-		if(g_handle_counted_rightsense_presses)
+		uint16_t rightsense_presses = atomicExchangeU16(&g_handle_counted_rightsense_presses, 0);
+		if(rightsense_presses)
 		{
-			if(g_handle_counted_rightsense_presses == 1)
+			if(rightsense_presses == 1)
 			{
 				LEDS.blink(LEDS_GREEN_BLINK_SLOW, true);
 			}
-			else if (g_handle_counted_rightsense_presses == 2)
+			else if (rightsense_presses == 2)
 			{
 				LEDS.blink(LEDS_GREEN_OFF);
 			}
-			
-			g_handle_counted_rightsense_presses = 0;
 		}
 		
-		if(g_rightsense_closed_time >= 1000)
+		if(atomicExchangeBool(&g_long_rightsense_press, false))
 		{
-			LEDS.blink(LEDS_GREEN_ON_CONSTANT);
-			LEDS.blink(LEDS_RED_ON_CONSTANT);
-		}
-		
-		if(g_long_rightsense_press)
-		{
-			g_long_rightsense_press = false;
 			LEDS.init(LEDS_RED_THEN_GREEN_BLINK_FAST);
 		}
 		
-		if(g_handle_counted_encoder_presses)
+		uint16_t encoder_presses = atomicExchangeU16(&g_handle_counted_encoder_presses, 0);
+		if(encoder_presses)
 		{
-			if(g_handle_counted_encoder_presses == 1)
+			if(encoder_presses == 1)
 			{
 				LEDS.blink(LEDS_RED_AND_GREEN_BLINK_FAST);
 			}
-			else if (g_handle_counted_encoder_presses == 2)
+			else if (encoder_presses == 2)
 			{
 				LEDS.blink(LEDS_RED_AND_GREEN_BLINK_SLOW);
 			}
-			
-			g_handle_counted_encoder_presses = 0;
 		}
 		
-		if(g_encoder_closed_time >= 1000)
+		if(atomicExchangeBool(&g_long_encoder_press, false))
 		{
-			LEDS.blink(LEDS_GREEN_ON_CONSTANT);
-			LEDS.blink(LEDS_RED_ON_CONSTANT);
-		}
-		
-		if(g_long_encoder_press)
-		{
-			g_long_encoder_press = false;
 			LEDS.init(LEDS_GREEN_ON_CONSTANT);
 			LEDS.blink(LEDS_RED_ON_CONSTANT);
 		}
@@ -868,11 +846,12 @@ int main(void)
 		/*********************************
 		* Handle Rotary Encoder Turns
 		*********************************/
-		if(g_rotary_count)
+		int rotary_step = atomicConsumeIntStep(&g_rotary_count);
+		if(rotary_step)
 		{
 			uint8_t pwm = g_rf_gain_setting;
 			
-			if(g_rotary_count < 0)
+			if(rotary_step < 0)
 			{
 				LEDS.blink(LEDS_GREEN_BLINK_FAST);
 				LEDS.blink(LEDS_RED_ON_CONSTANT);
@@ -883,19 +862,16 @@ int main(void)
 				}
 				else
 				{
-					if(g_leftSense_pressed)
+					Frequency_Hz requestedFrequency = g_rx_frequency;
+					uint32_t stepHz = g_leftSense_pressed ? 1000 : 100;
+					if(receiverFrequencyStep(g_rx_frequency, 1, stepHz, &requestedFrequency))
 					{
-						g_rx_frequency += 1000;
+						if(rxSetFrequency(&requestedFrequency, false))
+						{
+							g_last_error_code = ERROR_CODE_CLKGEN_NONRESPONSIVE;
+						}
 					}
-					else
-					{
-						g_rx_frequency += 100;
-					}
-
-					si5351_set_quad_frequency(g_rx_frequency);
 				}
-				
-				g_rotary_count++;
 			}
 			else
 			{
@@ -909,22 +885,18 @@ int main(void)
 				}
 				else
 				{
-					if(g_leftSense_pressed)
+					Frequency_Hz requestedFrequency = g_rx_frequency;
+					uint32_t stepHz = g_leftSense_pressed ? 1000 : 100;
+					if(receiverFrequencyStep(g_rx_frequency, -1, stepHz, &requestedFrequency))
 					{
-						g_rx_frequency -= 1000;
+						if(rxSetFrequency(&requestedFrequency, false))
+						{
+							g_last_error_code = ERROR_CODE_CLKGEN_NONRESPONSIVE;
+						}
 					}
-					else
-					{
-						g_rx_frequency -= 100;
-					}
-
-					si5351_set_quad_frequency(g_rx_frequency);					
 				}
-
-				g_rotary_count--;
 			}
 			
-			g_rx_frequency = si5351_get_frequency(SI5351_CLK0);			
 			g_rf_gain_setting = getPWM();
 		}
 
@@ -980,7 +952,7 @@ int main(void)
 
 void wdt_init(WDReset resetType)
 {
-	
+	(void)resetType;
 }
 
 EC hw_init()
@@ -1000,7 +972,7 @@ char* externBatString(bool volts)
 {
 	static char str[7] = "?";
 	char* pstr = str;
-	float bat = (float)g_lastConversionResult[BATT_VOLTAGE_RESULT];
+	float bat = (float)atomicReadU16(&g_lastConversionResult[BATT_VOLTAGE_RESULT]);
 	bat *= 172.;
 	bat *= 0.0005;
 	bat += 1.;
