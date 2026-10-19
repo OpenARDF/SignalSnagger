@@ -45,7 +45,11 @@ for policy_file in .editorconfig .gitattributes BUILD_ENVIRONMENT.md \
 	scripts/package-avr-release.py \
 	scripts/validate-avr-release-package.py \
 	scripts/check-avr-release-package-repeatability.py \
-	scripts/test-avr-release-package.py; do
+	scripts/test-avr-release-package.py \
+	scripts/verify-published-release.py \
+	scripts/validate-release-evidence.py \
+	scripts/test-release-evidence.py \
+	release-evidence/README.md; do
 	expect_file "$policy_file"
 done
 
@@ -94,6 +98,15 @@ fi
 if ! rg -q '^release-package-regression:' "$repo_root/Justfile"; then
 	fail "Justfile is missing release-package negative regression tests"
 fi
+if ! rg -q '^release-published-verify version:' "$repo_root/Justfile"; then
+	fail "Justfile is missing published-release verification"
+fi
+if ! rg -q '^release-evidence-check:' "$repo_root/Justfile"; then
+	fail "Justfile is missing durable release-evidence validation"
+fi
+if ! rg -q '^release-evidence-regression:' "$repo_root/Justfile"; then
+	fail "Justfile is missing release-evidence negative regression tests"
+fi
 if ! rg -q 'experimentally validated' "$repo_root/CODEX_WORKFLOW.md"; then
 	fail "CODEX_WORKFLOW.md must protect the experimentally validated Si5351 strategy"
 fi
@@ -108,6 +121,12 @@ if ! rg -q '^## 1\.0\.0 and later releases$' "$repo_root/RELEASE_WORKFLOW.md"; t
 fi
 if ! rg -q 'immediately preceding suffixed candidate' "$repo_root/RELEASE_WORKFLOW.md"; then
 	fail "RELEASE_WORKFLOW.md must define qualification inheritance for version-only pre-1.0 promotion"
+fi
+if ! rg -q '^## Mandatory GitHub release sequence$' "$repo_root/RELEASE_WORKFLOW.md"; then
+	fail "RELEASE_WORKFLOW.md must define the mandatory end-to-end GitHub release sequence"
+fi
+if ! rg -q '^## Post-publication evidence$' "$repo_root/RELEASE_WORKFLOW.md"; then
+	fail "RELEASE_WORKFLOW.md must require durable post-publication evidence"
 fi
 
 i2c1_read_wait="$(sed -n '/static uint8_t I2C_1_WaitR/,/Returns how many bytes have been sent/p' "$firmware_root/src/i2c.cpp")"

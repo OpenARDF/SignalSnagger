@@ -45,3 +45,8 @@ matching release ZIP with metadata, checksums, and programming guidance. The
 Si5351 quadrature strategy is experimentally established and must not be
 changed without focused regression tests and representative hardware
 measurements.
+
+Every GitHub release follows the mandatory ordered process in
+[RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md), including a reviewed release commit,
+clean deterministic packaging, an immutable annotated tag, exact two-asset
+publication, fresh-download verification, and checked post-tag evidence.

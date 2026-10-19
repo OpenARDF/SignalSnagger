@@ -46,6 +46,11 @@
 - Follow [RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md) for versions, release notes,
   clean-source requirements, deterministic builds, hardware evidence, tags,
   assets, and post-publication verification.
+- Treat the workflow's ordered GitHub release sequence as mandatory. Do not
+  omit fresh-download verification or post-tag evidence, and never move a
+  published tag to include later evidence.
+- Use `just release-published-verify X.Y.Z` after publication and `just
+  release-evidence-check` before integrating the evidence record.
 - SignalSnagger has one AVR128DA48 target and no checked-in SignalSlinger-style
   bootloader/update bundle. Do not claim dual-target, bootloader,
   interrupted-update, or recovery evidence that does not exist.
