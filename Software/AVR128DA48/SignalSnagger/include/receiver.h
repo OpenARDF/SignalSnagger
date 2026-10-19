@@ -32,6 +32,7 @@
 
 #include "defs.h"
 #include "include/si5351.h"
+#include "receiver_frequency.h"
 
 typedef int16_t Attenuation;
 
@@ -51,8 +52,8 @@ typedef int16_t Attenuation;
 #define BUCK_5V 75
 #define BUCK_0V 0
 
-#define RX_MINIMUM_80M_FREQUENCY (uint32_t)3500000
-#define RX_MAXIMUM_80M_FREQUENCY (uint32_t)4000000
+#define RX_MINIMUM_80M_FREQUENCY RECEIVER_FREQUENCY_MIN_HZ
+#define RX_MAXIMUM_80M_FREQUENCY RECEIVER_FREQUENCY_MAX_HZ
 
 /**
  */
@@ -78,6 +79,15 @@ EC init_receiver(Frequency_Hz freq);
 /**
  */
  bool rxSetFrequency(Frequency_Hz *freq, bool leaveClockOff);
+
+/**
+ * Step a memory frequency, tune the receiver, and commit both values only when
+ * the Si5351 accepts the new frequency.
+ */
+bool rxTuneMemoryStep(Frequency_Hz *receiverFrequency,
+	Frequency_Hz *memoryFrequency,
+	int8_t direction,
+	uint32_t stepHz);
 
 /**
  */

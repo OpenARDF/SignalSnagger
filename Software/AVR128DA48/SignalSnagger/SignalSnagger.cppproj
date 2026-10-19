@@ -220,6 +220,30 @@
     <Compile Include="include\CircularStringBuff.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="include\datetime_utils.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="include\memory_channels.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="include\periodic_countdown.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="include\shared_state.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="include\status_wait.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="include\text_utils.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="include\receiver_frequency.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="include\signal_score.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="include\CircularUintBuff.h">
       <SubType>compile</SubType>
     </Compile>
@@ -356,6 +380,27 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\receiver.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\datetime_utils.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\memory_channels.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\periodic_countdown.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\receiver_frequency.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\signal_score.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\status_wait.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\text_utils.cpp">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\util.cpp">

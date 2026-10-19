@@ -23,113 +23,150 @@
  */
 
 #include "Goertzel.h"
+#include <math.h>
 #include <string.h>
 
-#if !INIT_EEPROM_ONLY
+#if !defined(INIT_EEPROM_ONLY) || !INIT_EEPROM_ONLY
 
-float _SAMPLING_FREQUENCY;
-float _TARGET_FREQUENCY;
-volatile int _N;
-float g_coeff;
-float Q1;
-float Q2;
-volatile int _index = 0;
-volatile bool _samplesReady = false;
-int highValueCount = 0;
+namespace {
 
-int* testData;
-
-Goertzel::Goertzel(float N, float sampling_frequency)
+uint8_t boundedSampleCount(float requested)
 {
-	_SAMPLING_FREQUENCY = sampling_frequency;   /*on 16mhz, ~8928.57142857143, on 8mhz ~44444 */
-	_N = CLAMP(MINN, N, MAXN);
-	testData = (int*)malloc(_N * sizeof(int));
+	if (requested < MINN)
+	{
+		return MINN;
+	}
+	if (requested > MAXN)
+	{
+		return MAXN;
+	}
+	return (uint8_t)requested;
 }
 
-Goertzel::~Goertzel()
+} // namespace
+
+Goertzel::Goertzel(float N, float sampling_frequency) :
+	samplingFrequency_(sampling_frequency),
+	targetFrequency_(0),
+	sampleCount_(boundedSampleCount(N)),
+	coefficient_(0),
+	q1_(0),
+	q2_(0),
+	captureIndex_(0),
+	captureBuffer_(0),
+	readyBuffer_(0),
+	samplesReady_(false),
+	highValueCount_(0)
 {
-	free(testData);
+	Flush();
 }
 
 void Goertzel::Flush(void)
 {
-	memset(testData, 0x00, _N * sizeof(int));
-	ResetGoertzel();
+	memset(testData_, 0x00, sizeof(testData_));
+	captureIndex_ = 0;
+	captureBuffer_ = 0;
+	readyBuffer_ = 0;
+	samplesReady_ = false;
+	ResetAnalysis();
 }
 
 void Goertzel::SetTargetFrequency(float target_frequency)
 {
-	float floatN = (float)_N;
+	float floatN = (float)sampleCount_;
 
-	_TARGET_FREQUENCY = target_frequency;   /* Ideally, this should be an integer multiple of SAMPLING_RATE/N */
-	int k = (int)(0.5 + ((floatN * _TARGET_FREQUENCY) / _SAMPLING_FREQUENCY));
-	float w = (2.0 * PI * k) / floatN;
-	g_coeff = 2.0 * cos(w);
-	ResetGoertzel();
+	targetFrequency_ = target_frequency;   /* Ideally, an integer multiple of sample rate/N. */
+	int k = (int)(0.5 + ((floatN * targetFrequency_) / samplingFrequency_));
+	const double pi = 3.141592653589793;
+	float w = (2.0 * pi * k) / floatN;
+	coefficient_ = 2.0 * cos(w);
+	ResetAnalysis();
 }
 
-/* Call this routine before every sample "block" (size=N) of data. */
-void Goertzel::ResetGoertzel(void)
+void Goertzel::ResetAnalysis(void)
 {
-	Q2 = 0;
-	Q1 = 0;
-	_samplesReady = false;
+	q2_ = 0;
+	q1_ = 0;
 }
 
 /* Call this routine for every sample. */
 void Goertzel::ProcessSample(int sample)
 {
-	float Q0 = g_coeff * Q1 - Q2 + (float)(sample - ADCCENTER);
+	float q0 = coefficient_ * q1_ - q2_ + (float)(sample - ADCCENTER);
 
 	if(sample > SATURATION)
 	{
-		highValueCount++;
+		highValueCount_++;
 	}
 
-	Q2 = Q1;
-	Q1 = Q0;
+	q2_ = q1_;
+	q1_ = q0;
+}
+
+void Goertzel::PublishCapturedBlock(void)
+{
+	if (captureIndex_ < sampleCount_ || samplesReady_)
+	{
+		return;
+	}
+
+	readyBuffer_ = captureBuffer_;
+	captureBuffer_ ^= 1;
+	captureIndex_ = 0;
+	/* Publish last so foreground never sees partially initialized ownership. */
+	samplesReady_ = true;
 }
 
 bool Goertzel::DataPoint(int data)
+
 {
-	if(_samplesReady)
-	{
-		return(_samplesReady);
-	}
+	/* Publish a completed pending buffer after foreground releases the prior one. */
+	PublishCapturedBlock();
 
-	testData[_index] = data;
-	_index++;
-	if(_index >= _N)
+	if (captureIndex_ < sampleCount_)
 	{
-		_index = 0;
-		_samplesReady = true;
+		testData_[captureBuffer_][captureIndex_++] = data;
 	}
+	PublishCapturedBlock();
 
-	return(_samplesReady);
+	return samplesReady_;
 }
 
 bool Goertzel::SamplesReady(void)
 {
-	return(_samplesReady);
+	return samplesReady_;
+}
+
+void Goertzel::ReleaseSamples(void)
+{
+	/* A bool is one byte on AVR; the ISR owns every other capture-state write. */
+	samplesReady_ = false;
 }
 
 float Goertzel::Magnitude2(int *highCount)
 {
 	float magnitude2;
 
-	highValueCount = 0;
-
-	/* Process the samples. */
-	for(int index = 0; index < _N; index++)
+	if (!samplesReady_)
 	{
-		ProcessSample(testData[index]);
+		if (highCount) *highCount = 0;
+		return 0;
 	}
 
-	if(highCount) *highCount = highValueCount;
+	highValueCount_ = 0;
+	ResetAnalysis();
+	uint8_t buffer = readyBuffer_;
 
-	magnitude2 = Q1 * Q1 + Q2 * Q2 - g_coeff * Q1 * Q2;
+	/* Process the samples. */
+	for(uint8_t index = 0; index < sampleCount_; index++)
+	{
+		ProcessSample(testData_[buffer][index]);
+	}
 
-	ResetGoertzel();
+	if(highCount) *highCount = highValueCount_;
+
+	magnitude2 = q1_ * q1_ + q2_ * q2_ - coefficient_ * q1_ * q2_;
+
 	return( magnitude2);
 }
-#endif // !INIT_EEPROM_ONLY
+#endif // !defined(INIT_EEPROM_ONLY) || !INIT_EEPROM_ONLY

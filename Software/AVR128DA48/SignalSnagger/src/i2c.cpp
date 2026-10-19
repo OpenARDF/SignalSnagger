@@ -47,6 +47,7 @@
 #define TWI1_BAUD(F_SCL, T_RISE)                 ((((((float)CLK_PER / (float)F_SCL)) - 10 - ((float)CLK_PER * T_RISE))) / 2)
 
 #define I2C_SCL_FREQ                                    100000
+#define I2C_SPIN_GUARD                                  2000000UL
 
 
 enum {
@@ -57,8 +58,9 @@ enum {
 	I2C_ERROR
 };
 
-volatile uint16_t g_i2c0_timeout_ticks = 200; 
-volatile uint16_t g_i2c1_timeout_ticks = 200;
+/* All timeout values fit in one byte, making ISR/foreground access atomic. */
+volatile uint8_t g_i2c0_timeout_ticks = 200;
+volatile uint8_t g_i2c1_timeout_ticks = 200;
 
 /************************************************************************/
 /* I2C_0                                                               */
@@ -97,6 +99,7 @@ void I2C_0_Init(void)
 static uint8_t i2c_0_WaitW(void)
 {
 	uint8_t state = I2C_INIT;
+	uint32_t spin_guard = I2C_SPIN_GUARD;
 	
 	g_i2c0_timeout_ticks = 50;
 	
@@ -120,9 +123,9 @@ static uint8_t i2c_0_WaitW(void)
 			/* get here only in case of bus error or arbitration lost - M4 state */
 			state = I2C_ERROR;
 		}
-	} while(!state && g_i2c0_timeout_ticks);
+	} while(!state && g_i2c0_timeout_ticks && spin_guard--);
 	
-	if(!g_i2c0_timeout_ticks) 
+	if(!state)
 	{
 		state = I2C_ERROR;
 	}
@@ -133,6 +136,7 @@ static uint8_t i2c_0_WaitW(void)
 static uint8_t i2c_0_WaitR(void)
 {
 	uint8_t state = I2C_INIT;
+	uint32_t spin_guard = I2C_SPIN_GUARD;
 	
 	g_i2c0_timeout_ticks = 50;
 	
@@ -147,7 +151,12 @@ static uint8_t i2c_0_WaitR(void)
 			/* get here only in case of bus error or arbitration lost - M4 state */
 			state = I2C_ERROR;
 		}
-	} while(!state && g_i2c0_timeout_ticks);
+	} while(!state && g_i2c0_timeout_ticks && spin_guard--);
+
+	if(!state)
+	{
+		state = I2C_ERROR;
+	}
 	
 	return state;
 }
@@ -161,6 +170,7 @@ uint8_t I2C_0_SendData(uint8_t slaveAddr, uint8_t regAddr, uint8_t *pData, uint8
 	TWI0.MADDR = slaveAddr;
 	if(i2c_0_WaitW() != I2C_ACKED)
 	{
+		I2C_0_EndSession();
 		return retVal;
 	}
 	
@@ -168,6 +178,7 @@ uint8_t I2C_0_SendData(uint8_t slaveAddr, uint8_t regAddr, uint8_t *pData, uint8
 	TWI0.MDATA = regAddr;
 	if(i2c_0_WaitW() != I2C_ACKED)
 	{
+		I2C_0_EndSession();
 		return retVal;
 	}
 
@@ -186,9 +197,14 @@ uint8_t I2C_0_SendData(uint8_t slaveAddr, uint8_t regAddr, uint8_t *pData, uint8
 			}
 			else // did not get ACK after client address
 			{
+				I2C_0_EndSession();
 				break;
 			}
 		}
+	}
+	else
+	{
+		I2C_0_EndSession();
 	}
 	
 	return retVal;
@@ -203,6 +219,7 @@ uint8_t I2C_0_GetData(uint8_t slaveAddr, uint8_t regAddr, uint8_t *pData, uint8_
 	TWI0.MADDR = slaveAddr;
 	if(i2c_0_WaitW() != I2C_ACKED)
 	{
+		I2C_0_EndSession();
 		return retVal;
 	}
 	
@@ -210,6 +227,7 @@ uint8_t I2C_0_GetData(uint8_t slaveAddr, uint8_t regAddr, uint8_t *pData, uint8_
 	TWI0.MDATA = regAddr;
 	if(i2c_0_WaitW() != I2C_ACKED)
 	{
+		I2C_0_EndSession();
 		return retVal;
 	}
 	
@@ -217,6 +235,7 @@ uint8_t I2C_0_GetData(uint8_t slaveAddr, uint8_t regAddr, uint8_t *pData, uint8_
 	TWI0.MADDR = slaveAddr | 0x01;
 	if(i2c_0_WaitW() != I2C_ACKED)
 	{
+		I2C_0_EndSession();
 		return retVal;
 	}
 	
@@ -234,8 +253,15 @@ uint8_t I2C_0_GetData(uint8_t slaveAddr, uint8_t regAddr, uint8_t *pData, uint8_
 				continue;
 			}
 			else
-			break;
+			{
+				I2C_0_EndSession();
+				break;
+			}
 		}
+	}
+	else
+	{
+		I2C_0_EndSession();
 	}
 	
 	return retVal;
@@ -286,6 +312,7 @@ void I2C_1_Init(void)
 static uint8_t i2c_1_WaitW(void)
 {
 	uint8_t state = I2C_INIT;
+	uint32_t spin_guard = I2C_SPIN_GUARD;
 	
 	g_i2c1_timeout_ticks = 50;
 	
@@ -310,7 +337,12 @@ static uint8_t i2c_1_WaitW(void)
 			/* get here only in case of bus error or arbitration lost - M4 state */
 			state = I2C_ERROR;
 		}
-	} while(!state && g_i2c1_timeout_ticks);
+	} while(!state && g_i2c1_timeout_ticks && spin_guard--);
+
+	if(!state)
+	{
+		state = I2C_ERROR;
+	}
 	
 	return state;
 }
@@ -318,8 +350,9 @@ static uint8_t i2c_1_WaitW(void)
 static uint8_t I2C_1_WaitR(void)
 {
 	uint8_t state = I2C_INIT;
+	uint32_t spin_guard = I2C_SPIN_GUARD;
 	
-	g_i2c0_timeout_ticks = 50;
+	g_i2c1_timeout_ticks = 50;
 	
 	do
 	{
@@ -332,7 +365,12 @@ static uint8_t I2C_1_WaitR(void)
 			/* get here only in case of bus error or arbitration lost - M4 state */
 			state = I2C_ERROR;
 		}
-	} while(!state && g_i2c0_timeout_ticks);
+	} while(!state && g_i2c1_timeout_ticks && spin_guard--);
+
+	if(!state)
+	{
+		state = I2C_ERROR;
+	}
 	
 	return state;
 }
@@ -346,6 +384,7 @@ uint8_t I2C_1_SendData(uint8_t slaveAddr, uint8_t regAddr, uint8_t *pData, uint8
 	TWI1.MADDR = slaveAddr & ~0x01;
 	if(i2c_1_WaitW() != I2C_ACKED)
 	{
+		I2C_1_EndSession();
 		return retVal;
 	}
 	
@@ -353,6 +392,7 @@ uint8_t I2C_1_SendData(uint8_t slaveAddr, uint8_t regAddr, uint8_t *pData, uint8
 	TWI1.MDATA = regAddr;	
 	if(i2c_1_WaitW() != I2C_ACKED)
 	{
+		I2C_1_EndSession();
 		return retVal;
 	}	
 
@@ -371,9 +411,14 @@ uint8_t I2C_1_SendData(uint8_t slaveAddr, uint8_t regAddr, uint8_t *pData, uint8
 			}
 			else // did not get ACK after client address
 			{
+				I2C_1_EndSession();
 				break;
 			}
 		}
+	}
+	else
+	{
+		I2C_1_EndSession();
 	}
 	
 	return retVal;
@@ -389,6 +434,7 @@ uint8_t I2C_1_GetData(uint8_t slaveAddr, uint8_t regAddr, uint8_t *pData, uint8_
 	TWI1.MADDR = slaveAddr;
 	if(i2c_1_WaitW() != I2C_ACKED)
 	{
+		I2C_1_EndSession();
 		return retVal;
 	}
 	
@@ -396,6 +442,7 @@ uint8_t I2C_1_GetData(uint8_t slaveAddr, uint8_t regAddr, uint8_t *pData, uint8_
 	TWI1.MDATA = regAddr;	
 	if(i2c_1_WaitW() != I2C_ACKED)
 	{
+		I2C_1_EndSession();
 		return retVal;
 	}
 	
@@ -403,6 +450,7 @@ uint8_t I2C_1_GetData(uint8_t slaveAddr, uint8_t regAddr, uint8_t *pData, uint8_
 	TWI1.MADDR = slaveAddr | 0x01;
 	if(i2c_1_WaitW() != I2C_ACKED)
 	{
+		I2C_1_EndSession();
 		return retVal;	
 	}
 	
@@ -420,8 +468,15 @@ uint8_t I2C_1_GetData(uint8_t slaveAddr, uint8_t regAddr, uint8_t *pData, uint8_
 				continue;
 			}
 			else
-			break;
+			{
+				I2C_1_EndSession();
+				break;
+			}
 		}
+	}
+	else
+	{
+		I2C_1_EndSession();
 	}
 	
 	return retVal;

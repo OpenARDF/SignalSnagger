@@ -1,6 +1,6 @@
 
 /**********************************************************************************************
-* Copyright © 2017 Digital Confections LLC
+* Copyright Â© 2017 Digital Confections LLC
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy of
 * this software and associated documentation files (the "Software"), to deal in the
@@ -34,7 +34,7 @@
 
 /******************************************************
  * Set the text that gets displayed to the user       */
-#define SW_REVISION "0.38"
+#define SW_REVISION "0.38.1"
 
 //#define TRANQUILIZE_WATCHDOG
 

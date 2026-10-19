@@ -17,6 +17,35 @@ _autosave-*
 *-save.kicad_pcb
 fp-info-cache
 
+# Local verification and build outputs
+/build/
+__pycache__/
+*.pyc
+
+# Compiler and Microchip Studio outputs. Existing tracked release artifacts are
+# retained, but new untracked products remain local.
+.vs/
+*.atsuo
+*.o
+*.d
+*.hex
+*.elf
+*.map
+*.mk
+*.eep
+*.lss
+*.srec
+*.obj
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.opendb
+
+# KiCad editor lock files
+~*.lck
+
 # Netlist files (exported from Eeschema)
 *.net
 

@@ -32,21 +32,15 @@
 #define UTIL_H_
 
 #include "defs.h"
+#include "datetime_utils.h"
+#include "text_utils.h"
 #include <time.h>
 
 int32_t timeDif(time_t a, time_t b);
-bool only_digits(char *s);
-bool isDisplayable(char *s, int max);
-
 /***********************************************************************************************
  *  Print Formatting Utility Functions
  ************************************************************************************************/
 
-/**
- * Converts a string of format "yyyy-mm-ddThh:mm:ss" to seconds since 1900
- */
-uint32_t convertTimeStringToEpoch(char * s);
-bool mystrptime(char* s, struct tm* ltm);
 bool frequencyString(char* result, uint32_t freq);
 bool frequencyVal(char* str, Frequency_Hz* result);
 bool fox2Text(char* str, Fox_t fox);

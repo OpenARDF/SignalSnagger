@@ -21,9 +21,7 @@
 **********************************************************************************************/
 #include "CircularFloatBuff.h"
 #include <stdlib.h>
-#include <ctype.h>
 #include <stdint.h>
-#include "defs.h"
 
 CircularFloatBuff::CircularFloatBuff(size_t size)
 {
@@ -116,6 +114,11 @@ size_t CircularFloatBuff::remaining() const
  */
 void CircularFloatBuff::put(float item)
 {
+  if (!buf_ || !max_size_)
+  {
+    return;
+  }
+
   buf_[head_] = item;
 
   if (full_)
@@ -175,18 +178,28 @@ float CircularFloatBuff::get()
 
 float CircularFloatBuff::olympic()
 {
-	float accum=0., max=0., min=0.;
-	
-	for(uint8_t i = 0; i < max_size_; ++i)
+	size_t count = size();
+	if (!buf_ || !count)
 	{
-		accum += buf_[i];
-		min = MIN(buf_[i], min);
-		max = MAX(buf_[i], max);
+		return 0.0f;
 	}
-	  
-	accum -= min;
-	accum -= max;
-	
-	return(accum/((float)(max_size_-2)));
+
+	float first = buf_[tail_];
+	float accum = 0.0f;
+	float minimum = first;
+	float maximum = first;
+	for (size_t i = 0; i < count; ++i)
+	{
+		float value = buf_[(tail_ + i) % max_size_];
+		accum += value;
+		if (value < minimum) minimum = value;
+		if (value > maximum) maximum = value;
+	}
+
+	if (count > 2)
+	{
+		return (accum - minimum - maximum) / (float)(count - 2);
+	}
+	return accum / (float)count;
 }
 

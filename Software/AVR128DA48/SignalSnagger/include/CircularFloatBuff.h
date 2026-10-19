@@ -19,12 +19,18 @@
     DEALINGS IN THE SOFTWARE.
 
 **********************************************************************************************/
+
+#ifndef SIGNALSNAGGER_CIRCULAR_FLOAT_BUFF_H_
+#define SIGNALSNAGGER_CIRCULAR_FLOAT_BUFF_H_
+
 #include <stddef.h>
 
 class CircularFloatBuff {
   public:
     ~CircularFloatBuff();
     CircularFloatBuff(size_t);
+    CircularFloatBuff(const CircularFloatBuff&) = delete;
+    CircularFloatBuff& operator=(const CircularFloatBuff&) = delete;
 
     void put(float item);
     float get(void);
@@ -47,3 +53,5 @@ class CircularFloatBuff {
 	size_t max_size_;
 	volatile bool busy_;
 };
+
+#endif /* SIGNALSNAGGER_CIRCULAR_FLOAT_BUFF_H_ */
