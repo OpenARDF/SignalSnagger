@@ -4,6 +4,7 @@
 #include <type_traits>
 
 #include "CircularStringBuff.h"
+#include "Goertzel.h"
 #include "datetime_utils.h"
 #include "periodic_countdown.h"
 #include "receiver_frequency.h"
@@ -12,6 +13,10 @@ static_assert(!std::is_copy_constructible<CircularStringBuff>::value,
               "CircularStringBuff must not copy its owning buffer pointer");
 static_assert(!std::is_copy_assignable<CircularStringBuff>::value,
               "CircularStringBuff must not copy its owning buffer pointer");
+static_assert(!std::is_copy_constructible<Goertzel>::value,
+              "Goertzel detector state must not be copied");
+static_assert(!std::is_copy_assignable<Goertzel>::value,
+              "Goertzel detector state must not be copied");
 
 namespace {
 
@@ -235,6 +240,57 @@ void testPeriodicCountdownRejectsInvalidArguments()
     CHECK(ticksRemaining == 6);
 }
 
+void testGoertzelFlushDiscardsPartialBlock()
+{
+    Goertzel detector(100, 1000);
+
+    for(int i = 0; i < 37; ++i)
+    {
+        CHECK(!detector.DataPoint(i));
+    }
+
+    detector.Flush();
+
+    for(int i = 0; i < 99; ++i)
+    {
+        CHECK(!detector.DataPoint(i));
+    }
+    CHECK(detector.DataPoint(99));
+}
+
+void testGoertzelRetuneDiscardsPartialBlock()
+{
+    Goertzel detector(100, 1000);
+
+    for(int i = 0; i < 37; ++i)
+    {
+        CHECK(!detector.DataPoint(i));
+    }
+
+    detector.SetTargetFrequency(100);
+
+    for(int i = 0; i < 99; ++i)
+    {
+        CHECK(!detector.DataPoint(i));
+    }
+    CHECK(detector.DataPoint(99));
+}
+
+void testGoertzelInstancesKeepIndependentSampleState()
+{
+    Goertzel first(100, 1000);
+    Goertzel second(100, 1000);
+
+    for(int i = 0; i < 99; ++i)
+    {
+        CHECK(!first.DataPoint(i));
+    }
+
+    CHECK(!second.DataPoint(1));
+    CHECK(first.DataPoint(99));
+    CHECK(!second.SamplesReady());
+}
+
 } // namespace
 
 int main()
@@ -253,6 +309,9 @@ int main()
     testDateTimeEpochConversion();
     testPeriodicCountdownDoesNotDriftAtByteWrap();
     testPeriodicCountdownRejectsInvalidArguments();
+    testGoertzelFlushDiscardsPartialBlock();
+    testGoertzelRetuneDiscardsPartialBlock();
+    testGoertzelInstancesKeepIndependentSampleState();
 
     if (failures != 0) {
         fprintf(stderr, "%d regression test(s) failed\n", failures);

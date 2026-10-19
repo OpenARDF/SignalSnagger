@@ -30,13 +30,7 @@
 #ifndef Goertzel_h
 #define Goertzel_h
 
-/* include types & constants of Wiring core API */
-#include "defs.h"
-
-#if !INIT_EEPROM_ONLY
-
-#include <math.h>
-#include <stdlib.h>
+#if !defined(INIT_EEPROM_ONLY) || !INIT_EEPROM_ONLY
 
 #define MAXN 209
 #define ADCCENTER 512
@@ -52,7 +46,9 @@ class Goertzel
 {
 public:
 Goertzel(float, float);
-~Goertzel();
+~Goertzel() = default;
+Goertzel(const Goertzel&) = delete;
+Goertzel& operator=(const Goertzel&) = delete;
 void SetTargetFrequency(float);
 bool DataPoint(int);
 float Magnitude2(int *highCount);
@@ -62,8 +58,21 @@ void Flush(void);
 private:
 void ProcessSample(int);
 void ResetGoertzel(void);
+
+float samplingFrequency_;
+float targetFrequency_;
+int sampleCount_;
+float coefficient_;
+float q1_;
+float q2_;
+volatile int index_;
+/* One-byte readiness is written by the ADC ISR and observed by foreground code. */
+volatile bool samplesReady_;
+int highValueCount_;
+/* Fixed storage avoids allocation failure and heap fragmentation on the AVR. */
+int testData_[MAXN];
 };
 
-#endif // !INIT_EEPROM_ONLY
+#endif // !defined(INIT_EEPROM_ONLY) || !INIT_EEPROM_ONLY
 
 #endif

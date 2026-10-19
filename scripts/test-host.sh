@@ -16,6 +16,7 @@ trap 'rm -f "$test_binary"' EXIT
 	-I"$firmware_root/include" \
 	"$repo_root/tests/host/test_main.cpp" \
 	"$firmware_root/src/CircularStringBuff.cpp" \
+	"$firmware_root/src/Goertzel.cpp" \
 	"$firmware_root/src/datetime_utils.cpp" \
 	"$firmware_root/src/periodic_countdown.cpp" \
 	"$firmware_root/src/receiver_frequency.cpp" \
