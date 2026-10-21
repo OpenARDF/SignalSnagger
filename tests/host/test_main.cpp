@@ -4,6 +4,7 @@
 #include <type_traits>
 
 #include "audio_path.h"
+#include "battery_estimator.h"
 #include "CircularFloatBuff.h"
 #include "CircularStringBuff.h"
 #include "CircularUintBuff.h"
@@ -15,6 +16,7 @@
 #include "receiver.h"
 #include "receiver_frequency.h"
 #include "receiver_test_stubs.h"
+#include "rf_gain_audio_cue.h"
 #include "sense_switches.h"
 #include "signal_score.h"
 #include "sound_settings.h"
@@ -728,6 +730,150 @@ void testTurnTickAudioFeedbackStorageDefaultsSafely()
 		TURN_TICK_AUDIO_FEEDBACK_ENABLED);
 }
 
+void testGainIndicatorAudioFeedbackStorageDefaultsSafely()
+{
+	CHECK(GAIN_INDICATOR_AUDIO_FEEDBACK_DEFAULT);
+	CHECK(!gainIndicatorAudioFeedbackFromStored(
+		GAIN_INDICATOR_AUDIO_FEEDBACK_DISABLED));
+	CHECK(gainIndicatorAudioFeedbackFromStored(
+		GAIN_INDICATOR_AUDIO_FEEDBACK_ENABLED));
+	CHECK(gainIndicatorAudioFeedbackFromStored(0x00));
+	CHECK(gainIndicatorAudioFeedbackFromStored(0xff));
+	CHECK(gainIndicatorAudioFeedbackToStored(false) ==
+		GAIN_INDICATOR_AUDIO_FEEDBACK_DISABLED);
+	CHECK(gainIndicatorAudioFeedbackToStored(true) ==
+		GAIN_INDICATOR_AUDIO_FEEDBACK_ENABLED);
+}
+
+struct CapturedRfGainCue
+{
+	uint16_t leadingSilence;
+	uint16_t toneFrames[5];
+	uint16_t gapFrames[4];
+	uint8_t toneCount;
+};
+
+CapturedRfGainCue captureRfGainCue(uint8_t displayedGain)
+{
+	CapturedRfGainCue captured = {};
+	RfGainAudioCue cue;
+	cue.Schedule(displayedGain);
+	bool previousFrameWasTone = false;
+	uint32_t guard = 60000;
+
+	while (cue.Active() && guard--)
+	{
+		bool toneStarted = false;
+		const bool tone = cue.NextFrame(&toneStarted);
+		if (tone)
+		{
+			if (toneStarted)
+			{
+				CHECK(!previousFrameWasTone);
+				CHECK(captured.toneCount < 5);
+				if (captured.toneCount < 5)
+				{
+					++captured.toneCount;
+				}
+			}
+			if (captured.toneCount)
+			{
+				++captured.toneFrames[captured.toneCount - 1];
+			}
+			previousFrameWasTone = true;
+		}
+		else
+		{
+			previousFrameWasTone = false;
+			if (!captured.toneCount)
+			{
+				++captured.leadingSilence;
+			}
+			else if (cue.Active() && captured.toneCount < 5)
+			{
+				++captured.gapFrames[captured.toneCount - 1];
+			}
+		}
+	}
+
+	CHECK(guard > 0);
+	return captured;
+}
+
+void testRfGainAudioCueMatchesApprovedMorseTiming()
+{
+	static const uint8_t expectedToneCounts[11] = {
+		1, 1, 2, 3, 4, 5, 5, 5, 5, 5, 2
+	};
+	static const uint16_t expectedToneFrames[11][5] = {
+		{RF_GAIN_CUE_LONG_FRAMES, 0, 0, 0, 0},
+		{RF_GAIN_CUE_DOT_FRAMES, 0, 0, 0, 0},
+		{RF_GAIN_CUE_DOT_FRAMES, RF_GAIN_CUE_DOT_FRAMES, 0, 0, 0},
+		{RF_GAIN_CUE_DOT_FRAMES, RF_GAIN_CUE_DOT_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES, 0, 0},
+		{RF_GAIN_CUE_DOT_FRAMES, RF_GAIN_CUE_DOT_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES, RF_GAIN_CUE_DOT_FRAMES, 0},
+		{RF_GAIN_CUE_DOT_FRAMES, RF_GAIN_CUE_DOT_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES, RF_GAIN_CUE_DOT_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES},
+		{RF_GAIN_CUE_DASH_FRAMES, RF_GAIN_CUE_DOT_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES, RF_GAIN_CUE_DOT_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES},
+		{RF_GAIN_CUE_DASH_FRAMES, RF_GAIN_CUE_DASH_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES, RF_GAIN_CUE_DOT_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES},
+		{RF_GAIN_CUE_DASH_FRAMES, RF_GAIN_CUE_DASH_FRAMES,
+			RF_GAIN_CUE_DASH_FRAMES, RF_GAIN_CUE_DOT_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES},
+		{RF_GAIN_CUE_DASH_FRAMES, RF_GAIN_CUE_DASH_FRAMES,
+			RF_GAIN_CUE_DASH_FRAMES, RF_GAIN_CUE_DASH_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES},
+		{RF_GAIN_CUE_LONG_FRAMES, RF_GAIN_CUE_LONG_FRAMES, 0, 0, 0}
+	};
+
+	CHECK(RF_GAIN_CUE_DOT_FRAMES == 800);
+	CHECK(RF_GAIN_CUE_DASH_FRAMES == 2400);
+	CHECK(RF_GAIN_CUE_GAP_FRAMES == 800);
+	CHECK(RF_GAIN_CUE_LONG_FRAMES == 3600);
+	for (uint8_t gain = 0; gain <= RF_GAIN_CUE_MAX_DISPLAYED_GAIN; ++gain)
+	{
+		const CapturedRfGainCue captured = captureRfGainCue(gain);
+		CHECK(captured.leadingSilence == RF_GAIN_CUE_SETTLE_FRAMES);
+		CHECK(captured.toneCount == expectedToneCounts[gain]);
+		for (uint8_t tone = 0; tone < expectedToneCounts[gain]; ++tone)
+		{
+			CHECK(captured.toneFrames[tone] == expectedToneFrames[gain][tone]);
+			if (tone + 1 < expectedToneCounts[gain])
+			{
+				CHECK(captured.gapFrames[tone] == RF_GAIN_CUE_GAP_FRAMES);
+			}
+		}
+	}
+}
+
+void testRfGainAudioCueLatestRequestWinsAndInvalidCancels()
+{
+	RfGainAudioCue cue;
+	cue.Schedule(3);
+	for (uint16_t frame = 0; frame < 100; ++frame)
+	{
+		CHECK(!cue.NextFrame(0));
+	}
+	cue.Schedule(10);
+	CHECK(cue.DisplayedGain() == 10);
+	for (uint16_t frame = 0; frame < RF_GAIN_CUE_SETTLE_FRAMES; ++frame)
+	{
+		CHECK(!cue.NextFrame(0));
+	}
+	bool toneStarted = false;
+	CHECK(cue.NextFrame(&toneStarted));
+	CHECK(toneStarted);
+
+	cue.Schedule(RF_GAIN_CUE_MAX_DISPLAYED_GAIN + 1);
+	CHECK(!cue.Active());
+	CHECK(cue.DisplayedGain() == RF_GAIN_CUE_NO_REQUEST);
+}
+
 void testAudioFilterProfilesWidenWithoutMovingTheCwPeak()
 {
 	const double narrowCenter = audioPathRmsAtFrequency(800.0,
@@ -783,6 +929,40 @@ void testDigitValidationHandlesNullAndEmptyInputs()
 	CHECK(!only_digits(0));
 }
 
+void testBatteryVoltageConversionPreservesCalibration()
+{
+	CHECK(std::fabs(batteryVoltageFromAdcCounts(0.0f) - 0.2f) < 0.0001f);
+	const float countsAtEightVolts = (8.0f - 0.2f) * 4096.0f / 28.8f;
+	CHECK(std::fabs(batteryVoltageFromAdcCounts(countsAtEightVolts) - 8.0f) < 0.001f);
+}
+
+void testBatteryChargeEstimateInterpolatesAndClamps()
+{
+	CHECK(batteryChargePercentFromVoltage(8.5f) == 100.0f);
+	CHECK(batteryChargePercentFromVoltage(8.2f) == 90.0f);
+	CHECK(std::fabs(batteryChargePercentFromVoltage(7.55f) - 32.5f) < 0.01f);
+	CHECK(batteryChargePercentFromVoltage(7.4f) == 10.0f);
+	CHECK(batteryChargePercentFromVoltage(6.5f) == 0.0f);
+
+	float previous = batteryChargePercentFromVoltage(6.5f);
+	for(float voltage = 6.51f; voltage <= 8.5f; voltage += 0.01f)
+	{
+		const float current = batteryChargePercentFromVoltage(voltage);
+		CHECK(current >= previous);
+		previous = current;
+	}
+}
+
+void testBatteryDisplayRoundingSuppressesFalsePrecision()
+{
+	CHECK(batteryVoltageTenthsForDisplay(7.84f) == 78);
+	CHECK(batteryVoltageTenthsForDisplay(7.85f) == 79);
+	CHECK(batteryVoltageTenthsForDisplay(8.4f) == 84);
+	CHECK(batteryPercentForDisplay(12.4f) == 10);
+	CHECK(batteryPercentForDisplay(12.5f) == 15);
+	CHECK(batteryPercentForDisplay(101.0f) == 100);
+}
+
 } // namespace
 
 int main()
@@ -827,10 +1007,16 @@ int main()
 	testAudioFilterModesNormalizeCycleAndReportBandwidth();
 	testPushbuttonAudioFeedbackStorageDefaultsSafely();
 	testTurnTickAudioFeedbackStorageDefaultsSafely();
+	testGainIndicatorAudioFeedbackStorageDefaultsSafely();
+	testRfGainAudioCueMatchesApprovedMorseTiming();
+	testRfGainAudioCueLatestRequestWinsAndInvalidCancels();
 	testAudioFilterProfilesWidenWithoutMovingTheCwPeak();
 	testAudioFilterOffBypassesOnlyTheBandpass();
 	testDisplayTextValidationRejectsControlBytes();
 	testDigitValidationHandlesNullAndEmptyInputs();
+	testBatteryVoltageConversionPreservesCalibration();
+	testBatteryChargeEstimateInterpolatesAndClamps();
+	testBatteryDisplayRoundingSuppressesFalsePrecision();
 
 	if (failures != 0) {
 		std::fprintf(stderr, "%d regression test(s) failed\n", failures);

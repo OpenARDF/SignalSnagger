@@ -13,6 +13,7 @@
 #include "morse.h"
 #include "adc.h"
 #include "audio_path.h"
+#include "battery_estimator.h"
 #include "Goertzel.h"
 #include "util.h"
 #include "binio.h"
@@ -29,6 +30,7 @@
 #include "memory_channels.h"
 #include "periodic_countdown.h"
 #include "receiver_frequency.h"
+#include "rf_gain_audio_cue.h"
 #include "sense_switches.h"
 #include "shared_state.h"
 #include "signal_score.h"
@@ -89,6 +91,7 @@ enum MenuState_t {
 	MenuSounds,
 	MenuSetPushbuttonAudioFeedback,
 	MenuSetTurnTickAudioFeedback,
+	MenuSetGainIndicatorAudioFeedback,
 	MenuSettings,
 	MenuSetAudioFilter,
 	MenuAbout,
@@ -120,6 +123,7 @@ enum PrimaryMenu_t {
 enum SoundsMenu_t {
 	SOUND_BEEP,
 	SOUND_TURN_TICK,
+	SOUND_GAIN_INDICATOR,
 	NUMBER_OF_SOUND_MENUS,
 	INVALID_SOUND_MENU
 };
@@ -190,6 +194,11 @@ static Awakened_t g_awakenedBy = POWER_UP_START;
 static const int16_t g_adcChannel2Slot[TOTAL_OF_ALL_ADC_CHANNELS] = { -1, -1, -1, -1, -1, -1, -1, 0 };
 static uint16_t g_lastConversionResult[NUMBER_OF_POLLED_ADC_CHANNELS] = { 0 };
 
+/* Battery-menu sampling is deliberately slower than the foreground loop so
+ * ADC noise does not continually redraw the estimated charge. */
+static const uint8_t BATTERY_SAMPLE_PERIOD_TICKS = 75; /* 4 Hz at 300 Hz. */
+static volatile uint8_t g_battery_sample_countdown = 0;
+
 extern Goertzel g_goertzel;
 uint16_t g_goertzel_rssi = 0;
 
@@ -241,6 +250,11 @@ volatile bool g_turn_tick_audio_feedback_enabled =
 static bool g_turn_tick_audio_feedback_edit_original =
 	TURN_TICK_AUDIO_FEEDBACK_DEFAULT;
 static bool g_turn_tick_audio_feedback_edit_active = false;
+volatile bool g_gain_indicator_audio_feedback_enabled =
+	GAIN_INDICATOR_AUDIO_FEEDBACK_DEFAULT;
+static bool g_gain_indicator_audio_feedback_edit_original =
+	GAIN_INDICATOR_AUDIO_FEEDBACK_DEFAULT;
+static bool g_gain_indicator_audio_feedback_edit_active = false;
 
 Display display = Display();
 leds LEDS = leds();
@@ -286,9 +300,11 @@ int16_t sineWave[MAX_SINE_PERIOD_STEPS];
 static volatile uint8_t g_sine_period_steps = 25;
 static volatile uint16_t g_beep = 0;
 static volatile uint8_t g_tick = 0;
+static volatile uint8_t g_requested_rf_gain_cue = RF_GAIN_CUE_NO_REQUEST;
+static RfGainAudioCue g_rf_gain_audio_cue;
 
-/* Button-release tones and rotary ticks have independent settings; safety
- * alerts remain audible because they use separate feedback paths. */
+/* User-interface sounds have independent settings; safety alerts remain
+ * audible because they use separate feedback paths. */
 static void schedulePushbuttonAudioFeedback(void)
 {
 	if (g_pushbutton_audio_feedback_enabled)
@@ -302,6 +318,20 @@ static void scheduleTurnTickAudioFeedback(void)
 	if (g_turn_tick_audio_feedback_enabled)
 	{
 		g_tick++;
+	}
+}
+
+static void scheduleRfGainAudioFeedback(uint8_t displayedGain)
+{
+	/* RF-gain detents retain the normal tick while the delayed value cue can be
+	 * independently silenced for operators who do not need eyes-free feedback. */
+	scheduleTurnTickAudioFeedback();
+	if (g_gain_indicator_audio_feedback_enabled &&
+		displayedGain <= RF_GAIN_CUE_MAX_DISPLAYED_GAIN)
+	{
+		/* The request is one byte and is consumed only by the audio ISR. A newer
+		 * detent safely replaces an older request before it is consumed. */
+		g_requested_rf_gain_cue = displayedGain;
 	}
 }
 
@@ -391,6 +421,19 @@ ISR(TCA1_CMP0_vect)
 	int16_t injectedSample = 0;
 	bool feedthrough = g_enable_audio_feedthrough && !g_audio_test;
 	const uint8_t gain = g_audio_test ? AUDIO_NEUTRAL_GAIN : g_audio_gain;
+	const uint8_t requestedRfGainCue = g_requested_rf_gain_cue;
+	if (!g_gain_indicator_audio_feedback_enabled)
+	{
+		/* Cancel in the owning ISR so foreground menu edits never race the cue
+		 * sequencer's multi-byte frame counters. */
+		g_requested_rf_gain_cue = RF_GAIN_CUE_NO_REQUEST;
+		g_rf_gain_audio_cue.Cancel();
+	}
+	else if (requestedRfGainCue != RF_GAIN_CUE_NO_REQUEST)
+	{
+		g_requested_rf_gain_cue = RF_GAIN_CUE_NO_REQUEST;
+		g_rf_gain_audio_cue.Schedule(requestedRfGainCue);
+	}
 
 	/* Tone/tick durations are counted at the 12 ksample/s output rate. */
 	if (g_beep && g_sine_period_steps)
@@ -399,10 +442,26 @@ ISR(TCA1_CMP0_vect)
 		if(sineIndex >= g_sine_period_steps) sineIndex = 0;
 		g_beep--;
 	}
-	else if (g_tick)
+	else
 	{
-		g_tick--;
-		feedthrough = false;
+		bool gainCueToneStarted = false;
+		if (g_rf_gain_audio_cue.NextFrame(&gainCueToneStarted) &&
+			g_sine_period_steps)
+		{
+			/* Every demonstrated element spans an integer number of 480 Hz cycles;
+			 * restarting at phase zero keeps each edge free of waveform steps. */
+			if (gainCueToneStarted)
+			{
+				sineIndex = 0;
+			}
+			injectedSample = sineWave[sineIndex++];
+			if(sineIndex >= g_sine_period_steps) sineIndex = 0;
+		}
+		else if (g_tick)
+		{
+			g_tick--;
+			feedthrough = false;
+		}
 	}
 
 	AudioFrame frame;
@@ -434,6 +493,7 @@ ISR(TCB0_INT_vect)
 		static uint16_t rotaryNoMotionCountdown = 0;
 		
 		if(g_rssi_countdown) g_rssi_countdown--;
+		if(g_battery_sample_countdown) g_battery_sample_countdown--;
 		
 		if(periodicCountdownTick(&switchScanTicksRemaining, 6))
 		{
@@ -922,6 +982,8 @@ static void startAudioFlow(void)
 {
 	g_audio_frame_ready = false;
 	g_audio_dropped_frames = 0;
+	g_requested_rf_gain_cue = RF_GAIN_CUE_NO_REQUEST;
+	g_rf_gain_audio_cue.Cancel();
 	g_audio_path.Reset(g_audio_filter_mode);
 	g_goertzel.Flush();
 	ADC0.MUXPOS = ADC_I_AMPED;
@@ -1038,6 +1100,17 @@ static void commitMenuEditsIfActive(void)
 		EEPromMgr.updateEEPROMVar(Turn_Tick_Audio_Feedback, &storedSetting);
 		g_turn_tick_audio_feedback_edit_active = false;
 	}
+
+	if (g_gain_indicator_audio_feedback_edit_active)
+	{
+		g_gain_indicator_audio_feedback_edit_original =
+			g_gain_indicator_audio_feedback_enabled;
+		uint8_t storedSetting = gainIndicatorAudioFeedbackToStored(
+			g_gain_indicator_audio_feedback_enabled);
+		EEPromMgr.updateEEPROMVar(Gain_Indicator_Audio_Feedback,
+			&storedSetting);
+		g_gain_indicator_audio_feedback_edit_active = false;
+	}
 }
 
 static void rollbackMenuEditsIfActive(void)
@@ -1061,6 +1134,13 @@ static void rollbackMenuEditsIfActive(void)
 			g_turn_tick_audio_feedback_edit_original;
 		g_turn_tick_audio_feedback_edit_active = false;
 	}
+
+	if (g_gain_indicator_audio_feedback_edit_active)
+	{
+		g_gain_indicator_audio_feedback_enabled =
+			g_gain_indicator_audio_feedback_edit_original;
+		g_gain_indicator_audio_feedback_edit_active = false;
+	}
 }
 
 int main(void)
@@ -1083,6 +1163,12 @@ int main(void)
 	AudioFilterMode hold_audio_filter_mode = AUDIO_FILTER_MODE_INVALID;
 	uint8_t hold_pushbutton_audio_feedback = 0xff;
 	uint8_t hold_turn_tick_audio_feedback = 0xff;
+	uint8_t hold_gain_indicator_audio_feedback = 0xff;
+	char hold_battery_row0[13] = "";
+	char hold_battery_row2[13] = "";
+	char hold_battery_row3[13] = "";
+	float filtered_battery_adc_counts = 0.0f;
+	bool battery_filter_initialized = false;
 	uint16_t hold_goertzel_rssi = 0;
 	bool hold_headphone_state = true;
 	bool refresh_display = true;
@@ -1206,8 +1292,22 @@ int main(void)
 			if(refresh_display || (currentMenu != hold_menuState))
 			{
 				refresh_display = false;
+				const bool currentIsBatteryMenu =
+					(currentMenu == MenuBattery) || (currentMenu == MenuSetmAh) ||
+					(currentMenu == MenuSetBatThresh);
+				const bool previousWasBatteryMenu =
+					(hold_menuState == MenuBattery) || (hold_menuState == MenuSetmAh) ||
+					(hold_menuState == MenuSetBatThresh);
+				if(currentIsBatteryMenu)
+				{
+					g_battery_sample_countdown = 0;
+					if(!previousWasBatteryMenu)
+					{
+						battery_filter_initialized = false;
+					}
+				}
 				
-				if((hold_menuState == MenuBattery) || (hold_menuState == MenuSetmAh) || (hold_menuState == MenuSetBatThresh))
+				if(previousWasBatteryMenu)
 				{
 					if((currentMenu != MenuBattery) && (currentMenu != MenuSetmAh) && (currentMenu != MenuSetBatThresh))
 					{
@@ -1223,10 +1323,14 @@ int main(void)
 				hold_audio_filter_mode = AUDIO_FILTER_MODE_INVALID; /* force update */
 				hold_pushbutton_audio_feedback = 0xff; /* force update */
 				hold_turn_tick_audio_feedback = 0xff; /* force update */
+				hold_gain_indicator_audio_feedback = 0xff; /* force update */
 				hold_activeMemory = 0xff; /* force update */
 				hold_goertzel_rssi = 0; /* force update */
 				hold_menuRow = INVALID_MENU; /* force update */
 				hold_soundMenuRow = INVALID_SOUND_MENU; /* force update */
+				hold_battery_row0[0] = '\0'; /* force update */
+				hold_battery_row2[0] = '\0'; /* force update */
+				hold_battery_row3[0] = '\0'; /* force update */
 				
 				if(currentMenu == MenuOperational)
 				{
@@ -1321,24 +1425,34 @@ int main(void)
 				case MenuSounds:
 				case MenuSetPushbuttonAudioFeedback:
 				case MenuSetTurnTickAudioFeedback:
+				case MenuSetGainIndicatorAudioFeedback:
 				{
+					const bool showGainIndicator =
+						currentMenu == MenuSetGainIndicatorAudioFeedback ||
+						(currentMenu == MenuSounds &&
+							soundMenuRow == SOUND_GAIN_INDICATOR);
 					const bool showTurnTick =
 						currentMenu == MenuSetTurnTickAudioFeedback ||
 						(currentMenu == MenuSounds &&
 							soundMenuRow == SOUND_TURN_TICK);
-					const uint8_t enabled = showTurnTick
-						? (g_turn_tick_audio_feedback_enabled ? 1U : 0U)
-						: (g_pushbutton_audio_feedback_enabled ? 1U : 0U);
-					uint8_t* holdEnabled = showTurnTick
-						? &hold_turn_tick_audio_feedback
-						: &hold_pushbutton_audio_feedback;
+					const uint8_t enabled = showGainIndicator
+						? (g_gain_indicator_audio_feedback_enabled ? 1U : 0U)
+						: (showTurnTick
+							? (g_turn_tick_audio_feedback_enabled ? 1U : 0U)
+							: (g_pushbutton_audio_feedback_enabled ? 1U : 0U));
+					uint8_t* holdEnabled = showGainIndicator
+						? &hold_gain_indicator_audio_feedback
+						: (showTurnTick
+							? &hold_turn_tick_audio_feedback
+							: &hold_pushbutton_audio_feedback);
 					if (hold_soundMenuRow != soundMenuRow ||
 						*holdEnabled != enabled)
 					{
 						hold_soundMenuRow = soundMenuRow;
 						*holdEnabled = enabled;
-						g_text_buff.putString(showTurnTick
-							? "00Turn Tick " : "00Beep      ");
+						g_text_buff.putString(showGainIndicator
+							? "00Gain Indic"
+							: (showTurnTick ? "00Turn Tick " : "00Beep      "));
 						g_text_buff.putString("10          ");
 						const char selection = currentMenu == MenuSounds ? ' ' : '>';
 						snprintf(g_tempStr, 13, "20%c%-3s      ", selection,
@@ -1385,35 +1499,50 @@ int main(void)
 				case MenuBattery:
 				{
 					uint16_t result = 0;
-					static float filtered_float = 0.;
-		
-						ADC0_startConversion();
-						if(!ADC0_waitForConversion())
-						{
-							break;
-						}
-						result = ADC0.RES;
-						
-						if(filtered_float < 1.)
-						{
-							filtered_float = (float)result;
-						}
-						else
-						{
-							filtered_float = filtered_float * 10. + (float)result;
-						}
-		
-					filtered_float /= 11.;
+					if(g_battery_sample_countdown)
+					{
+						break;
+					}
+					g_battery_sample_countdown = BATTERY_SAMPLE_PERIOD_TICKS;
 
-					snprintf(g_tempStr, 13, "00Bat: %sV", batteryVoltsString(true, &filtered_float));
-					g_text_buff.putString(g_tempStr);
+					ADC0_startConversion();
+					if(!ADC0_waitForConversion())
+					{
+						break;
+					}
+					result = ADC0.RES;
+
+					if(!battery_filter_initialized)
+					{
+						filtered_battery_adc_counts = (float)result;
+						battery_filter_initialized = true;
+					}
+					else
+					{
+						/* About a one-second smoothing window at the 4 Hz sample rate. */
+						filtered_battery_adc_counts =
+							(3.0f * filtered_battery_adc_counts + (float)result) / 4.0f;
+					}
+
+					snprintf(g_tempStr, 13, "00Bat: %sV",
+						batteryVoltsString(true, &filtered_battery_adc_counts));
+					if(strcmp(g_tempStr, hold_battery_row0) != 0)
+					{
+						strcpy(hold_battery_row0, g_tempStr);
+						g_text_buff.putString(g_tempStr);
+					}
 					
 					if(currentMenu == MenuBattery)
 					{
-						;
-						snprintf(g_tempStr, 13, "20pcnt: %s  ", batteryPercentString(filtered_float, null));
-						g_text_buff.putString(g_tempStr);
-						snprintf(g_tempStr, 13, "30min: %s  ", batteryTimeLeftString(&filtered_float));
+						snprintf(g_tempStr, 13, "20pcnt: %s  ",
+							batteryPercentString(filtered_battery_adc_counts, null));
+						if(strcmp(g_tempStr, hold_battery_row2) != 0)
+						{
+							strcpy(hold_battery_row2, g_tempStr);
+							g_text_buff.putString(g_tempStr);
+						}
+						snprintf(g_tempStr, 13, "30min: %s  ",
+							batteryTimeLeftString(&filtered_battery_adc_counts));
 					}
 					else if(currentMenu == MenuSetmAh)
 					{
@@ -1426,7 +1555,14 @@ int main(void)
 							(unsigned int)g_battery_warning_threshold);
 					}
 					
-					g_text_buff.putString(g_tempStr);
+					if(strcmp(g_tempStr, currentMenu == MenuBattery
+						? hold_battery_row3 : hold_battery_row2) != 0)
+					{
+						char* holdRow = currentMenu == MenuBattery
+							? hold_battery_row3 : hold_battery_row2;
+						strcpy(holdRow, g_tempStr);
+						g_text_buff.putString(g_tempStr);
+					}
 				}
 				break;
 				
@@ -1904,7 +2040,14 @@ int main(void)
 
 						case MenuSounds:
 						{
-							if (soundMenuRow == SOUND_TURN_TICK)
+							if (soundMenuRow == SOUND_GAIN_INDICATOR)
+							{
+								g_gain_indicator_audio_feedback_edit_original =
+									g_gain_indicator_audio_feedback_enabled;
+								g_gain_indicator_audio_feedback_edit_active = true;
+								setMenu(MenuSetGainIndicatorAudioFeedback);
+							}
+							else if (soundMenuRow == SOUND_TURN_TICK)
 							{
 								g_turn_tick_audio_feedback_edit_original =
 									g_turn_tick_audio_feedback_enabled;
@@ -1923,6 +2066,7 @@ int main(void)
 
 						case MenuSetPushbuttonAudioFeedback:
 						case MenuSetTurnTickAudioFeedback:
+						case MenuSetGainIndicatorAudioFeedback:
 						{
 							/* Encoder and sense-button navigation are deliberate menu
 							 * exits, so both retain the value already being previewed. */
@@ -2079,8 +2223,9 @@ int main(void)
 								if(pwm)
 								{
 									setPWM(--pwm);
-									scheduleTurnTickAudioFeedback();
 								}
+								scheduleRfGainAudioFeedback(
+									MAX_PWM_SETTING - getPWM());
 							}
 						
 							g_rx_frequency = si5351_get_frequency(SI5351_CLK0);			
@@ -2185,6 +2330,13 @@ int main(void)
 								!g_turn_tick_audio_feedback_enabled;
 						}
 						break;
+
+						case MenuSetGainIndicatorAudioFeedback:
+						{
+							g_gain_indicator_audio_feedback_enabled =
+								!g_gain_indicator_audio_feedback_enabled;
+						}
+						break;
 					
 						case MenuMain:
 						{
@@ -2249,8 +2401,9 @@ int main(void)
 								if(pwm < MAX_PWM_SETTING) 
 								{
 									setPWM(++pwm);
-									scheduleTurnTickAudioFeedback();
 								}
+								scheduleRfGainAudioFeedback(
+									MAX_PWM_SETTING - getPWM());
 							}
 						
 							g_rx_frequency = si5351_get_frequency(SI5351_CLK0);			
@@ -2350,7 +2503,7 @@ int main(void)
 						{
 							if (soundMenuRow == SOUND_BEEP)
 							{
-								soundMenuRow = SOUND_TURN_TICK;
+								soundMenuRow = SOUND_GAIN_INDICATOR;
 							}
 							else
 							{
@@ -2370,6 +2523,13 @@ int main(void)
 						{
 							g_turn_tick_audio_feedback_enabled =
 								!g_turn_tick_audio_feedback_enabled;
+						}
+						break;
+
+						case MenuSetGainIndicatorAudioFeedback:
+						{
+							g_gain_indicator_audio_feedback_enabled =
+								!g_gain_indicator_audio_feedback_enabled;
 						}
 						break;
 					
@@ -2598,16 +2758,7 @@ char* batteryTimeLeftString(float* adcCounts)
 		bat = (float)g_lastConversionResult[g_adcChannel2Slot[ADCBatteryVoltage]];
 	}
 	
-	if(bat <= 878)
-	{
-		bat = 0.;
-	}
-	else
-	{
-		bat = (bat - 878.) / 2.85;
-	}
-	
-	if(bat > 100.) bat = 100.;
+	bat = batteryChargePercentFromVoltage(batteryVoltageFromAdcCounts(bat));
 	
 	bat = 60. * bat * (((uint8_t)g_battery_capacity + 1)*50) / 5000.; /* Example: 50 mA average current */
 	
@@ -2625,20 +2776,11 @@ char* batteryPercentString(float adcCounts, float* result)
 	char* pstr = str;
 	float pct;
 	
-	if(adcCounts <= 878.)
-	{
-		pct = 0.;
-	}
-	else
-	{
-		pct = (adcCounts - 878.) / 2.85;
-	}
-	
-	if(pct > 100.) pct = 100.;
+	pct = batteryChargePercentFromVoltage(batteryVoltageFromAdcCounts(adcCounts));
 	
 	if(result) *result = pct;
 
-	dtostrf(pct, 2, 0, str);
+	dtostrf((float)batteryPercentForDisplay(pct), 2, 0, str);
 	str[3] = '\0';
 	pstr = trimwhitespace(str);
 				
@@ -2649,7 +2791,6 @@ char* batteryPercentString(float adcCounts, float* result)
 // Returns a pointer to a string of length 7.
 char* batteryVoltsString(bool volts, float* value)
 {
-	static float filtered = 78.0;
 	static char str[7] = "?";
 	char* pstr = str;
 	float bat;
@@ -2663,34 +2804,22 @@ char* batteryVoltsString(bool volts, float* value)
 		bat = (float)g_lastConversionResult[g_adcChannel2Slot[ADCBatteryVoltage]];
 	}
 	
-	bat *= 288.;
-	bat /= 4096.;
-	bat += 2.;
+	bat = batteryVoltageFromAdcCounts(bat);
 	
-	if(value)
+	if((bat >= 0.0f) && (bat <= 18.0f))
 	{
-		filtered = bat;
-	}
-	else
-	{
-		filtered = (bat + 9*filtered) / 10.;
-	}
-	
-	if((bat >= 0.) && (bat <= 180.))
-	{
+		const uint16_t tenths = batteryVoltageTenthsForDisplay(bat);
 		if(volts)
 		{
-			dtostrf(filtered/10., 5, 2, str);
-			str[6] = '\0';
-			pstr = trimwhitespace(str);
-			return pstr;
+			snprintf(str, sizeof(str), "%u.%u",
+				(unsigned int)(tenths / 10U), (unsigned int)(tenths % 10U));
 		}
 		else
 		{
-			dtostrf(filtered, 4, 0, str);		
-			str[5] = '\0';
-			return str;
+			snprintf(str, sizeof(str), "%u", (unsigned int)tenths);
 		}
+		pstr = trimwhitespace(str);
+		return pstr;
 	}
 				
 	return str;

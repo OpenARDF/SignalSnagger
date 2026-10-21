@@ -207,6 +207,12 @@
     <Compile Include="include\audio_path.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="include\battery_estimator.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="include\rf_gain_audio_cue.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="include\sound_settings.h">
       <SubType>compile</SubType>
     </Compile>
@@ -331,6 +337,12 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\audio_path.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\battery_estimator.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\rf_gain_audio_cue.cpp">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\binio.cpp">
