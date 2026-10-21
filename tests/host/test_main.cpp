@@ -7,6 +7,7 @@
 #include "CircularUintBuff.h"
 #include "Goertzel.h"
 #include "datetime_utils.h"
+#include "deferred_byte_write_queue.h"
 #include "memory_channels.h"
 #include "periodic_countdown.h"
 #include "receiver.h"
@@ -210,6 +211,44 @@ void testPeriodicCountdownRejectsInvalidArguments()
 	ticksRemaining = 0;
 	CHECK(periodicCountdownTick(&ticksRemaining, 6));
 	CHECK(ticksRemaining == 6);
+}
+
+void testDeferredByteWritesPreserveOrderAndCoalesceAddresses()
+{
+	DeferredByteWriteQueue<3> queue;
+	DeferredByteWrite write = {};
+
+	CHECK(queue.put(10, 1));
+	CHECK(queue.put(11, 2));
+	CHECK(queue.put(10, 3));
+	CHECK(queue.size() == 2);
+	CHECK(queue.front(&write));
+	CHECK(write.address == 10);
+	CHECK(write.value == 3);
+	CHECK(queue.removeFront());
+	CHECK(queue.front(&write));
+	CHECK(write.address == 11);
+	CHECK(write.value == 2);
+	CHECK(queue.removeFront());
+	CHECK(queue.empty());
+	CHECK(!queue.front(&write));
+	CHECK(!queue.removeFront());
+}
+
+void testDeferredByteWritesRejectOverflowButStillCoalesce()
+{
+	DeferredByteWriteQueue<2> queue;
+	DeferredByteWrite write = {};
+
+	CHECK(queue.put(20, 1));
+	CHECK(queue.put(21, 2));
+	CHECK(!queue.put(22, 3));
+	CHECK(queue.put(20, 4));
+	CHECK(queue.size() == 2);
+	CHECK(queue.front(&write));
+	CHECK(write.address == 20);
+	CHECK(write.value == 4);
+	CHECK(!queue.front(0));
 }
 
 void testReceiverFrequencyBoundsAreInclusive()
@@ -569,6 +608,8 @@ int main()
 	testCircularUintAverageUsesOnlyInitializedEntries();
 	testPeriodicCountdownDoesNotDriftAtByteWrap();
 	testPeriodicCountdownRejectsInvalidArguments();
+	testDeferredByteWritesPreserveOrderAndCoalesceAddresses();
+	testDeferredByteWritesRejectOverflowButStillCoalesce();
 	testReceiverFrequencyBoundsAreInclusive();
 	testReceiverFrequencyStepRejectsOutOfBandResult();
 	testReceiverFrequencyStepProducesValidatedResult();

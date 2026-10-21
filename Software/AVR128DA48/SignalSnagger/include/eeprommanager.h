@@ -26,6 +26,7 @@
 #define __EEPROMMANAGER_H__
 
 #include "defs.h"
+#include "deferred_byte_write_queue.h"
 
 #ifdef ATMEL_STUDIO_7
 #include <avr/eeprom.h>
@@ -205,10 +206,19 @@ class EepromManager
 	bool initializeEEPROMVars(void);
 	bool readNonVols(void);
 	void updateEEPROMVar(EE_var_t v, void* val);
+	void queueTuningPersistence(Frequency_Hz frequency, FrequencyMode_t mode,
+		uint8_t activeMemory);
+	void serviceQueuedWrites();
 	void saveAllEEPROM();
 
 	protected:
 	private:
+	static const size_t TUNING_WRITE_QUEUE_CAPACITY = sizeof(Frequency_Hz) + 2;
+	DeferredByteWriteQueue<TUNING_WRITE_QUEUE_CAPACITY> deferredWrites_;
+	bool deferredWriteInProgress_;
+
+	void queueEEPROMBytes(uint16_t address, const uint8_t* bytes, size_t length);
+	void flushQueuedWrites();
 	EepromManager( const EepromManager &c );
 	EepromManager& operator=( const EepromManager &c );
 };  /*EepromManager */

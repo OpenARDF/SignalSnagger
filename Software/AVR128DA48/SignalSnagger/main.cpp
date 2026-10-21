@@ -913,10 +913,9 @@ static void acceptOperationalFrequencyUpdate(uint8_t* displayedMemory,
 	g_suppress_cardioid_until_side_release = true;
 	g_frequency_updates_enabled = false;
 
-	/* Acceptance persists tuning without coupling it to a full-screen refresh. */
-	EEPromMgr.updateEEPROMVar(Frequency, (void*)&g_rx_frequency);
-	EEPromMgr.updateEEPROMVar(Frequency_Mode, (void*)&g_frequency_mode);
-	EEPromMgr.updateEEPROMVar(Active_Memory, (void*)&g_active_memory);
+	/* EEPROM persistence is serviced one byte at a time from the foreground loop
+	 * so acceptance cannot stall the ADC audio interrupt. */
+	EEPromMgr.queueTuningPersistence(g_rx_frequency, g_frequency_mode, g_active_memory);
 
 	if(g_frequency_mode == MODE_MEMORY)
 	{
@@ -1115,6 +1114,8 @@ int main(void)
 
 	while (1) 
 	{
+		EEPromMgr.serviceQueuedWrites();
+
 		if(!g_display_active_countdown)
 		{
 			MenuState_t currentMenu = setMenu(MenuGetCurrent);

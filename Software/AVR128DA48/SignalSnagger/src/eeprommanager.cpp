@@ -248,7 +248,7 @@ uint16_t g_i2c_failure_count = UNUSED_VAR;
 extern char g_tempStr[];
 
 /* default constructor */
-EepromManager::EepromManager()
+EepromManager::EepromManager() : deferredWrites_(), deferredWriteInProgress_(false)
 {
 }   /*EepromManager */
 
@@ -309,6 +309,75 @@ void avr_eeprom_write_float(eeprom_addr_t index, float in) {
 	_PROTECTED_WRITE_SPM(NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
 }
 
+void EepromManager::queueEEPROMBytes(uint16_t address, const uint8_t* bytes,
+	size_t length)
+{
+	if(!bytes)
+	{
+		return;
+	}
+
+	for(size_t i = 0; i < length; ++i)
+	{
+		/* This queue is private to the six tuning-state addresses, so repeated
+		 * acceptances coalesce and cannot exhaust its fixed capacity. */
+		(void)deferredWrites_.put(address + i, bytes[i]);
+	}
+}
+
+void EepromManager::queueTuningPersistence(Frequency_Hz frequency,
+	FrequencyMode_t mode, uint8_t activeMemory)
+{
+	const uint8_t modeByte = (uint8_t)mode;
+
+	queueEEPROMBytes(Frequency, (const uint8_t*)&frequency, sizeof(frequency));
+	queueEEPROMBytes(Frequency_Mode, &modeByte, sizeof(modeByte));
+	queueEEPROMBytes(Active_Memory, &activeMemory, sizeof(activeMemory));
+}
+
+void EepromManager::serviceQueuedWrites()
+{
+	if(NVMCTRL.STATUS & NVMCTRL_EEBUSY_bm)
+	{
+		return;
+	}
+
+	if(deferredWriteInProgress_)
+	{
+		_PROTECTED_WRITE_SPM(NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
+		deferredWriteInProgress_ = false;
+	}
+
+	DeferredByteWrite write;
+	while(deferredWrites_.front(&write))
+	{
+		if(eeprom_read_byte((const uint8_t*)write.address) == write.value)
+		{
+			(void)deferredWrites_.removeFront();
+			continue;
+		}
+
+		/* Start only one byte per service call. Never access mapped EEPROM again
+		 * until NVM reports ready, so audio interrupts can run during the write. */
+		_PROTECTED_WRITE_SPM(NVMCTRL.CTRLA, NVMCTRL_CMD_EEERWR_gc);
+		*(uint8_t*)(eeprom_addr_t)(MAPPED_EEPROM_START + write.address) = write.value;
+		(void)deferredWrites_.removeFront();
+		deferredWriteInProgress_ = true;
+		return;
+	}
+}
+
+void EepromManager::flushQueuedWrites()
+{
+	while(deferredWriteInProgress_ || !deferredWrites_.empty())
+	{
+		if(!eepromWaitReady())
+		{
+			return;
+		}
+		serviceQueuedWrites();
+	}
+}
 
 void EepromManager::updateEEPROMVar(EE_var_t v, void* val)
 {
@@ -785,6 +854,8 @@ void EepromManager::updateEEPROMVar(EE_var_t v, void* val)
  */
 void EepromManager::saveAllEEPROM(void)
 {
+	/* Power-down and menu saves must finish any accepted tuning state first. */
+	flushQueuedWrites();
 	updateEEPROMVar(Id_codespeed, (void*)&g_id_codespeed);	
 	updateEEPROMVar(Fox_setting_none, (void*)&g_fox[EVENT_NONE]);
 	updateEEPROMVar(Fox_setting_classic, (void*)&g_fox[EVENT_CLASSIC]);

@@ -223,6 +223,9 @@
     <Compile Include="include\datetime_utils.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="include\deferred_byte_write_queue.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="include\memory_channels.h">
       <SubType>compile</SubType>
     </Compile>
