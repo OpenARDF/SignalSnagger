@@ -1191,6 +1191,15 @@ int main(void)
 	EEPromMgr.initializeEEPROMVars();
 	EEPromMgr.readNonVols();
 
+	/* Switch scanning starts with the system timers, before EEPROM settings are
+	 * restored. If the startup debounce pass queued a release beep while the
+	 * default was enabled, honor the restored disabled setting by discarding
+	 * that stale UI tone. Safety alerts are scheduled later and are unaffected. */
+	if (!g_pushbutton_audio_feedback_enabled)
+	{
+		atomicWriteU16(&g_beep, 0);
+	}
+
 	ec = init_receiver(g_rx_frequency);
 	
 	if(ec != ERROR_CODE_NO_ERROR)
