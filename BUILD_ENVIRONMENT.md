@@ -9,9 +9,11 @@ The deployed 0.38 firmware was built by Microchip Studio with these inputs:
 - the source list in `Software/AVR128DA48/SignalSnagger/SignalSnagger.cppproj`;
 - `-O0 -g2 -DDEBUG`, function/data sections, and section garbage collection.
 
-The portable wrapper intentionally begins with those released compile settings.
-Changing optimization or debug settings is a separately reviewed firmware change,
-not an incidental build-system cleanup.
+The portable wrapper retains `-g2 -DDEBUG` but uses `-Og` for routine debugging
+and testing. This keeps source-level debugging practical while avoiding the code
+size and interrupt latency of the deployed firmware's unoptimized build.
+Optimization or debug-setting changes remain separately reviewed firmware
+changes, not incidental build-system cleanup.
 
 Set `AVR_TOOLCHAIN_ROOT` to the extracted compiler directory and
 `AVR_DFP_ROOT` to the extracted DFP version directory. The repository does not

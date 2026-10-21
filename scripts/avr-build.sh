@@ -38,8 +38,8 @@ if [[ ${#sources[@]} -eq 0 ]]; then
 	exit 1
 fi
 
-# Match the deployed 0.38 Microchip Studio compile configuration before making
-# any independently reviewed optimization change.
+# Keep debug/test builds easy to inspect while avoiding the excessive code size
+# and ISR overhead produced by an entirely unoptimized build.
 common_flags=(
 	-funsigned-char
 	-funsigned-bitfields
@@ -50,7 +50,7 @@ common_flags=(
 	-I"$firmware_root/utils/assembler"
 	-I"$firmware_root"
 	-I"$AVR_DFP_ROOT/include"
-	-O0
+	-Og
 	-g2
 	-ffunction-sections
 	-fdata-sections
