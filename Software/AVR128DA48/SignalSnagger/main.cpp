@@ -88,6 +88,7 @@ enum MenuState_t {
 	MenuClock,
 	MenuSounds,
 	MenuSetPushbuttonAudioFeedback,
+	MenuSetTurnTickAudioFeedback,
 	MenuSettings,
 	MenuSetAudioFilter,
 	MenuAbout,
@@ -115,6 +116,13 @@ enum PrimaryMenu_t {
 	NUMBER_OF_MENUS,
 	INVALID_MENU
 	};
+
+enum SoundsMenu_t {
+	SOUND_BEEP,
+	SOUND_TURN_TICK,
+	NUMBER_OF_SOUND_MENUS,
+	INVALID_SOUND_MENU
+};
 
 // #define NUMBER_OF_MENUS 5
 const char menuTitle[NUMBER_OF_MENUS][10] = {"MEMORIES", "BATTERY", "CLOCK", "EVENT", "SOUNDS", "SETTINGS", "ABOUT"};
@@ -228,6 +236,11 @@ volatile bool g_pushbutton_audio_feedback_enabled =
 static bool g_pushbutton_audio_feedback_edit_original =
 	PUSHBUTTON_AUDIO_FEEDBACK_DEFAULT;
 static bool g_pushbutton_audio_feedback_edit_active = false;
+volatile bool g_turn_tick_audio_feedback_enabled =
+	TURN_TICK_AUDIO_FEEDBACK_DEFAULT;
+static bool g_turn_tick_audio_feedback_edit_original =
+	TURN_TICK_AUDIO_FEEDBACK_DEFAULT;
+static bool g_turn_tick_audio_feedback_edit_active = false;
 
 Display display = Display();
 leds LEDS = leds();
@@ -274,13 +287,21 @@ static volatile uint8_t g_sine_period_steps = 25;
 static volatile uint16_t g_beep = 0;
 static volatile uint8_t g_tick = 0;
 
-/* This setting affects only button-release tones; tuning ticks and safety
- * alerts remain audible because they are separate feedback paths. */
+/* Button-release tones and rotary ticks have independent settings; safety
+ * alerts remain audible because they use separate feedback paths. */
 static void schedulePushbuttonAudioFeedback(void)
 {
 	if (g_pushbutton_audio_feedback_enabled)
 	{
 		g_beep = 1000;
+	}
+}
+
+static void scheduleTurnTickAudioFeedback(void)
+{
+	if (g_turn_tick_audio_feedback_enabled)
+	{
+		g_tick++;
 	}
 }
 
@@ -1007,6 +1028,16 @@ static void commitMenuEditsIfActive(void)
 		EEPromMgr.updateEEPROMVar(Pushbutton_Audio_Feedback, &storedSetting);
 		g_pushbutton_audio_feedback_edit_active = false;
 	}
+
+	if (g_turn_tick_audio_feedback_edit_active)
+	{
+		g_turn_tick_audio_feedback_edit_original =
+			g_turn_tick_audio_feedback_enabled;
+		uint8_t storedSetting = turnTickAudioFeedbackToStored(
+			g_turn_tick_audio_feedback_enabled);
+		EEPromMgr.updateEEPROMVar(Turn_Tick_Audio_Feedback, &storedSetting);
+		g_turn_tick_audio_feedback_edit_active = false;
+	}
 }
 
 static void rollbackMenuEditsIfActive(void)
@@ -1023,6 +1054,13 @@ static void rollbackMenuEditsIfActive(void)
 			g_pushbutton_audio_feedback_edit_original;
 		g_pushbutton_audio_feedback_edit_active = false;
 	}
+
+	if (g_turn_tick_audio_feedback_edit_active)
+	{
+		g_turn_tick_audio_feedback_enabled =
+			g_turn_tick_audio_feedback_edit_original;
+		g_turn_tick_audio_feedback_edit_active = false;
+	}
 }
 
 int main(void)
@@ -1035,6 +1073,8 @@ int main(void)
 	
 	PrimaryMenu_t hold_menuRow = MEMORIES;
 	PrimaryMenu_t menuRow = MEMORIES;
+	SoundsMenu_t hold_soundMenuRow = INVALID_SOUND_MENU;
+	SoundsMenu_t soundMenuRow = SOUND_BEEP;
 
 	Frequency_Hz hold_rx_frequency = 0;
 	uint8_t hold_rf_gain_setting = 255;
@@ -1042,6 +1082,7 @@ int main(void)
 	uint8_t hold_audio_gain = 0;
 	AudioFilterMode hold_audio_filter_mode = AUDIO_FILTER_MODE_INVALID;
 	uint8_t hold_pushbutton_audio_feedback = 0xff;
+	uint8_t hold_turn_tick_audio_feedback = 0xff;
 	uint16_t hold_goertzel_rssi = 0;
 	bool hold_headphone_state = true;
 	bool refresh_display = true;
@@ -1181,9 +1222,11 @@ int main(void)
 				hold_audio_gain = 0xff; /* force update */
 				hold_audio_filter_mode = AUDIO_FILTER_MODE_INVALID; /* force update */
 				hold_pushbutton_audio_feedback = 0xff; /* force update */
+				hold_turn_tick_audio_feedback = 0xff; /* force update */
 				hold_activeMemory = 0xff; /* force update */
 				hold_goertzel_rssi = 0; /* force update */
 				hold_menuRow = INVALID_MENU; /* force update */
+				hold_soundMenuRow = INVALID_SOUND_MENU; /* force update */
 				
 				if(currentMenu == MenuOperational)
 				{
@@ -1277,16 +1320,27 @@ int main(void)
 
 				case MenuSounds:
 				case MenuSetPushbuttonAudioFeedback:
+				case MenuSetTurnTickAudioFeedback:
 				{
-					const uint8_t enabled =
-						g_pushbutton_audio_feedback_enabled ? 1U : 0U;
-					if (hold_pushbutton_audio_feedback != enabled)
+					const bool showTurnTick =
+						currentMenu == MenuSetTurnTickAudioFeedback ||
+						(currentMenu == MenuSounds &&
+							soundMenuRow == SOUND_TURN_TICK);
+					const uint8_t enabled = showTurnTick
+						? (g_turn_tick_audio_feedback_enabled ? 1U : 0U)
+						: (g_pushbutton_audio_feedback_enabled ? 1U : 0U);
+					uint8_t* holdEnabled = showTurnTick
+						? &hold_turn_tick_audio_feedback
+						: &hold_pushbutton_audio_feedback;
+					if (hold_soundMenuRow != soundMenuRow ||
+						*holdEnabled != enabled)
 					{
-						hold_pushbutton_audio_feedback = enabled;
-						g_text_buff.putString("00SOUNDS");
-						g_text_buff.putString("10PUSHBUTTON");
-						const char selection =
-							currentMenu == MenuSetPushbuttonAudioFeedback ? '>' : ' ';
+						hold_soundMenuRow = soundMenuRow;
+						*holdEnabled = enabled;
+						g_text_buff.putString(showTurnTick
+							? "00Turn Tick " : "00Beep      ");
+						g_text_buff.putString("10          ");
+						const char selection = currentMenu == MenuSounds ? ' ' : '>';
 						snprintf(g_tempStr, 13, "20%c%-3s      ", selection,
 							enabled ? "ON" : "OFF");
 						g_text_buff.putString(g_tempStr);
@@ -1301,16 +1355,8 @@ int main(void)
 					if (hold_audio_filter_mode != mode)
 					{
 						hold_audio_filter_mode = mode;
-						if (currentMenu == MenuSettings)
-						{
-							g_text_buff.putString("00SETTINGS");
-							g_text_buff.putString("10AUDIO FILT");
-						}
-						else
-						{
-							g_text_buff.putString("00AUDIO FILT");
-							g_text_buff.putString("10          ");
-						}
+						g_text_buff.putString("00Audio Filt");
+						g_text_buff.putString("10          ");
 
 						const char selection = currentMenu == MenuSetAudioFilter ? '>' : ' ';
 						const uint16_t bandwidth = audioFilterBandwidthHz(mode);
@@ -1858,14 +1904,25 @@ int main(void)
 
 						case MenuSounds:
 						{
-							g_pushbutton_audio_feedback_edit_original =
-								g_pushbutton_audio_feedback_enabled;
-							g_pushbutton_audio_feedback_edit_active = true;
-							setMenu(MenuSetPushbuttonAudioFeedback);
+							if (soundMenuRow == SOUND_TURN_TICK)
+							{
+								g_turn_tick_audio_feedback_edit_original =
+									g_turn_tick_audio_feedback_enabled;
+								g_turn_tick_audio_feedback_edit_active = true;
+								setMenu(MenuSetTurnTickAudioFeedback);
+							}
+							else
+							{
+								g_pushbutton_audio_feedback_edit_original =
+									g_pushbutton_audio_feedback_enabled;
+								g_pushbutton_audio_feedback_edit_active = true;
+								setMenu(MenuSetPushbuttonAudioFeedback);
+							}
 						}
 						break;
 
 						case MenuSetPushbuttonAudioFeedback:
+						case MenuSetTurnTickAudioFeedback:
 						{
 							/* Encoder and sense-button navigation are deliberate menu
 							 * exits, so both retain the value already being previewed. */
@@ -2007,14 +2064,14 @@ int main(void)
 
 								si5351_set_quad_frequency(g_rx_frequency);
 							
-								g_tick++;
+								scheduleTurnTickAudioFeedback();
 							}
 							else if(g_leftsense_pressed)
 							{
 								if(g_audio_gain < 10) 
 								{
 									g_audio_gain++;
-									g_tick++;
+									scheduleTurnTickAudioFeedback();
 								}
 							}
 							else
@@ -2022,7 +2079,7 @@ int main(void)
 								if(pwm)
 								{
 									setPWM(--pwm);
-									g_tick++;
+									scheduleTurnTickAudioFeedback();
 								}
 							}
 						
@@ -2105,10 +2162,27 @@ int main(void)
 						}
 						break;
 
+						case MenuSounds:
+						{
+							soundMenuRow = (SoundsMenu_t)((uint8_t)soundMenuRow + 1);
+							if (soundMenuRow == NUMBER_OF_SOUND_MENUS)
+							{
+								soundMenuRow = SOUND_BEEP;
+							}
+						}
+						break;
+
 						case MenuSetPushbuttonAudioFeedback:
 						{
 							g_pushbutton_audio_feedback_enabled =
 								!g_pushbutton_audio_feedback_enabled;
+						}
+						break;
+
+						case MenuSetTurnTickAudioFeedback:
+						{
+							g_turn_tick_audio_feedback_enabled =
+								!g_turn_tick_audio_feedback_enabled;
 						}
 						break;
 					
@@ -2160,14 +2234,14 @@ int main(void)
 
 								si5351_set_quad_frequency(g_rx_frequency);
 							
-								g_tick++;
+								scheduleTurnTickAudioFeedback();
 							}
 							else if(g_leftsense_pressed)
 							{
 								if(g_audio_gain > 1) 
 								{
 									g_audio_gain--;
-									g_tick++;
+									scheduleTurnTickAudioFeedback();
 								}
 							}
 							else
@@ -2175,7 +2249,7 @@ int main(void)
 								if(pwm < MAX_PWM_SETTING) 
 								{
 									setPWM(++pwm);
-									g_tick++;
+									scheduleTurnTickAudioFeedback();
 								}
 							}
 						
@@ -2272,10 +2346,30 @@ int main(void)
 						}
 						break;
 
+						case MenuSounds:
+						{
+							if (soundMenuRow == SOUND_BEEP)
+							{
+								soundMenuRow = SOUND_TURN_TICK;
+							}
+							else
+							{
+								soundMenuRow = (SoundsMenu_t)((uint8_t)soundMenuRow - 1);
+							}
+						}
+						break;
+
 						case MenuSetPushbuttonAudioFeedback:
 						{
 							g_pushbutton_audio_feedback_enabled =
 								!g_pushbutton_audio_feedback_enabled;
+						}
+						break;
+
+						case MenuSetTurnTickAudioFeedback:
+						{
+							g_turn_tick_audio_feedback_enabled =
+								!g_turn_tick_audio_feedback_enabled;
 						}
 						break;
 					

@@ -112,6 +112,7 @@ struct EE_prom
 	uint8_t active_memory;
 	uint8_t audio_filter_mode;
 	uint8_t pushbutton_audio_feedback;
+	uint8_t turn_tick_audio_feedback;
 
 };
 
@@ -189,7 +190,8 @@ typedef enum
 	Battery_Threshold = Battery_Capacity + sizeof(uint8_t),
 	Active_Memory = Battery_Threshold + sizeof(uint8_t),
 	Audio_Filter_Mode = Active_Memory + sizeof(uint8_t),
-	Pushbutton_Audio_Feedback = Audio_Filter_Mode + sizeof(uint8_t)
+	Pushbutton_Audio_Feedback = Audio_Filter_Mode + sizeof(uint8_t),
+	Turn_Tick_Audio_Feedback = Pushbutton_Audio_Feedback + sizeof(uint8_t)
 } EE_var_t;
 
 

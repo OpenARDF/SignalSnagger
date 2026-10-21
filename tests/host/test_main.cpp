@@ -713,6 +713,21 @@ void testPushbuttonAudioFeedbackStorageDefaultsSafely()
 		PUSHBUTTON_AUDIO_FEEDBACK_ENABLED);
 }
 
+void testTurnTickAudioFeedbackStorageDefaultsSafely()
+{
+	CHECK(TURN_TICK_AUDIO_FEEDBACK_DEFAULT);
+	CHECK(!turnTickAudioFeedbackFromStored(
+		TURN_TICK_AUDIO_FEEDBACK_DISABLED));
+	CHECK(turnTickAudioFeedbackFromStored(
+		TURN_TICK_AUDIO_FEEDBACK_ENABLED));
+	CHECK(turnTickAudioFeedbackFromStored(0x00));
+	CHECK(turnTickAudioFeedbackFromStored(0xff));
+	CHECK(turnTickAudioFeedbackToStored(false) ==
+		TURN_TICK_AUDIO_FEEDBACK_DISABLED);
+	CHECK(turnTickAudioFeedbackToStored(true) ==
+		TURN_TICK_AUDIO_FEEDBACK_ENABLED);
+}
+
 void testAudioFilterProfilesWidenWithoutMovingTheCwPeak()
 {
 	const double narrowCenter = audioPathRmsAtFrequency(800.0,
@@ -811,6 +826,7 @@ int main()
 	testAudioPathBandpassRejectsOutOfBandSignals();
 	testAudioFilterModesNormalizeCycleAndReportBandwidth();
 	testPushbuttonAudioFeedbackStorageDefaultsSafely();
+	testTurnTickAudioFeedbackStorageDefaultsSafely();
 	testAudioFilterProfilesWidenWithoutMovingTheCwPeak();
 	testAudioFilterOffBypassesOnlyTheBandpass();
 	testDisplayTextValidationRejectsControlBytes();

@@ -83,8 +83,9 @@ ASSERT_EEPROM_OFFSET(battery_threshold, Battery_Threshold);
 ASSERT_EEPROM_OFFSET(active_memory, Active_Memory);
 ASSERT_EEPROM_OFFSET(audio_filter_mode, Audio_Filter_Mode);
 ASSERT_EEPROM_OFFSET(pushbutton_audio_feedback, Pushbutton_Audio_Feedback);
-static_assert(sizeof(EE_prom) == Pushbutton_Audio_Feedback + sizeof(uint8_t),
-	"EEPROM layout size must end after pushbutton_audio_feedback");
+ASSERT_EEPROM_OFFSET(turn_tick_audio_feedback, Turn_Tick_Audio_Feedback);
+static_assert(sizeof(EE_prom) == Turn_Tick_Audio_Feedback + sizeof(uint8_t),
+	"EEPROM layout size must end after turn_tick_audio_feedback");
 
 #undef ASSERT_EEPROM_OFFSET
 
@@ -209,7 +210,8 @@ const struct EE_prom EEMEM EepromManager::ee_vars
 	0x00,       //  uint8_t battery_threshold
 	0x00,       // uint8_t active_memory
 	(uint8_t)AUDIO_FILTER_DEFAULT_MODE, // uint8_t audio_filter_mode
-	PUSHBUTTON_AUDIO_FEEDBACK_ENABLED // uint8_t pushbutton_audio_feedback
+	PUSHBUTTON_AUDIO_FEEDBACK_ENABLED, // uint8_t pushbutton_audio_feedback
+	TURN_TICK_AUDIO_FEEDBACK_ENABLED // uint8_t turn_tick_audio_feedback
 };
 
 bool g_isMaster = UNUSED_VAR;
@@ -867,6 +869,16 @@ void EepromManager::updateEEPROMVar(EE_var_t v, void* val)
 		}
 		break;
 
+		case Turn_Tick_Audio_Feedback:
+		{
+			if (*(uint8_t*)val != eeprom_read_byte(
+				(uint8_t*)&(EepromManager::ee_vars.turn_tick_audio_feedback)))
+			{
+				avr_eeprom_write_byte(Turn_Tick_Audio_Feedback, *(uint8_t*)val);
+			}
+		}
+		break;
+
 		default:
 		{
 
@@ -925,6 +937,9 @@ void EepromManager::saveAllEEPROM(void)
 		g_pushbutton_audio_feedback_enabled);
 	updateEEPROMVar(Pushbutton_Audio_Feedback,
 		(void*)&pushbuttonAudioFeedback);
+	uint8_t turnTickAudioFeedback = turnTickAudioFeedbackToStored(
+		g_turn_tick_audio_feedback_enabled);
+	updateEEPROMVar(Turn_Tick_Audio_Feedback, (void*)&turnTickAudioFeedback);
 }
 
 
@@ -1062,6 +1077,9 @@ bool EepromManager::readNonVols(void)
 		g_pushbutton_audio_feedback_enabled = pushbuttonAudioFeedbackFromStored(
 			eeprom_read_byte((uint8_t*)&(
 				EepromManager::ee_vars.pushbutton_audio_feedback)));
+		g_turn_tick_audio_feedback_enabled = turnTickAudioFeedbackFromStored(
+			eeprom_read_byte((uint8_t*)&(
+				EepromManager::ee_vars.turn_tick_audio_feedback)));
 
 		failure = false;
 	}
@@ -1237,6 +1255,12 @@ bool EepromManager::readNonVols(void)
 			avr_eeprom_write_byte(Pushbutton_Audio_Feedback,
 				pushbuttonAudioFeedbackToStored(
 					g_pushbutton_audio_feedback_enabled));
+
+			g_turn_tick_audio_feedback_enabled =
+				TURN_TICK_AUDIO_FEEDBACK_DEFAULT;
+			avr_eeprom_write_byte(Turn_Tick_Audio_Feedback,
+				turnTickAudioFeedbackToStored(
+					g_turn_tick_audio_feedback_enabled));
 			
 			/* Done */
 
