@@ -12,6 +12,7 @@
 #include "receiver.h"
 #include "receiver_frequency.h"
 #include "receiver_test_stubs.h"
+#include "sense_switches.h"
 #include "signal_score.h"
 #include "status_wait.h"
 #include "text_utils.h"
@@ -362,6 +363,50 @@ void testMemoryChannelSelectionRejectsInvalidOrEmptyInputs()
 	CHECK(findNextActiveMemory(empty, 0, 0, true, invalid) == invalid);
 }
 
+void testSenseSwitchesSuppressCardioidOutputsWhileEditing()
+{
+	const SenseSwitchState left = resolveSenseSwitches(false, true, false);
+	CHECK(left.leftPressed);
+	CHECK(!left.rightPressed);
+	CHECK(!left.bothPressed);
+	CHECK(!left.cardioidFrontEnabled);
+	CHECK(!left.cardioidBackEnabled);
+
+	const SenseSwitchState right = resolveSenseSwitches(true, false, false);
+	CHECK(!right.leftPressed);
+	CHECK(right.rightPressed);
+	CHECK(!right.bothPressed);
+	CHECK(!right.cardioidFrontEnabled);
+	CHECK(!right.cardioidBackEnabled);
+}
+
+void testSenseSwitchesRetainOperationalCardioidBehavior()
+{
+	const SenseSwitchState left = resolveSenseSwitches(false, true, true);
+	CHECK(left.leftPressed);
+	CHECK(left.cardioidFrontEnabled);
+	CHECK(!left.cardioidBackEnabled);
+
+	const SenseSwitchState right = resolveSenseSwitches(true, false, true);
+	CHECK(right.rightPressed);
+	CHECK(!right.cardioidFrontEnabled);
+	CHECK(right.cardioidBackEnabled);
+
+	const SenseSwitchState both = resolveSenseSwitches(false, false, true);
+	CHECK(!both.leftPressed);
+	CHECK(!both.rightPressed);
+	CHECK(both.bothPressed);
+	CHECK(!both.cardioidFrontEnabled);
+	CHECK(!both.cardioidBackEnabled);
+
+	const SenseSwitchState neither = resolveSenseSwitches(true, true, true);
+	CHECK(!neither.leftPressed);
+	CHECK(!neither.rightPressed);
+	CHECK(!neither.bothPressed);
+	CHECK(!neither.cardioidFrontEnabled);
+	CHECK(!neither.cardioidBackEnabled);
+}
+
 void testSignalScoreRejectsInvalidLogarithmInputs()
 {
 	CHECK(receiverSignalScore(0.0f, 0.0f) == 0);
@@ -535,6 +580,8 @@ int main()
 	testStatusWaitCompletesOrTimesOut();
 	testMemoryChannelSelectionWrapsAndSkipsEmptyChannels();
 	testMemoryChannelSelectionRejectsInvalidOrEmptyInputs();
+	testSenseSwitchesSuppressCardioidOutputsWhileEditing();
+	testSenseSwitchesRetainOperationalCardioidBehavior();
 	testSignalScoreRejectsInvalidLogarithmInputs();
 	testSignalScoreIsBounded();
 	testDateTimeParserAcceptsSupportedFormats();

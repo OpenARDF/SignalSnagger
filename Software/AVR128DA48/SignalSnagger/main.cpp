@@ -28,6 +28,7 @@
 #include "memory_channels.h"
 #include "periodic_countdown.h"
 #include "receiver_frequency.h"
+#include "sense_switches.h"
 #include "shared_state.h"
 #include "signal_score.h"
 
@@ -203,6 +204,10 @@ static volatile bool g_leftsense_pressed = false;
 static volatile bool g_rightsense_pressed = false;
 static volatile bool g_doublesense_pressed = false;
 static volatile bool g_encoderswitch_pressed = false;
+/* Foreground owns this flag; the switch ISR reads it to preserve the RF path while editing. */
+static volatile bool g_frequency_updates_enabled = false;
+/* A long accept press must remain RF-neutral until the physical button is released. */
+static volatile bool g_suppress_cardioid_until_side_release = false;
 
 /* Values are 1..10; keeping this byte-sized makes ISR/foreground access atomic. */
 volatile uint8_t g_audio_gain = 4;
@@ -247,6 +252,8 @@ volatile bool g_audio_test = false;
 // #define STEP_DELAY_TIME         1./13868.
 
 static void sineWaveInit(int sine_period_steps);
+static void acceptOperationalFrequencyUpdate(uint8_t* displayedMemory,
+	Frequency_Hz* displayedFrequency);
 
 /* Buffer to store the sine wave samples */
 uint16_t sineWave[MAX_SINE_PERIOD_STEPS];
@@ -420,9 +427,6 @@ ISR(TCB0_INT_vect)
 		
 		if(periodicCountdownTick(&switchScanTicksRemaining, 6))
 		{
-			bool leftSense_pressed = false;
-			bool rightSense_pressed = false;
-			bool bothSense_pressed = false;
 			uint8_t switch_bits = ((1 << SENSE_SWITCH_LEFT) | (1 << SENSE_SWITCH_RIGHT) | (1 << ENCODER_SWITCH) | (1 << HEADPHONE_DETECT));
 
 			holdSwitch = portAdebouncedVals() & switch_bits;
@@ -457,33 +461,21 @@ ISR(TCB0_INT_vect)
 				headphones_filter = 50;
 			}
 			
-			bothSense_pressed = false;
-			
-			if(!leftSense && rightSense)
+			if(leftSense && rightSense)
 			{
-				PORTA_set_pin_level(CARDIOID_BACK, LOW);
-				PORTA_set_pin_level(CARDIOID_FRONT, HIGH);
-				leftSense_pressed = true;
+				g_suppress_cardioid_until_side_release = false;
 			}
-			else if(!rightSense && leftSense)
-			{
-				PORTA_set_pin_level(CARDIOID_FRONT, LOW);
-				PORTA_set_pin_level(CARDIOID_BACK, HIGH);
-				rightSense_pressed = true;
-			}
-			else
-			{
-				PORTA_set_pin_level(CARDIOID_FRONT, LOW);
-				PORTA_set_pin_level(CARDIOID_BACK, LOW);
-				leftSense_pressed = false;
-				rightSense_pressed = false;
-				bothSense_pressed = !leftSense && !rightSense;
-			}
+
+			const SenseSwitchState senseSwitches = resolveSenseSwitches(leftSense,
+				rightSense,
+				!g_frequency_updates_enabled && !g_suppress_cardioid_until_side_release);
+			PORTA_set_pin_level(CARDIOID_FRONT, senseSwitches.cardioidFrontEnabled ? HIGH : LOW);
+			PORTA_set_pin_level(CARDIOID_BACK, senseSwitches.cardioidBackEnabled ? HIGH : LOW);
 			
 			g_encoderswitch_pressed = !encoderSwitch;
-			g_leftsense_pressed = leftSense_pressed;
-			g_rightsense_pressed = rightSense_pressed;
-			g_doublesense_pressed = bothSense_pressed;
+			g_leftsense_pressed = senseSwitches.leftPressed;
+			g_rightsense_pressed = senseSwitches.rightPressed;
+			g_doublesense_pressed = senseSwitches.bothPressed;
 			
 			if(holdSwitch != nowSwitch) /* Change detected */
 			{
@@ -526,7 +518,7 @@ ISR(TCB0_INT_vect)
 					rightsenseAction = SwitchUnchanged;
 				}
 				
-				if(bothSense_pressed) /* Both sense switches are closed */
+				if(senseSwitches.bothPressed) /* Both sense switches are closed */
 				{
 					g_doublesense_presses_count++;
 					g_leftsense_closed_time = 0;
@@ -586,7 +578,7 @@ ISR(TCB0_INT_vect)
 			}
 			else // no switches have changed
 			{
-				if(bothSense_pressed) /* Both sense switches closed and unchanged */
+				if(senseSwitches.bothPressed) /* Both sense switches closed and unchanged */
 				{
 					if(!g_long_doublesense_press && doublesenseLongPressEnabled)
 					{
@@ -606,7 +598,7 @@ ISR(TCB0_INT_vect)
 				}
 				else
 				{
-					if(leftSense_pressed) /* Switch closed and unchanged */
+					if(senseSwitches.leftPressed) /* Switch closed and unchanged */
 					{
 						if(g_leftsense_closed_time < MAX_UINT16) g_leftsense_closed_time++;
 							
@@ -621,7 +613,7 @@ ISR(TCB0_INT_vect)
 						}
 					}
 
-					if(rightSense_pressed) /* Switch closed and unchanged */
+					if(senseSwitches.rightPressed) /* Switch closed and unchanged */
 					{
 						if(g_rightsense_closed_time < MAX_UINT16) g_rightsense_closed_time++;
 							
@@ -915,6 +907,27 @@ static void sineWaveInit(int sine_period_steps)
 	}
 }
 
+static void acceptOperationalFrequencyUpdate(uint8_t* displayedMemory,
+	Frequency_Hz* displayedFrequency)
+{
+	g_suppress_cardioid_until_side_release = true;
+	g_frequency_updates_enabled = false;
+
+	/* Acceptance persists tuning without coupling it to a full-screen refresh. */
+	EEPromMgr.updateEEPROMVar(Frequency, (void*)&g_rx_frequency);
+	EEPromMgr.updateEEPROMVar(Frequency_Mode, (void*)&g_frequency_mode);
+	EEPromMgr.updateEEPROMVar(Active_Memory, (void*)&g_active_memory);
+
+	if(g_frequency_mode == MODE_MEMORY)
+	{
+		*displayedMemory = INVALID_CHANNEL;
+	}
+	else
+	{
+		*displayedFrequency = INVALID_FREQUENCY;
+	}
+}
+
 void powerdown(void)
 {
 	EEPromMgr.saveAllEEPROM();
@@ -978,7 +991,6 @@ int main(void)
 	sineWaveInit(25);
 	
 	MenuState_t hold_menuState = MenuOperational;
-	bool frequency_updates_enabled = false;
 	uint8_t hold_activeMemory = 0;
 	Frequency_Hz hold_activeMemoryFreq = 0;
 	
@@ -1153,7 +1165,7 @@ int main(void)
 							hold_rx_frequency = g_rx_frequency;
 				
 							frequencyString(str, hold_rx_frequency);
-							sprintf(g_tempStr, "00VFO%s%s", frequency_updates_enabled ? ">":" ", str);
+							sprintf(g_tempStr, "00VFO%s%s", g_frequency_updates_enabled ? ">":" ", str);
 							g_text_buff.putString(g_tempStr);
 						}
 					}
@@ -1166,12 +1178,12 @@ int main(void)
 						
 							if(g_channel_name[g_active_memory])
 							{
-								snprintf(g_tempStr, 13, "00M%02d%s%s", hold_activeMemory + 1, frequency_updates_enabled ? ">":" ", channelNames[g_channel_name[g_active_memory]]);
+								snprintf(g_tempStr, 13, "00M%02d%s%s", hold_activeMemory + 1, g_frequency_updates_enabled ? ">":" ", channelNames[g_channel_name[g_active_memory]]);
 							}
 							else
 							{
 								frequencyString(str, hold_rx_frequency);
-								snprintf(g_tempStr, 13, "00M%02d%s%s", hold_activeMemory + 1, frequency_updates_enabled ? ">":" ", str);
+								snprintf(g_tempStr, 13, "00M%02d%s%s", hold_activeMemory + 1, g_frequency_updates_enabled ? ">":" ", str);
 							}
 							
 							g_text_buff.putString(g_tempStr);
@@ -1510,10 +1522,9 @@ int main(void)
 			
 				if(setMenu(MenuGetCurrent) != MenuOperational)
 				{
-					if(frequency_updates_enabled)
+					if(g_frequency_updates_enabled)
 					{
-						frequency_updates_enabled = false;
-						refresh_display = true;
+						acceptOperationalFrequencyUpdate(&hold_activeMemory, &hold_rx_frequency);
 					}
 
 					if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
@@ -1534,10 +1545,9 @@ int main(void)
 				}
 				else
 				{
-					if(frequency_updates_enabled)
+					if(g_frequency_updates_enabled)
 					{
-						frequency_updates_enabled = false;
-						refresh_display = true;
+						acceptOperationalFrequencyUpdate(&hold_activeMemory, &hold_rx_frequency);
 					}
 				}
 			
@@ -1552,10 +1562,9 @@ int main(void)
 			{
 				if(setMenu(MenuGetCurrent) != MenuOperational)
 				{
-					if(frequency_updates_enabled)
+					if(g_frequency_updates_enabled)
 					{
-						frequency_updates_enabled = false;
-						refresh_display = true;
+						acceptOperationalFrequencyUpdate(&hold_activeMemory, &hold_rx_frequency);
 					}
 
 					if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
@@ -1576,10 +1585,9 @@ int main(void)
 				}
 				else
 				{
-					if(frequency_updates_enabled)
+					if(g_frequency_updates_enabled)
 					{
-						frequency_updates_enabled = false;
-						refresh_display = true;
+						acceptOperationalFrequencyUpdate(&hold_activeMemory, &hold_rx_frequency);
 					}
 				}
 			
@@ -1607,10 +1615,9 @@ int main(void)
 			
 				if(setMenu(MenuGetCurrent) != MenuOperational)
 				{
-					if(frequency_updates_enabled)
+					if(g_frequency_updates_enabled)
 					{
-						frequency_updates_enabled = false;
-						refresh_display = true;
+						acceptOperationalFrequencyUpdate(&hold_activeMemory, &hold_rx_frequency);
 					}
 
 					if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
@@ -1631,10 +1638,9 @@ int main(void)
 				}
 				else
 				{
-					if(frequency_updates_enabled)
+					if(g_frequency_updates_enabled)
 					{
-						frequency_updates_enabled = false;
-						refresh_display = true;
+						acceptOperationalFrequencyUpdate(&hold_activeMemory, &hold_rx_frequency);
 					}
 				}
 			
@@ -1649,10 +1655,9 @@ int main(void)
 			{
 				if(setMenu(MenuGetCurrent) != MenuOperational)
 				{
-					if(frequency_updates_enabled)
+					if(g_frequency_updates_enabled)
 					{
-						frequency_updates_enabled = false;
-						refresh_display = true;
+						acceptOperationalFrequencyUpdate(&hold_activeMemory, &hold_rx_frequency);
 					}
 
 					if(g_channel_frequency[g_active_memory] == EMPTY_MEMORY)
@@ -1673,10 +1678,9 @@ int main(void)
 				}
 				else
 				{
-					if(frequency_updates_enabled)
+					if(g_frequency_updates_enabled)
 					{
-						frequency_updates_enabled = false;
-						refresh_display = true;
+						acceptOperationalFrequencyUpdate(&hold_activeMemory, &hold_rx_frequency);
 					}
 				}
 			
@@ -1709,7 +1713,7 @@ int main(void)
 					{
 						case MenuOperational:
 						{
-							frequency_updates_enabled = true;
+							g_frequency_updates_enabled = true;
 							refresh_display = true;
 						}
 						break;
@@ -1825,7 +1829,7 @@ int main(void)
 							{
 								sineWaveInit(g_sine_period_steps + 5);
 							}
-							else if(frequency_updates_enabled)
+							else if(g_frequency_updates_enabled)
 							{
 								if(g_frequency_mode == MODE_VFO)
 								{
@@ -1964,7 +1968,7 @@ int main(void)
 							{
 								sineWaveInit(g_sine_period_steps - 5);
 							}
-							else if(frequency_updates_enabled)
+							else if(g_frequency_updates_enabled)
 							{
 								if(g_frequency_mode == MODE_VFO)
 								{

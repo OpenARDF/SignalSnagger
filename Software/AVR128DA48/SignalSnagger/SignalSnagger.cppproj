@@ -226,6 +226,9 @@
     <Compile Include="include\memory_channels.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="include\sense_switches.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="include\periodic_countdown.h">
       <SubType>compile</SubType>
     </Compile>
@@ -386,6 +389,9 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\memory_channels.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\sense_switches.cpp">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\periodic_countdown.cpp">
