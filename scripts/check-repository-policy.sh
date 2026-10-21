@@ -161,7 +161,7 @@ fi
 if rg -q 'g_active_memory[[:space:]]*=[[:space:]]*nextActiveMemory' "$firmware_root/main.cpp"; then
 	fail "memory selection must validate INVALID_CHANNEL before updating the active array index"
 fi
-if ! rg -q 'static_assert\(sizeof\(EE_prom\) == Active_Memory' "$firmware_root/src/eeprommanager.cpp"; then
+if ! rg -q 'static_assert\(sizeof\(EE_prom\) == Pushbutton_Audio_Feedback' "$firmware_root/src/eeprommanager.cpp"; then
 	fail "EEPROM address constants require compile-time layout verification"
 fi
 if rg -q 'while\s*\(\s*!ADC0_conversionDone\(\)\s*\)' \

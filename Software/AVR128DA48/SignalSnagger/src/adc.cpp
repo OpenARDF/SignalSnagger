@@ -28,29 +28,22 @@
 #include <stdbool.h>
 #include <driver_init.h>
 #include <compiler.h>
+#include "audio_path.h"
 #include "Goertzel.h"
 
-#define SAMPLE_RATE 96154
-#define Goertzel_N 101
 #define ADC_CONVERSION_SPIN_GUARD UINT32_C(100000)
-const int N = Goertzel_N;
-const float threshold = 500000. * (Goertzel_N / 100.);
-const float sampling_freq = SAMPLE_RATE;
-// const float x_frequencies[4] = { 1209., 1336., 1477., 1633. };
-// const float pitch_frequencies[4] = { 697., 770., 852., 941. };
-	
-#define FREE_RUNNING true
-#define SINGLE_CONVERSION false
-	
-Goertzel g_goertzel(N, sampling_freq);
+
+Goertzel g_goertzel(AUDIO_GOERTZEL_SAMPLE_COUNT, AUDIO_DSP_SAMPLE_RATE_HZ);
 
 static void PORT_init(void);
-static void ADC0_Freerun_Init(bool twelveBit);
+static void ADC0_Audio_Init(bool twelveBit);
 static void ADC0_Single_Init(bool twelveBit);
+static void ADC0_AudioTimerStart(void);
+static void ADC0_AudioTimerStop(void);
 
 typedef enum {
 	ADC_NOT_INITIALIZED,
-	ADC_FREE_RUN_INITIALIZED,
+	ADC_AUDIO_INITIALIZED,
 	ADC_SINGLE_CONVERSION_INITIALIZED
 	} ADC_Init_t;
 	
@@ -59,7 +52,7 @@ static ADC_Init_t g_adc_initialization = ADC_NOT_INITIALIZED;
 
 void ADC0_startConversion(void)
 {
-	if(g_adc_initialization != ADC_NOT_INITIALIZED)
+	if(g_adc_initialization == ADC_SINGLE_CONVERSION_INITIALIZED)
 	{
 		ADC0.COMMAND = ADC_STCONV_bm; /* Start conversion */
 	}
@@ -151,28 +144,72 @@ static void PORT_init(void)
 	PORTD.PIN7CTRL &= ~PORT_PULLUPEN_bm;
 }
 
-static void ADC0_Freerun_Init(bool twelveBit)
+static void ADC0_AudioTimerStop(void)
 {
+	TCA1.SINGLE.INTCTRL = 0;
+	TCA1.SINGLE.CTRLA = 0;
+	ADC0.EVCTRL = 0;
+	EVSYS.USERADC0START = 0;
+	EVSYS.CHANNEL0 = 0;
+	CPUINT.LVL1VEC = TCB2_INT_vect_num;
+}
+
+static void ADC0_AudioTimerStart(void)
+{
+#if (F_CPU % AUDIO_ADC_SAMPLE_RATE_HZ) != 0
+#error F_CPU must divide evenly into the requested ADC sample rate
+#endif
+	TCA1.SINGLE.CTRLA = 0;
+	TCA1.SINGLE.CTRLB = TCA_SINGLE_WGMODE_NORMAL_gc;
+	TCA1.SINGLE.CNT = 0;
+	TCA1.SINGLE.PER = (F_CPU / AUDIO_ADC_SAMPLE_RATE_HZ) - 1;
+	/* Start lower-priority DSP after the ADC conversion and capture ISR. */
+	TCA1.SINGLE.CMP0 = ((F_CPU / AUDIO_ADC_SAMPLE_RATE_HZ) * 4 / 5);
+	TCA1.SINGLE.INTCTRL = 0;
+	TCA1.SINGLE.INTFLAGS = TCA_SINGLE_OVF_bm | TCA_SINGLE_CMP0_bm |
+		TCA_SINGLE_CMP1_bm | TCA_SINGLE_CMP2_bm;
+
+	EVSYS.CHANNEL0 = EVSYS_CHANNEL0_TCA1_OVF_LUNF_gc;
+	EVSYS.USERADC0START = EVSYS_USER_CHANNEL0_gc;
+	ADC0.EVCTRL = ADC_STARTEI_bm;
+	CPUINT.LVL1VEC = ADC0_RESRDY_vect_num;
+	TCA1.SINGLE.CTRLA = TCA_SINGLE_CLKSEL_DIV1_gc | TCA_SINGLE_ENABLE_bm;
+}
+
+void ADC0_scheduleAudioFrame(void)
+{
+	/* Clear any stale compare and arm one low-priority DSP pass at the current
+	 * or next compare point; the ADC remains the level-1 interrupt. */
+	TCA1.SINGLE.INTFLAGS = TCA_SINGLE_CMP0_bm;
+	TCA1.SINGLE.INTCTRL |= TCA_SINGLE_CMP0_bm;
+}
+
+void ADC0_audioFrameHandled(void)
+{
+	TCA1.SINGLE.INTCTRL &= (uint8_t)~TCA_SINGLE_CMP0_bm;
+	TCA1.SINGLE.INTFLAGS = TCA_SINGLE_CMP0_bm;
+}
+
+static void ADC0_Audio_Init(bool twelveBit)
+{
+	VREF.ADC0REF = VREF_ALWAYSON_bm | VREF_REFSEL_2V048_gc;
+	ADC0.CTRLC = ADC_PRESC_DIV16_gc;
 	if(twelveBit)
 	{
-		VREF.ADC0REF = 0x80 |VREF_REFSEL_2V048_gc;  /* Internal 2.048V reference */
-		ADC0.CTRLC = ADC_PRESC_DIV16_gc;   /* CLK_PER frequency divided by prescaler and by 15.6 (12-bit conversion time = 48.1 ksps) */
 		ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
-		| ADC_RESSEL_12BIT_gc      /* 12-bit mode */
-		| ADC_FREERUN_bm;          /* Enable Free-Run mode */
-		ADC0.INTCTRL = 0x01; /* Enable interrupt */
-		g_adc_initialization = ADC_FREE_RUN_INITIALIZED;
+			| ADC_RESSEL_12BIT_gc;    /* 12-bit mode */
 	}
 	else
 	{
-		VREF.ADC0REF = 0x80 | VREF_REFSEL_2V048_gc;  /* Internal 2.048V reference */
-		ADC0.CTRLC = ADC_PRESC_DIV128_gc;   /* CLK_PER frequency divided by prescaler and by 13.5 (10-bit conversion time = 13889 sps) */
 		ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
-		| ADC_RESSEL_10BIT_gc      /* 10-bit mode */
-		| ADC_FREERUN_bm;          /* Enable Free-Run mode */
-		ADC0.INTCTRL = 0x01; /* Enable interrupt */
-		g_adc_initialization = ADC_FREE_RUN_INITIALIZED;
+			| ADC_RESSEL_10BIT_gc;    /* 10-bit mode */
 	}
+	ADC0.INTFLAGS = ADC_RESRDY_bm | ADC_WCMP_bm;
+	ADC0.INTCTRL = ADC_RESRDY_bm;
+	g_adc_initialization = ADC_AUDIO_INITIALIZED;
+	/* TCA1 overflow starts each conversion through EVSYS, giving an exact
+	 * 48 ksample/s cadence without a second timer interrupt. */
+	ADC0_AudioTimerStart();
 }
 
 static void ADC0_Single_Init(bool twelveBit)
@@ -199,20 +236,14 @@ static void ADC0_Single_Init(bool twelveBit)
 
 void ADC0_SYSTEM_init(bool twelveBit, bool freerun)
 {
+	ADC0_SYSTEM_shutdown();
 	PORT_init();
 	if(freerun)
 	{
-		ADC0_Freerun_Init(twelveBit);
+		ADC0_Audio_Init(twelveBit);
 	}
 	else
 	{
-		ADC0.INTCTRL &= 0xFE; /* Disable interrupt */		
-		if(ADC0.CTRLA & ADC_FREERUN_bm)
-		{
-			while(util_delay_ms(2) && !ADC0_conversionDone());
-		}
-
-		ADC0.CTRLA = 0;
 		ADC0_Single_Init(twelveBit);
 	}
 	
@@ -221,7 +252,9 @@ void ADC0_SYSTEM_init(bool twelveBit, bool freerun)
 void ADC0_SYSTEM_shutdown(void)
 {
 	ADC0.INTCTRL = 0x00; /* Disable interrupt */
+	ADC0_AudioTimerStop();
 	ADC0.CTRLA = ADC_RESSEL_12BIT_gc; /* Turn off ADC leaving 12-bit resolution set */
+	ADC0.INTFLAGS = ADC_RESRDY_bm | ADC_WCMP_bm;
 	g_adc_initialization = ADC_NOT_INITIALIZED;
 }
 

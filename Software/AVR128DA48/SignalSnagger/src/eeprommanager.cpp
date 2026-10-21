@@ -24,8 +24,10 @@
 
 #include "defs.h"
 #include "eeprommanager.h"
+#include "audio_path.h"
 #include "i2c.h"
 #include "receiver.h"
+#include "sound_settings.h"
 #include <avr/pgmspace.h>
 #include <stddef.h>
 #include <string.h>
@@ -79,8 +81,10 @@ ASSERT_EEPROM_OFFSET(frequency_mode, Frequency_Mode);
 ASSERT_EEPROM_OFFSET(battery_capacity, Battery_Capacity);
 ASSERT_EEPROM_OFFSET(battery_threshold, Battery_Threshold);
 ASSERT_EEPROM_OFFSET(active_memory, Active_Memory);
-static_assert(sizeof(EE_prom) == Active_Memory + sizeof(uint8_t),
-	"EEPROM layout size must end after active_memory");
+ASSERT_EEPROM_OFFSET(audio_filter_mode, Audio_Filter_Mode);
+ASSERT_EEPROM_OFFSET(pushbutton_audio_feedback, Pushbutton_Audio_Feedback);
+static_assert(sizeof(EE_prom) == Pushbutton_Audio_Feedback + sizeof(uint8_t),
+	"EEPROM layout size must end after pushbutton_audio_feedback");
 
 #undef ASSERT_EEPROM_OFFSET
 
@@ -203,7 +207,9 @@ const struct EE_prom EEMEM EepromManager::ee_vars
 	(FrequencyMode_t)0x00,		//  uint8_t frequency_mode
 	(BatteryCapacity_t)0x00,       //  uint8_t battery_capacity
 	0x00,       //  uint8_t battery_threshold
-	0x00		// uint8_t active_memory
+	0x00,       // uint8_t active_memory
+	(uint8_t)AUDIO_FILTER_DEFAULT_MODE, // uint8_t audio_filter_mode
+	PUSHBUTTON_AUDIO_FEEDBACK_ENABLED // uint8_t pushbutton_audio_feedback
 };
 
 bool g_isMaster = UNUSED_VAR;
@@ -841,6 +847,26 @@ void EepromManager::updateEEPROMVar(EE_var_t v, void* val)
 		}
 		break;
 
+		case Audio_Filter_Mode:
+		{
+			if (*(uint8_t*)val != eeprom_read_byte(
+				(uint8_t*)&(EepromManager::ee_vars.audio_filter_mode)))
+			{
+				avr_eeprom_write_byte(Audio_Filter_Mode, *(uint8_t*)val);
+			}
+		}
+		break;
+
+		case Pushbutton_Audio_Feedback:
+		{
+			if (*(uint8_t*)val != eeprom_read_byte(
+				(uint8_t*)&(EepromManager::ee_vars.pushbutton_audio_feedback)))
+			{
+				avr_eeprom_write_byte(Pushbutton_Audio_Feedback, *(uint8_t*)val);
+			}
+		}
+		break;
+
 		default:
 		{
 
@@ -893,6 +919,12 @@ void EepromManager::saveAllEEPROM(void)
 	updateEEPROMVar(Battery_Capacity, (void*)&g_battery_capacity);
 	updateEEPROMVar(Battery_Threshold, (void*)&g_battery_warning_threshold);
 	updateEEPROMVar(Active_Memory, (void*)&g_active_memory);
+	uint8_t audioFilterMode = (uint8_t)g_audio_filter_mode;
+	updateEEPROMVar(Audio_Filter_Mode, (void*)&audioFilterMode);
+	uint8_t pushbuttonAudioFeedback = pushbuttonAudioFeedbackToStored(
+		g_pushbutton_audio_feedback_enabled);
+	updateEEPROMVar(Pushbutton_Audio_Feedback,
+		(void*)&pushbuttonAudioFeedback);
 }
 
 
@@ -1019,6 +1051,17 @@ bool EepromManager::readNonVols(void)
 		
 		g_active_memory = (uint8_t)eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.active_memory));
 		if((uint8_t)g_active_memory >= NUMBER_OF_FREQUENCY_CHANNELS) g_active_memory = 0;
+
+		/* Older firmware leaves this appended byte erased. Normalize 0xff to the
+		 * current 200 Hz default without resetting any preceding user settings. */
+		g_audio_filter_mode = audioFilterModeFromStored(eeprom_read_byte(
+			(uint8_t*)&(EepromManager::ee_vars.audio_filter_mode)));
+
+		/* Only the explicit disabled token mutes feedback. Legacy values retain
+		 * the enabled default without forcing an EEPROM-wide reset. */
+		g_pushbutton_audio_feedback_enabled = pushbuttonAudioFeedbackFromStored(
+			eeprom_read_byte((uint8_t*)&(
+				EepromManager::ee_vars.pushbutton_audio_feedback)));
 
 		failure = false;
 	}
@@ -1181,6 +1224,19 @@ bool EepromManager::readNonVols(void)
 			
 			g_battery_warning_threshold = 10;
 			avr_eeprom_write_byte(Battery_Threshold, g_battery_warning_threshold);
+
+			g_active_memory = 0;
+			avr_eeprom_write_byte(Active_Memory, g_active_memory);
+
+			g_audio_filter_mode = AUDIO_FILTER_DEFAULT_MODE;
+			avr_eeprom_write_byte(Audio_Filter_Mode,
+				(uint8_t)g_audio_filter_mode);
+
+			g_pushbutton_audio_feedback_enabled =
+				PUSHBUTTON_AUDIO_FEEDBACK_DEFAULT;
+			avr_eeprom_write_byte(Pushbutton_Audio_Feedback,
+				pushbuttonAudioFeedbackToStored(
+					g_pushbutton_audio_feedback_enabled));
 			
 			/* Done */
 

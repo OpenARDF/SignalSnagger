@@ -38,8 +38,9 @@ if [[ ${#sources[@]} -eq 0 ]]; then
 	exit 1
 fi
 
-# Keep debug/test builds easy to inspect while avoiding the excessive code size
-# and ISR overhead produced by an entirely unoptimized build.
+# Keep debug symbols in test images, but optimize the real-time 48 kHz audio
+# path enough that hardware testing measures firmware behavior rather than
+# debug-build interrupt overhead.
 common_flags=(
 	-funsigned-char
 	-funsigned-bitfields
@@ -50,7 +51,7 @@ common_flags=(
 	-I"$firmware_root/utils/assembler"
 	-I"$firmware_root"
 	-I"$AVR_DFP_ROOT/include"
-	-Og
+	-O2
 	-g2
 	-ffunction-sections
 	-fdata-sections

@@ -17,6 +17,7 @@ trap 'rm -f "$test_binary"' EXIT
 	-I"$firmware_root/include" \
 	"$repo_root/tests/host/test_main.cpp" \
 	"$repo_root/tests/host/receiver_test_stubs.cpp" \
+	"$firmware_root/src/audio_path.cpp" \
 	"$firmware_root/src/CircularFloatBuff.cpp" \
 	"$firmware_root/src/CircularStringBuff.cpp" \
 	"$firmware_root/src/CircularUintBuff.cpp" \

@@ -110,6 +110,8 @@ struct EE_prom
 	BatteryCapacity_t battery_capacity;
 	uint8_t battery_threshold;
 	uint8_t active_memory;
+	uint8_t audio_filter_mode;
+	uint8_t pushbutton_audio_feedback;
 
 };
 
@@ -185,7 +187,9 @@ typedef enum
 	Frequency_Mode = Channel_Name + NUMBER_OF_FREQUENCY_CHANNELS * sizeof(uint8_t),
 	Battery_Capacity = Frequency_Mode + sizeof(uint8_t),
 	Battery_Threshold = Battery_Capacity + sizeof(uint8_t),
-	Active_Memory = Battery_Threshold + sizeof(uint8_t)
+	Active_Memory = Battery_Threshold + sizeof(uint8_t),
+	Audio_Filter_Mode = Active_Memory + sizeof(uint8_t),
+	Pushbutton_Audio_Feedback = Audio_Filter_Mode + sizeof(uint8_t)
 } EE_var_t;
 
 

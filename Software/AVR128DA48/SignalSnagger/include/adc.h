@@ -48,6 +48,8 @@ int ADC0_read(void);
 int16_t temperatureC(void);
 void ADC0_SYSTEM_init(bool twelveBit, bool freerun);
 void ADC0_SYSTEM_shutdown(void);
+void ADC0_scheduleAudioFrame(void);
+void ADC0_audioFrameHandled(void);
 
 
 #endif /* ADC_H_ */

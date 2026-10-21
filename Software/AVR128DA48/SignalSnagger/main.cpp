@@ -12,6 +12,7 @@
 #include "receiver.h"
 #include "morse.h"
 #include "adc.h"
+#include "audio_path.h"
 #include "Goertzel.h"
 #include "util.h"
 #include "binio.h"
@@ -31,6 +32,7 @@
 #include "sense_switches.h"
 #include "shared_state.h"
 #include "signal_score.h"
+#include "sound_settings.h"
 
 #include <cpuint.h>
 #include <ccp.h>
@@ -84,6 +86,10 @@ enum MenuState_t {
 	MenuSetmAh,
 	MenuSetBatThresh,
 	MenuClock,
+	MenuSounds,
+	MenuSetPushbuttonAudioFeedback,
+	MenuSettings,
+	MenuSetAudioFilter,
 	MenuAbout,
 	MenuInactivityPoweroff,
 	MenuNoHeadphones,
@@ -212,6 +218,16 @@ static volatile bool g_suppress_cardioid_until_side_release = false;
 /* Values are 1..10; keeping this byte-sized makes ISR/foreground access atomic. */
 volatile uint8_t g_audio_gain = 4;
 volatile bool g_enable_audio_feedthrough = true;
+volatile AudioFilterMode g_audio_filter_mode = AUDIO_FILTER_DEFAULT_MODE;
+/* Foreground restores this snapshot when live filter preview is cancelled. */
+static AudioFilterMode g_audio_filter_edit_original = AUDIO_FILTER_DEFAULT_MODE;
+static bool g_audio_filter_edit_active = false;
+volatile bool g_pushbutton_audio_feedback_enabled =
+	PUSHBUTTON_AUDIO_FEEDBACK_DEFAULT;
+/* Foreground restores this snapshot when live feedback preview is cancelled. */
+static bool g_pushbutton_audio_feedback_edit_original =
+	PUSHBUTTON_AUDIO_FEEDBACK_DEFAULT;
+static bool g_pushbutton_audio_feedback_edit_active = false;
 
 Display display = Display();
 leds LEDS = leds();
@@ -225,41 +241,48 @@ static CircularUintBuff g_rssi_buff(HIGH_WATER_BUFF_SIZE);
 
 EepromManager EEPromMgr;
 
-#define Goertzel_N 209
-#define SAMPLE_RATE 96154 /* 480965 12080  13868 */
-const int N = Goertzel_N;
-//const float threshold = 500000. * (Goertzel_N / 100);
-const float sampling_freq = SAMPLE_RATE;
-const float pitch_frequencies[3] = { 600., 700., 800.}; /* should be an integer multiple of SAMPLING_RATE/N (SAMPLE_RATE / Goertzel_N) */
+static const float pitch_frequencies[MAX_GOERTZEL_TARGETS] = {
+	AUDIO_CW_DETECTOR_LOW_HZ, AUDIO_CW_OFFSET_HZ,
+	AUDIO_CW_DETECTOR_HIGH_HZ
+}; /* Exact 100 Hz bins at 12 ksample/s with 120-sample blocks. */
 volatile uint16_t g_rssi_countdown = 100;
 
 volatile bool g_audio_test = false;
+static AudioPathProcessor g_audio_path;
+static volatile int16_t g_pending_audio_sample = 0;
+static volatile bool g_audio_frame_ready = false;
+/* Debugger-visible deadline evidence: nonzero means 12 kHz DSP lost a frame. */
+static volatile uint16_t g_audio_dropped_frames = 0;
 
 /* VREF start-up time */
 #define VREF_STARTUP_TIME       (50)
-/* Mask needed to get the 2 LSb for DAC Data Register */
-#define LSB_MASK                (0x03)
 /* Number of samples for a sine wave period */
 #define SINE_PERIOD_STEPS       (25)
 #define MAX_SINE_PERIOD_STEPS   (201)
-/* Sine wave amplitude */
-#define SINE_AMPLITUDE          (1) // (511)
-/* Sine wave DC offset */
-#define SINE_DC_OFFSET          (2048) //(512)
-/* Frequency of the sine wave */
-// #define SINE_FREQ               (200)
-// /* Step delay for the loop */
-// #define STEP_DELAY_TIME         1./13868.
+#define SINE_AMPLITUDE          (256)
 
 static void sineWaveInit(int sine_period_steps);
+static void startAudioFlow(void);
+static void commitMenuEditsIfActive(void);
+static void rollbackMenuEditsIfActive(void);
 static void acceptOperationalFrequencyUpdate(uint8_t* displayedMemory,
 	Frequency_Hz* displayedFrequency);
 
 /* Buffer to store the sine wave samples */
-uint16_t sineWave[MAX_SINE_PERIOD_STEPS];
+int16_t sineWave[MAX_SINE_PERIOD_STEPS];
 static volatile uint8_t g_sine_period_steps = 25;
 static volatile uint16_t g_beep = 0;
 static volatile uint8_t g_tick = 0;
+
+/* This setting affects only button-release tones; tuning ticks and safety
+ * alerts remain audible because they are separate feedback paths. */
+static void schedulePushbuttonAudioFeedback(void)
+{
+	if (g_pushbutton_audio_feedback_enabled)
+	{
+		g_beep = 1000;
+	}
+}
 
 
 /***********************************************************************
@@ -314,92 +337,58 @@ ADC Result Ready Interrupt
 */
 ISR(ADC0_RESRDY_vect)
 {
-	uint8_t x = ADC0.INTFLAGS;
-	
-	if(x & ADC_RESRDY_bm)
+	const uint16_t sample = ADC0.RES; /* Reading RES clears RESRDY. */
+	int16_t decimatedSample = 0;
+	if (g_audio_path.CaptureAdcSample(sample, &decimatedSample))
 	{
-// 		static uint8_t indexSingleConversionInProcess = NO_ADC_SELECTED;
-		static uint8_t sineIndex = 0;
-		uint16_t sample = ADC0.RES;
-		uint16_t result = 0;
-// 		bool passAudio = true;
-
-		if(g_enable_audio_feedthrough)
+		if (g_audio_frame_ready)
 		{
-			result = sample;
-		}
-				
-// 		if(g_active_ADC_sample != ADC_I_AMPED)
-// 		{			
-// 			if(indexSingleConversionInProcess == NO_ADC_SELECTED) /* set up to take a single sample of another channel */
-// 			{
-// 				ADC0.MUXPOS = indexSingleConversionInProcess;
-// 				indexSingleConversionInProcess = g_active_ADC_sample;
-// 				ADC0.CTRLC = ADC_PRESC_DIV2_gc;
-// 				ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
-// 					| ADC_RESSEL_12BIT_gc      /* 12-bit mode */
-// 					| ADC_FREERUN_bm;          /* Enable Free-Run mode */
-// 			}
-// 			else /* read result of a single sample of another channel */
-// 			{
-// 					int16_t slot = g_adcChannel2Slot[indexSingleConversionInProcess];
-// 					g_lastConversionResult[slot] = result;
-// 					g_adcUpdated[slot] = true;
-// 					ADC0.MUXPOS = ADC_I_AMPED;
-// 					g_active_ADC_sample = ADC_I_AMPED;
-// 					ADC0.CTRLC = ADC_PRESC_DIV128_gc;
-// 					ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
-// 					| ADC_RESSEL_10BIT_gc      /* 10-bit mode */
-// 					| ADC_FREERUN_bm;          /* Enable Free-Run mode */
-//					indexSingleConversionInProcess = NO_ADC_SELECTED;
-// 					passAudio = false;
-// 			}
-// 		}
-		
- 		if(g_audio_test)
-		{
-			if(g_sine_period_steps)
-			{
-				if(g_beep)
-				{
-					result += sineWave[sineIndex++];
-					if(sineIndex >= g_sine_period_steps) sineIndex = 0;
-					g_beep--;
-				}
-				DAC0_setVal(result);
-				g_goertzel.DataPoint(result);
-			}
+			g_audio_dropped_frames++;
 		}
 		else
 		{
-			if(g_beep)
-			{
-				result += sineWave[sineIndex++];
-				if(sineIndex >= g_sine_period_steps) sineIndex = 0;
-				g_beep--;
-			}
-			else if(g_tick)
-			{
-				g_tick--;
-				result = 0;
-			}
-		
-			if(g_audio_gain > 4)
-			{
-				result = result << (g_audio_gain - 4);
-			}
-			else
-			{
-				result = result >> (4 - g_audio_gain);
-			}
-		
-			DAC0_setVal(result);
-			g_goertzel.DataPoint(sample);
-// 				PORTC_toggle_pin_level(5);
+			g_pending_audio_sample = decimatedSample;
+			g_audio_frame_ready = true;
+			ADC0_scheduleAudioFrame();
 		}
 	}
-	
-	ADC0.INTFLAGS = (ADC_RESRDY_bm | ADC_WCMP_bm);
+}
+
+/* CPUINT level 1 lets the ADC preempt this level-0 ISR without globally
+ * enabling same-level UI interrupts, which would add DAC timing jitter. */
+ISR(TCA1_CMP0_vect)
+{
+	static uint8_t sineIndex = 0;
+	ADC0_audioFrameHandled();
+	if (!g_audio_frame_ready)
+	{
+		return;
+	}
+
+	const int16_t decimatedSample = g_pending_audio_sample;
+	g_audio_frame_ready = false;
+	int16_t injectedSample = 0;
+	bool feedthrough = g_enable_audio_feedthrough && !g_audio_test;
+	const uint8_t gain = g_audio_test ? AUDIO_NEUTRAL_GAIN : g_audio_gain;
+
+	/* Tone/tick durations are counted at the 12 ksample/s output rate. */
+	if (g_beep && g_sine_period_steps)
+	{
+		injectedSample = sineWave[sineIndex++];
+		if(sineIndex >= g_sine_period_steps) sineIndex = 0;
+		g_beep--;
+	}
+	else if (g_tick)
+	{
+		g_tick--;
+		feedthrough = false;
+	}
+
+	AudioFrame frame;
+	g_audio_path.ProcessFrame(decimatedSample, gain, feedthrough,
+		injectedSample, g_audio_filter_mode, &frame);
+	DAC0_setVal(frame.dacValue);
+	g_goertzel.DataPoint(frame.analysisSample);
 }
 
 
@@ -529,7 +518,7 @@ ISR(TCB0_INT_vect)
 				}
 				else if(g_doublesense_closed_time)
 				{
-					g_beep = 1000;
+					schedulePushbuttonAudioFeedback();
 					g_doublesense_closed_time = 0;
 					doublesenseAction = SwitchRelease;
 				}
@@ -539,7 +528,7 @@ ISR(TCB0_INT_vect)
 
 					if(leftsenseAction == SwitchRelease)
 					{
-						g_beep = 1000;
+						schedulePushbuttonAudioFeedback();
 						g_leftsense_closed_time = 0;
 						leftsenseLongPressEnabled = true;
 					}
@@ -550,7 +539,7 @@ ISR(TCB0_INT_vect)
 					
 					if(rightsenseAction == SwitchRelease)
 					{
-						g_beep = 1000;
+						schedulePushbuttonAudioFeedback();
 						g_rightsense_closed_time = 0;
 						rightsenseLongPressEnabled = true;
 					}
@@ -569,7 +558,7 @@ ISR(TCB0_INT_vect)
 					}
 					else
 					{
-						g_beep = 1000;
+						schedulePushbuttonAudioFeedback();
 						g_encoder_closed_time = 0;
  						encoderLongPressEnabled = true;
 						encoderswitchAction = SwitchRelease;
@@ -899,12 +888,23 @@ static void sineWaveInit(int sine_period_steps)
 	
 		for(i = 0; i < sine_period_steps; i++)
 		{
-			sineWave[i] = SINE_DC_OFFSET + SINE_AMPLITUDE * sin(2 * M_PI * i / sine_period_steps);
+			sineWave[i] = (int16_t)(SINE_AMPLITUDE *
+				sin(2 * M_PI * i / sine_period_steps));
 		}
 	
 		g_sine_period_steps = sine_period_steps;
 		g_audio_test = hold_at;
 	}
+}
+
+static void startAudioFlow(void)
+{
+	g_audio_frame_ready = false;
+	g_audio_dropped_frames = 0;
+	g_audio_path.Reset(g_audio_filter_mode);
+	g_goertzel.Flush();
+	ADC0.MUXPOS = ADC_I_AMPED;
+	ADC0_SYSTEM_init(ADC12BIT, true);
 }
 
 static void acceptOperationalFrequencyUpdate(uint8_t* displayedMemory,
@@ -929,6 +929,9 @@ static void acceptOperationalFrequencyUpdate(uint8_t* displayedMemory,
 
 void powerdown(void)
 {
+	/* Power loss is not a normal sense-button exit. Restore all live previews
+	 * before the general EEPROM save records the receiver state. */
+	rollbackMenuEditsIfActive();
 	EEPromMgr.saveAllEEPROM();
 	PORTA_set_pin_level(PWR_5V_ENABLE, LOW);	
 	PORTA_set_pin_level(POWER_ENABLE, LOW);
@@ -985,6 +988,43 @@ MenuState_t setMenu(MenuState_t menu)
 	return(menuStateTrace[menuIndex]);
 }
 
+static void commitMenuEditsIfActive(void)
+{
+	if (g_audio_filter_edit_active)
+	{
+		g_audio_filter_edit_original = g_audio_filter_mode;
+		uint8_t storedMode = (uint8_t)g_audio_filter_mode;
+		EEPromMgr.updateEEPROMVar(Audio_Filter_Mode, &storedMode);
+		g_audio_filter_edit_active = false;
+	}
+
+	if (g_pushbutton_audio_feedback_edit_active)
+	{
+		g_pushbutton_audio_feedback_edit_original =
+			g_pushbutton_audio_feedback_enabled;
+		uint8_t storedSetting = pushbuttonAudioFeedbackToStored(
+			g_pushbutton_audio_feedback_enabled);
+		EEPromMgr.updateEEPROMVar(Pushbutton_Audio_Feedback, &storedSetting);
+		g_pushbutton_audio_feedback_edit_active = false;
+	}
+}
+
+static void rollbackMenuEditsIfActive(void)
+{
+	if (g_audio_filter_edit_active)
+	{
+		g_audio_filter_mode = g_audio_filter_edit_original;
+		g_audio_filter_edit_active = false;
+	}
+
+	if (g_pushbutton_audio_feedback_edit_active)
+	{
+		g_pushbutton_audio_feedback_enabled =
+			g_pushbutton_audio_feedback_edit_original;
+		g_pushbutton_audio_feedback_edit_active = false;
+	}
+}
+
 int main(void)
 {
 	sineWaveInit(25);
@@ -1000,6 +1040,8 @@ int main(void)
 	uint8_t hold_rf_gain_setting = 255;
 //	uint16_t hold_assi_result = 0;
 	uint8_t hold_audio_gain = 0;
+	AudioFilterMode hold_audio_filter_mode = AUDIO_FILTER_MODE_INVALID;
+	uint8_t hold_pushbutton_audio_feedback = 0xff;
 	uint16_t hold_goertzel_rssi = 0;
 	bool hold_headphone_state = true;
 	bool refresh_display = true;
@@ -1010,6 +1052,8 @@ int main(void)
 	float temp_float = 0.;
 		
 	atmel_start_init();
+	g_goertzel.SetTargetFrequencies(pitch_frequencies,
+		MAX_GOERTZEL_TARGETS);
 
 	x = si5351_get_status() & 0x80;
 	while((util_delay_ms(1000)) && x)
@@ -1107,10 +1151,8 @@ int main(void)
 	LEDS.blink(LEDS_OFF);
 	g_text_buff.putString(g_tempStr);
 	
-	/* Start audio flow */
-	ADC0.MUXPOS = ADC_I_AMPED; 
-	ADC0_SYSTEM_init(ADC12BIT, true);
- 	ADC0_startConversion();
+	/* Start the timer/event-driven audio flow. */
+	startAudioFlow();
 
 	while (1) 
 	{
@@ -1128,9 +1170,7 @@ int main(void)
 				{
 					if((currentMenu != MenuBattery) && (currentMenu != MenuSetmAh) && (currentMenu != MenuSetBatThresh))
 					{
-						ADC0.MUXPOS = ADC_I_AMPED; 
-						ADC0_SYSTEM_init(ADC12BIT, true);
- 						ADC0_startConversion();
+						startAudioFlow();
 					}
 				}
 				
@@ -1139,6 +1179,8 @@ int main(void)
 				hold_rx_frequency = 0; /* force update */
 				hold_rf_gain_setting = 0xff; /* force update */
 				hold_audio_gain = 0xff; /* force update */
+				hold_audio_filter_mode = AUDIO_FILTER_MODE_INVALID; /* force update */
+				hold_pushbutton_audio_feedback = 0xff; /* force update */
 				hold_activeMemory = 0xff; /* force update */
 				hold_goertzel_rssi = 0; /* force update */
 				hold_menuRow = INVALID_MENU; /* force update */
@@ -1232,6 +1274,65 @@ int main(void)
 					}									
 				}
 				break;
+
+				case MenuSounds:
+				case MenuSetPushbuttonAudioFeedback:
+				{
+					const uint8_t enabled =
+						g_pushbutton_audio_feedback_enabled ? 1U : 0U;
+					if (hold_pushbutton_audio_feedback != enabled)
+					{
+						hold_pushbutton_audio_feedback = enabled;
+						g_text_buff.putString("00SOUNDS");
+						g_text_buff.putString("10PUSHBUTTON");
+						const char selection =
+							currentMenu == MenuSetPushbuttonAudioFeedback ? '>' : ' ';
+						snprintf(g_tempStr, 13, "20%c%-3s      ", selection,
+							enabled ? "ON" : "OFF");
+						g_text_buff.putString(g_tempStr);
+					}
+				}
+				break;
+
+				case MenuSettings:
+				case MenuSetAudioFilter:
+				{
+					const AudioFilterMode mode = g_audio_filter_mode;
+					if (hold_audio_filter_mode != mode)
+					{
+						hold_audio_filter_mode = mode;
+						if (currentMenu == MenuSettings)
+						{
+							g_text_buff.putString("00SETTINGS");
+							g_text_buff.putString("10AUDIO FILT");
+						}
+						else
+						{
+							g_text_buff.putString("00AUDIO FILT");
+							g_text_buff.putString("10          ");
+						}
+
+						const char selection = currentMenu == MenuSetAudioFilter ? '>' : ' ';
+						const uint16_t bandwidth = audioFilterBandwidthHz(mode);
+						if (bandwidth)
+						{
+							snprintf(g_tempStr, 13, "20%c%3u Hz", selection,
+								(unsigned int)bandwidth);
+							g_text_buff.putString(g_tempStr);
+							snprintf(g_tempStr, 13, "30%u-%uHz",
+								(unsigned int)(AUDIO_CW_OFFSET_HZ - bandwidth / 2U),
+								(unsigned int)(AUDIO_CW_OFFSET_HZ + bandwidth / 2U));
+							g_text_buff.putString(g_tempStr);
+						}
+						else
+						{
+							snprintf(g_tempStr, 13, "20%cOFF     ", selection);
+							g_text_buff.putString(g_tempStr);
+							g_text_buff.putString("30BYPASS");
+						}
+					}
+				}
+				break;
 				
 				case MenuSetBatThresh:
 				case MenuSetmAh:
@@ -1270,11 +1371,13 @@ int main(void)
 					}
 					else if(currentMenu == MenuSetmAh)
 					{
-						snprintf(g_tempStr, 13, "20> %d mAh  ",  ((uint8_t)g_battery_capacity + 1)*50);						
+						snprintf(g_tempStr, 13, "20>%5u mAh",
+							(unsigned int)(((uint8_t)g_battery_capacity + 1U) * 50U));
 					}
 					else
 					{
-						snprintf(g_tempStr, 13, "20thre> %d%%  ", g_battery_warning_threshold);
+						snprintf(g_tempStr, 13, "20thre>%3u%% ",
+							(unsigned int)g_battery_warning_threshold);
 					}
 					
 					g_text_buff.putString(g_tempStr);
@@ -1430,6 +1533,7 @@ int main(void)
 			
 			if(!hold_headphone_state)
 			{
+				rollbackMenuEditsIfActive();
 				if(setMenu(MenuGetCurrent) != MenuNoHeadphones)
 				{
 					setMenu(MenuNoHeadphones);
@@ -1454,6 +1558,7 @@ int main(void)
 			{
 				if(setMenu(MenuGetCurrent) != MenuInactivityPoweroff)
 				{
+					rollbackMenuEditsIfActive();
 					setMenu(MenuInactivityPoweroff);
 				}
 				else if(!g_text_buff.size())
@@ -1501,6 +1606,7 @@ int main(void)
 				}
 				else
 				{
+					commitMenuEditsIfActive();
 					setMenu(MenuOperational);
 				}
 			}
@@ -1542,6 +1648,7 @@ int main(void)
 						}
 					}
 				
+					commitMenuEditsIfActive();
 					setMenu(MenuBackOne);
 				}
 				else
@@ -1582,6 +1689,7 @@ int main(void)
 						}
 					}
 				
+					commitMenuEditsIfActive();
 					setMenu(MenuOperational);
 				}
 				else
@@ -1635,6 +1743,7 @@ int main(void)
 						}
 					}
 				
+					commitMenuEditsIfActive();
 					setMenu(MenuBackOne);
 				}
 				else
@@ -1675,6 +1784,7 @@ int main(void)
 						}
 					}
 				
+					commitMenuEditsIfActive();
 					setMenu(MenuOperational);
 				}
 				else
@@ -1731,10 +1841,51 @@ int main(void)
 								ADC0.MUXPOS = ADCBatteryVoltage;
 								setMenu(MenuBattery);
 							}
+							else if(menuRow == SOUNDS)
+							{
+								setMenu(MenuSounds);
+							}
 							else if(menuRow == ABOUT)
 							{
 								setMenu(MenuAbout);
 							}
+							else if(menuRow == SETTINGS)
+							{
+								setMenu(MenuSettings);
+							}
+						}
+						break;
+
+						case MenuSounds:
+						{
+							g_pushbutton_audio_feedback_edit_original =
+								g_pushbutton_audio_feedback_enabled;
+							g_pushbutton_audio_feedback_edit_active = true;
+							setMenu(MenuSetPushbuttonAudioFeedback);
+						}
+						break;
+
+						case MenuSetPushbuttonAudioFeedback:
+						{
+							/* Encoder and sense-button navigation are deliberate menu
+							 * exits, so both retain the value already being previewed. */
+							commitMenuEditsIfActive();
+							setMenu(MenuBackOne);
+						}
+						break;
+
+						case MenuSettings:
+						{
+							g_audio_filter_edit_original = g_audio_filter_mode;
+							g_audio_filter_edit_active = true;
+							setMenu(MenuSetAudioFilter);
+						}
+						break;
+
+						case MenuSetAudioFilter:
+						{
+							commitMenuEditsIfActive();
+							setMenu(MenuBackOne);
 						}
 						break;
 					
@@ -1946,6 +2097,20 @@ int main(void)
 							g_battery_warning_threshold = t;
 						}
 						break;
+
+						case MenuSetAudioFilter:
+						{
+							g_audio_filter_mode = nextAudioFilterMode(
+								g_audio_filter_mode, true);
+						}
+						break;
+
+						case MenuSetPushbuttonAudioFeedback:
+						{
+							g_pushbutton_audio_feedback_enabled =
+								!g_pushbutton_audio_feedback_enabled;
+						}
+						break;
 					
 						case MenuMain:
 						{
@@ -2099,6 +2264,20 @@ int main(void)
 							g_battery_warning_threshold = t;
 						}
 						break;
+
+						case MenuSetAudioFilter:
+						{
+							g_audio_filter_mode = nextAudioFilterMode(
+								g_audio_filter_mode, false);
+						}
+						break;
+
+						case MenuSetPushbuttonAudioFeedback:
+						{
+							g_pushbutton_audio_feedback_enabled =
+								!g_pushbutton_audio_feedback_enabled;
+						}
+						break;
 					
 						case MenuMain:
 						{
@@ -2129,7 +2308,7 @@ int main(void)
 		if(g_goertzel.SamplesReady() && !atomicReadU16(&g_rssi_countdown))
 		{
 			static uint8_t init = NOMINAL_BUFF_SIZE;
-			float level, levelA, levelB, levelC; //, minLevel, maxLevel;
+			float level;
 			static float highSigDetectThreshold = 0.;
 			static float low_water = 999999.;
 			static float nominal = 0., high_water = 0.;
@@ -2142,15 +2321,12 @@ int main(void)
 
 			int clipCount = 0;
 
-			g_goertzel.SetTargetFrequency(pitch_frequencies[0]);    /* Initialize the object with the sampling frequency, # of samples and target freq */
-			levelA = g_goertzel.Magnitude2(&clipCount);     /* Check samples for presence of the target frequency */
-			g_goertzel.SetTargetFrequency(pitch_frequencies[1]);    /* Initialize the object with the sampling frequency, # of samples and target freq */
-			levelB = g_goertzel.Magnitude2(&clipCount);     /* Check samples for presence of the target frequency */
-			g_goertzel.SetTargetFrequency(pitch_frequencies[2]);    /* Initialize the object with the sampling frequency, # of samples and target freq */
-			levelC = g_goertzel.Magnitude2(&clipCount);     /* Check samples for presence of the target frequency */
+			float levels[MAX_GOERTZEL_TARGETS] = {};
+			g_goertzel.Magnitudes2(levels, MAX_GOERTZEL_TARGETS,
+				&clipCount);
 			g_goertzel.ReleaseSamples();
 
-			level = (levelA + levelB + levelC);
+			level = levels[0] + levels[1] + levels[2];
 
 			if(1)
 			{		
