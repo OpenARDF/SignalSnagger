@@ -59,8 +59,11 @@ void TIMERA_init(void)
 	TCA0.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm; /* enable TimerA0 */
 }
 
-//const uint16_t rf_gain_settings[MAX_PWM_SETTING+1] = {0, 960, 1920, 2880, 3840, 4800, 5760, 6720, 7680, 8640, 9600}; /* 2500 Hz PWM period */
-const uint16_t rf_gain_settings[MAX_PWM_SETTING+1] = {0, 672, 1344, 2016, 2688, 3360, 4032, 4704, 5376, 6048, 6720}; /* 2500 Hz PWM period */
+/* The display reverses this index: displayed RF 10 uses index 0, while RF 0 uses index 10.
+ * Keep displayed RF 10 at its existing maximum-gain endpoint and map displayed RF 0 to the
+ * former RF 3 value. These provisional values are evenly spaced until measured tuning data
+ * is available for a nonlinear table. */
+const uint16_t rf_gain_settings[MAX_PWM_SETTING+1] = {0, 470, 941, 1411, 1882, 2352, 2822, 3293, 3763, 4234, 4704}; /* 2500 Hz PWM period */
 
 void setPWM(uint8_t duty)
 {

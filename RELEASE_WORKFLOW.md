@@ -70,29 +70,60 @@
 - Keep passed, failed, and waived checks distinct; never present a waived check
   as passing evidence.
 
-## Publication
+## Mandatory GitHub release sequence
 
-- SignalSnagger publishes one AVR128DA48 firmware image and does not share
-  SignalSlinger's hardware-specific bootloader/update packages.
-- Run `just release-package`, then independently validate the generated
-  directory with `just release-package-validate
-  build/release-packages/SignalSnagger-X.Y.Z`.
-- Publish exactly these two public assets:
-  - `SignalSnagger-vX.Y.Z.hex`
-  - `SignalSnagger-vX.Y.Z-Release-Files.zip`
-- The ZIP contains the same firmware HEX plus release-info JSON, SHA-256
-  checksums, and a README for SignalSnagger's single AVR128DA48 target. It does
-  not contain bootloader, updater, first-install, or provisioning files.
-- Require the package release-info to identify the exact tagged commit and a
-  clean source tree. Record both public-asset SHA-256 checksums.
-- Create an annotated `vX.Y.Z` tag only after explicit authorization. Never move
-  a published tag.
-- Use `release-notes/vX.Y.Z.md` as the GitHub release body.
-- After publication, download both assets into a fresh directory. Verify their
-  checksums, the ZIP's exact members and bytes, the tag target, the release
-  body, and the statically embedded version. Verify a displayed version only
-  when the exact released image was programmed on representative hardware.
-- Commit release evidence after the tag is fixed without moving the tag.
+Every SignalSnagger GitHub release must complete this sequence in order. A
+successful upload alone is not a completed release.
+
+1. Prepare the unsuffixed version, release notes, and any release-workflow
+   changes on a focused topic branch. Run the applicable gates, review the
+   complete diff, merge through a pull request, and synchronize a clean
+   `main`.
+2. On that exact clean `main` commit, run `just release-preflight`, then `just
+   release-package`. Run `just release-package-validate
+   build/release-packages/SignalSnagger-X.Y.Z` and require the release-info JSON
+   to name `HEAD` with `sourceTreeDirty` set to `false`.
+3. Confirm that the firmware checksum, full-flash checksum, embedded version,
+   flash/RAM budgets, hardware evidence, and all not-performed or waived checks
+   agree with the reviewed release notes.
+4. After explicit authorization, create and push an annotated `vX.Y.Z` tag at
+   that exact release commit. A published tag is immutable and must never be
+   moved to include evidence or later documentation.
+5. Create a non-draft, non-prerelease GitHub release named `SignalSnagger
+   vX.Y.Z`. Use `release-notes/vX.Y.Z.md` verbatim as its body and publish
+   exactly two public assets:
+   - `SignalSnagger-vX.Y.Z.hex`
+   - `SignalSnagger-vX.Y.Z-Release-Files.zip`
+6. Run `just release-published-verify X.Y.Z`. This must freshly download both
+   assets, verify GitHub's asset metadata and SHA-256 digests, compare the
+   standalone HEX with the ZIP member, validate the ZIP's exact members and
+   clean-source metadata, confirm the annotated tag target, compare the release
+   body byte-for-byte, and verify the embedded version.
+7. Add `release-evidence/vX.Y.Z.json` on a new topic branch, run `just check`,
+   merge it through a pull request, and leave the release tag fixed at the
+   earlier release commit. Run `just release-published-verify X.Y.Z` again from
+   synchronized `main` so the checked evidence is compared with GitHub. Delete
+   merged remote topic branches after their state is safely integrated.
+
+SignalSnagger publishes one AVR128DA48 firmware image. The ZIP contains that
+same firmware HEX plus release-info JSON, SHA-256 checksums, and a README. It
+does not contain SignalSlinger bootloader, updater, first-install, provisioning,
+or second-hardware-variant files that SignalSnagger cannot use.
+
+## Post-publication evidence
+
+Post-publication evidence is mandatory. Each `release-evidence/vX.Y.Z.json`
+record must identify the immutable tag and peeled commit, GitHub release URL and
+publication time, checked release-notes digest, both public asset names, sizes,
+and SHA-256 digests, and the fresh-download verification results.
+
+Evidence must keep passed, failed, waived, inherited, and not-performed checks
+distinct. In particular, `exactReleaseImageProgrammedOnHardware` must remain
+`false` when hardware testing used an immediately preceding suffixed candidate;
+the accompanying `hardwareEvidence` text must identify that inheritance. Run
+`just release-evidence-check` to validate all checked records and `just
+release-evidence-regression` to confirm that invalid or overstated evidence is
+rejected.
 
 ## Intentional differences from SignalSlinger
 

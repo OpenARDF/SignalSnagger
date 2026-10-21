@@ -50,12 +50,24 @@ release-package-repeatability:
 release-package-regression:
     python3 ./scripts/test-avr-release-package.py
 
+# Verify a published GitHub release by fresh download and remote readback.
+release-published-verify version:
+    python3 ./scripts/verify-published-release.py --version "{{version}}"
+
+# Validate every durable post-publication evidence record.
+release-evidence-check:
+    python3 ./scripts/validate-release-evidence.py
+
+# Prove invalid or overstated release evidence is rejected.
+release-evidence-regression:
+    python3 ./scripts/test-release-evidence.py
+
 # Scan the repository and history for secrets.
 secrets:
     gitleaks detect --source "{{repo_root}}" --no-banner --redact
 
 # Blocking local gate for repository and firmware changes.
-check: doctor docs-check policy-check test avr-build
+check: doctor docs-check policy-check release-evidence-check release-evidence-regression test avr-build
 
 # Complete deterministic release-candidate gate; hardware validation remains separate.
 release-preflight: check secrets avr-repeatability release-package-repeatability release-package-regression
