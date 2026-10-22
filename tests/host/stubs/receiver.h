@@ -29,6 +29,9 @@ enum {
 #define RX_MAXIMUM_80M_FREQUENCY RECEIVER_FREQUENCY_MAX_HZ
 #define NUMBER_OF_FREQUENCY_CHANNELS 20
 
+extern Frequency_Hz g_rx_frequency;
+extern volatile uint8_t g_cw_offset_setting;
+
 bool si5351_init(uint8_t crystalLoad, int32_t correction);
 EC si5351_drive_strength(uint8_t clock, uint8_t drive);
 EC si5351_clock_enable(uint8_t clock, uint8_t enabled);
@@ -46,6 +49,7 @@ EC init_receiver(Frequency_Hz frequencyHz);
 bool rxIsInitialized(void);
 EC rxSetParameters(void);
 bool rxSetFrequency(Frequency_Hz* frequencyHz, bool leaveClockOff);
+bool rxSetCwOffsetSetting(uint8_t setting);
 bool rxTuneMemoryStep(Frequency_Hz* receiverFrequency,
 	Frequency_Hz* memoryFrequency,
 	int8_t direction,

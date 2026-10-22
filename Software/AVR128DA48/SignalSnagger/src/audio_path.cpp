@@ -8,6 +8,46 @@ const int32_t FILTER_Q = INT32_C(256);
 
 const uint8_t FILTER_TRANSITION_HALF = AUDIO_FILTER_TRANSITION_FRAMES / 2;
 
+struct FilterProfile
+{
+	int16_t b0;
+	int16_t a1;
+	int16_t a2;
+};
+
+/* Q8 constant-peak RBJ profiles for 12 kHz audio. Each row is a center from
+ * 500 through 1000 Hz; columns are 200, 400, and 800 Hz bandwidths. The 800 Hz
+ * row preserves the released coefficients exactly. Profiles are generated
+ * offline so the audio ISR performs no trigonometry or floating-point setup. */
+const FilterProfile FILTER_PROFILES[6][3] = {
+	{{19, -457, 217}, {38, -422, 181}, {66, -367, 124}},
+	{{19, -450, 218}, {37, -416, 181}, {66, -362, 125}},
+	{{19, -442, 218}, {37, -408, 182}, {65, -356, 125}},
+	{{19, -433, 217}, {37, -401, 182}, {65, -349, 126}},
+	{{19, -423, 218}, {37, -391, 182}, {65, -341, 127}},
+	{{19, -411, 219}, {36, -380, 183}, {64, -332, 128}}
+};
+
+uint8_t filterOffsetIndex(uint8_t offsetSetting)
+{
+	return cwOffsetSettingFromStored(offsetSetting) - CW_OFFSET_MIN_SETTING;
+}
+
+uint8_t filterModeIndex(AudioFilterMode mode)
+{
+	switch (mode)
+	{
+		case AUDIO_FILTER_400_HZ:
+			return 1;
+		case AUDIO_FILTER_800_HZ:
+			return 2;
+		case AUDIO_FILTER_200_HZ:
+		case AUDIO_FILTER_OFF:
+		default:
+			return 0;
+	}
+}
+
 int16_t clampCentered(int32_t value)
 {
 	if (value < ADC_MIN_CENTERED)
@@ -59,13 +99,13 @@ AudioFilterMode nextAudioFilterMode(AudioFilterMode mode, bool up)
 				return AUDIO_FILTER_800_HZ;
 			case AUDIO_FILTER_800_HZ:
 			default:
-				return AUDIO_FILTER_OFF;
+				return AUDIO_FILTER_800_HZ;
 		}
 	}
 	switch (mode)
 	{
 		case AUDIO_FILTER_OFF:
-			return AUDIO_FILTER_800_HZ;
+			return AUDIO_FILTER_OFF;
 		case AUDIO_FILTER_200_HZ:
 			return AUDIO_FILTER_OFF;
 		case AUDIO_FILTER_400_HZ:
@@ -127,14 +167,16 @@ AudioPathProcessor::AudioPathProcessor()
 	Reset();
 }
 
-void AudioPathProcessor::Reset(AudioFilterMode mode)
+void AudioPathProcessor::Reset(AudioFilterMode mode, uint8_t offsetSetting)
 {
 	decimationSum_ = 0;
 	decimationCount_ = 0;
 	activeMode_ = audioFilterModeFromStored((uint8_t)mode);
 	pendingMode_ = activeMode_;
+	activeOffsetSetting_ = cwOffsetSettingFromStored(offsetSetting);
+	pendingOffsetSetting_ = activeOffsetSetting_;
 	transitionFramesRemaining_ = 0;
-	ActivateFilterMode(activeMode_);
+	ActivateFilterProfile(activeMode_, activeOffsetSetting_);
 	lastDacValue_ = AUDIO_DAC_CENTER;
 }
 
@@ -149,35 +191,21 @@ void AudioPathProcessor::ClearBandpassState(void)
 	}
 }
 
-void AudioPathProcessor::ActivateFilterMode(AudioFilterMode mode)
+void AudioPathProcessor::ActivateFilterProfile(AudioFilterMode mode,
+	uint8_t offsetSetting)
 {
 	activeMode_ = audioFilterModeFromStored((uint8_t)mode);
-	/* These Q8 constant-peak RBJ profiles are generated offline for a 12 kHz
-	 * sample rate and 800 Hz center. Loading literals only when the mode changes
-	 * keeps floating point and coefficient-table reads out of the audio ISR. */
-	switch (activeMode_)
-	{
-		case AUDIO_FILTER_400_HZ:
-			coefficients_.b0 = INT16_C(37);
-			coefficients_.b2 = -INT16_C(37);
-			coefficients_.a1 = -INT16_C(401);
-			coefficients_.a2 = INT16_C(182);
-			break;
-		case AUDIO_FILTER_800_HZ:
-			coefficients_.b0 = INT16_C(65);
-			coefficients_.b2 = -INT16_C(65);
-			coefficients_.a1 = -INT16_C(349);
-			coefficients_.a2 = INT16_C(126);
-			break;
-		case AUDIO_FILTER_200_HZ:
-		case AUDIO_FILTER_OFF:
-		default:
-			coefficients_.b0 = INT16_C(19);
-			coefficients_.b2 = -INT16_C(19);
-			coefficients_.a1 = -INT16_C(433);
-			coefficients_.a2 = INT16_C(217);
-			break;
-	}
+	activeOffsetSetting_ = cwOffsetSettingFromStored(offsetSetting);
+	/* Zero-beat mode deliberately bypasses filtering. Coefficients still receive
+	 * a valid profile so re-enabling an offset requires only the normal ramp. */
+	const uint8_t profileOffset = activeOffsetSetting_ == CW_OFFSET_ZERO_SETTING
+		? CW_OFFSET_DEFAULT_SETTING : activeOffsetSetting_;
+	const FilterProfile& profile = FILTER_PROFILES[
+		filterOffsetIndex(profileOffset)][filterModeIndex(activeMode_)];
+	coefficients_.b0 = profile.b0;
+	coefficients_.b2 = -profile.b0;
+	coefficients_.a1 = profile.a1;
+	coefficients_.a2 = profile.a2;
 	ClearBandpassState();
 }
 
@@ -207,7 +235,8 @@ int16_t AudioPathProcessor::ProcessBandpassSection(int16_t input,
 
 int16_t AudioPathProcessor::ProcessListeningSample(int16_t source)
 {
-	if (activeMode_ == AUDIO_FILTER_OFF)
+	if (activeMode_ == AUDIO_FILTER_OFF ||
+		activeOffsetSetting_ == CW_OFFSET_ZERO_SETTING)
 	{
 		return source;
 	}
@@ -243,12 +272,14 @@ bool AudioPathProcessor::CaptureAdcSample(uint16_t adcSample,
 
 void AudioPathProcessor::ProcessFrame(int16_t decimatedSample, uint8_t gain,
 	bool feedthrough, int16_t injectedSample, AudioFilterMode requestedMode,
-	AudioFrame* frame)
+	uint8_t requestedOffsetSetting, AudioFrame* frame)
 {
 	requestedMode = audioFilterModeFromStored((uint8_t)requestedMode);
-	if (requestedMode != pendingMode_)
+	if (requestedMode != pendingMode_ ||
+		requestedOffsetSetting != pendingOffsetSetting_)
 	{
 		pendingMode_ = requestedMode;
+		pendingOffsetSetting_ = requestedOffsetSetting;
 		transitionFramesRemaining_ = AUDIO_FILTER_TRANSITION_FRAMES;
 	}
 
@@ -263,7 +294,7 @@ void AudioPathProcessor::ProcessFrame(int16_t decimatedSample, uint8_t gain,
 			transitionFramesRemaining_--;
 			if (transitionFramesRemaining_ == FILTER_TRANSITION_HALF)
 			{
-				ActivateFilterMode(pendingMode_);
+				ActivateFilterProfile(pendingMode_, pendingOffsetSetting_);
 			}
 		}
 		else
@@ -291,7 +322,7 @@ void AudioPathProcessor::ProcessFrame(int16_t decimatedSample, uint8_t gain,
 
 bool AudioPathProcessor::ProcessAdcSample(uint16_t adcSample, uint8_t gain,
 	bool feedthrough, int16_t injectedSample, AudioFilterMode requestedMode,
-	AudioFrame* frame)
+	uint8_t requestedOffsetSetting, AudioFrame* frame)
 {
 	int16_t decimatedSample = 0;
 	if (!CaptureAdcSample(adcSample, &decimatedSample))
@@ -299,7 +330,7 @@ bool AudioPathProcessor::ProcessAdcSample(uint16_t adcSample, uint8_t gain,
 		return false;
 	}
 	ProcessFrame(decimatedSample, gain, feedthrough, injectedSample,
-		requestedMode, frame);
+		requestedMode, requestedOffsetSetting, frame);
 	return true;
 }
 

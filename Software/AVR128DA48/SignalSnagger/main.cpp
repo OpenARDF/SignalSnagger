@@ -94,6 +94,7 @@ enum MenuState_t {
 	MenuSetGainIndicatorAudioFeedback,
 	MenuSettings,
 	MenuSetAudioFilter,
+	MenuSetCwOffset,
 	MenuAbout,
 	MenuInactivityPoweroff,
 	MenuNoHeadphones,
@@ -126,6 +127,13 @@ enum SoundsMenu_t {
 	SOUND_GAIN_INDICATOR,
 	NUMBER_OF_SOUND_MENUS,
 	INVALID_SOUND_MENU
+};
+
+enum SettingsMenu_t {
+	SETTING_AUDIO_FILTER,
+	SETTING_CW_OFFSET,
+	NUMBER_OF_SETTINGS_MENUS,
+	INVALID_SETTINGS_MENU
 };
 
 // #define NUMBER_OF_MENUS 5
@@ -201,6 +209,8 @@ static volatile uint8_t g_battery_sample_countdown = 0;
 
 extern Goertzel g_goertzel;
 uint16_t g_goertzel_rssi = 0;
+/* Foreground analysis recalibrates after its detector bins move. */
+static bool g_signal_analysis_reset_requested = false;
 
 /* These counters are private to TCB0_INT_vect. */
 static uint16_t g_leftsense_closed_time = 0;
@@ -239,6 +249,10 @@ volatile AudioFilterMode g_audio_filter_mode = AUDIO_FILTER_DEFAULT_MODE;
 /* Foreground restores this snapshot when live filter preview is cancelled. */
 static AudioFilterMode g_audio_filter_edit_original = AUDIO_FILTER_DEFAULT_MODE;
 static bool g_audio_filter_edit_active = false;
+/* Offset previews retune immediately; cancellation restores this coherent
+ * oscillator, detector, and filter-center snapshot. */
+static uint8_t g_cw_offset_edit_original = CW_OFFSET_DEFAULT_SETTING;
+static bool g_cw_offset_edit_active = false;
 volatile bool g_pushbutton_audio_feedback_enabled =
 	PUSHBUTTON_AUDIO_FEEDBACK_DEFAULT;
 /* Foreground restores this snapshot when live feedback preview is cancelled. */
@@ -268,10 +282,6 @@ static CircularUintBuff g_rssi_buff(HIGH_WATER_BUFF_SIZE);
 
 EepromManager EEPromMgr;
 
-static const float pitch_frequencies[MAX_GOERTZEL_TARGETS] = {
-	AUDIO_CW_DETECTOR_LOW_HZ, AUDIO_CW_OFFSET_HZ,
-	AUDIO_CW_DETECTOR_HIGH_HZ
-}; /* Exact 100 Hz bins at 12 ksample/s with 120-sample blocks. */
 volatile uint16_t g_rssi_countdown = 100;
 
 volatile bool g_audio_test = false;
@@ -294,6 +304,9 @@ static void commitMenuEditsIfActive(void);
 static void rollbackMenuEditsIfActive(void);
 static void acceptOperationalFrequencyUpdate(uint8_t* displayedMemory,
 	Frequency_Hz* displayedFrequency);
+static bool tuneReceiverTo(Frequency_Hz carrierFrequency);
+static void configureCwDetector(void);
+static bool applyCwOffsetSetting(uint8_t setting);
 
 /* Buffer to store the sine wave samples */
 int16_t sineWave[MAX_SINE_PERIOD_STEPS];
@@ -465,10 +478,14 @@ ISR(TCA1_CMP0_vect)
 	}
 
 	AudioFrame frame;
+	const uint8_t cwOffsetSetting = g_cw_offset_setting;
 	g_audio_path.ProcessFrame(decimatedSample, gain, feedthrough,
-		injectedSample, g_audio_filter_mode, &frame);
+		injectedSample, g_audio_filter_mode, cwOffsetSetting, &frame);
 	DAC0_setVal(frame.dacValue);
-	g_goertzel.DataPoint(frame.analysisSample);
+	if (cwOffsetSetting != CW_OFFSET_ZERO_SETTING)
+	{
+		g_goertzel.DataPoint(frame.analysisSample);
+	}
 }
 
 
@@ -978,13 +995,62 @@ static void sineWaveInit(int sine_period_steps)
 	}
 }
 
+static bool tuneReceiverTo(Frequency_Hz carrierFrequency)
+{
+	if (rxSetFrequency(&carrierFrequency, false))
+	{
+		g_hardware_error |= (uint16_t)HARDWARE_NO_SI5351;
+		return false;
+	}
+	g_rx_frequency = carrierFrequency;
+	return true;
+}
+
+static void configureCwDetector(void)
+{
+	const uint16_t centerHz = cwOffsetHz(g_cw_offset_setting);
+	g_goertzel_rssi = 0;
+	g_signal_analysis_reset_requested = true;
+	if (centerHz == 0)
+	{
+		/* The ISR stops publishing samples before this foreground reset, avoiding
+		 * an unusable DC detector and clearing any stale tuning indication. */
+		g_goertzel.Flush();
+		return;
+	}
+
+	const float targets[MAX_GOERTZEL_TARGETS] = {
+		(float)(centerHz - AUDIO_CW_DETECTOR_SPACING_HZ),
+		(float)centerHz,
+		(float)(centerHz + AUDIO_CW_DETECTOR_SPACING_HZ)
+	};
+	g_goertzel.SetTargetFrequencies(targets, MAX_GOERTZEL_TARGETS);
+	/* A completed block may belong to the previous center frequency. Discard it;
+	 * the ISR-owned capture buffer can continue safely because it stores raw data. */
+	if (g_goertzel.SamplesReady())
+	{
+		g_goertzel.ReleaseSamples();
+	}
+}
+
+static bool applyCwOffsetSetting(uint8_t setting)
+{
+	if (!cwOffsetSettingIsValid(setting) || rxSetCwOffsetSetting(setting))
+	{
+		g_hardware_error |= (uint16_t)HARDWARE_NO_SI5351;
+		return false;
+	}
+	configureCwDetector();
+	return true;
+}
+
 static void startAudioFlow(void)
 {
 	g_audio_frame_ready = false;
 	g_audio_dropped_frames = 0;
 	g_requested_rf_gain_cue = RF_GAIN_CUE_NO_REQUEST;
 	g_rf_gain_audio_cue.Cancel();
-	g_audio_path.Reset(g_audio_filter_mode);
+	g_audio_path.Reset(g_audio_filter_mode, g_cw_offset_setting);
 	g_goertzel.Flush();
 	ADC0.MUXPOS = ADC_I_AMPED;
 	ADC0_SYSTEM_init(ADC12BIT, true);
@@ -1081,6 +1147,14 @@ static void commitMenuEditsIfActive(void)
 		g_audio_filter_edit_active = false;
 	}
 
+	if (g_cw_offset_edit_active)
+	{
+		g_cw_offset_edit_original = g_cw_offset_setting;
+		uint8_t storedSetting = g_cw_offset_setting;
+		EEPromMgr.updateEEPROMVar(Cw_Offset_Setting, &storedSetting);
+		g_cw_offset_edit_active = false;
+	}
+
 	if (g_pushbutton_audio_feedback_edit_active)
 	{
 		g_pushbutton_audio_feedback_edit_original =
@@ -1121,6 +1195,12 @@ static void rollbackMenuEditsIfActive(void)
 		g_audio_filter_edit_active = false;
 	}
 
+	if (g_cw_offset_edit_active)
+	{
+		(void)applyCwOffsetSetting(g_cw_offset_edit_original);
+		g_cw_offset_edit_active = false;
+	}
+
 	if (g_pushbutton_audio_feedback_edit_active)
 	{
 		g_pushbutton_audio_feedback_enabled =
@@ -1155,12 +1235,15 @@ int main(void)
 	PrimaryMenu_t menuRow = MEMORIES;
 	SoundsMenu_t hold_soundMenuRow = INVALID_SOUND_MENU;
 	SoundsMenu_t soundMenuRow = SOUND_BEEP;
+	SettingsMenu_t hold_settingsMenuRow = INVALID_SETTINGS_MENU;
+	SettingsMenu_t settingsMenuRow = SETTING_AUDIO_FILTER;
 
 	Frequency_Hz hold_rx_frequency = 0;
 	uint8_t hold_rf_gain_setting = 255;
 //	uint16_t hold_assi_result = 0;
 	uint8_t hold_audio_gain = 0;
 	AudioFilterMode hold_audio_filter_mode = AUDIO_FILTER_MODE_INVALID;
+	uint8_t hold_cw_offset_setting = UINT8_MAX;
 	uint8_t hold_pushbutton_audio_feedback = 0xff;
 	uint8_t hold_turn_tick_audio_feedback = 0xff;
 	uint8_t hold_gain_indicator_audio_feedback = 0xff;
@@ -1179,8 +1262,6 @@ int main(void)
 	float temp_float = 0.;
 		
 	atmel_start_init();
-	g_goertzel.SetTargetFrequencies(pitch_frequencies,
-		MAX_GOERTZEL_TARGETS);
 
 	x = si5351_get_status() & 0x80;
 	while((util_delay_ms(1000)) && x)
@@ -1190,6 +1271,7 @@ int main(void)
 	
 	EEPromMgr.initializeEEPROMVars();
 	EEPromMgr.readNonVols();
+	configureCwDetector();
 
 	/* Switch scanning starts with the system timers, before EEPROM settings are
 	 * restored. If the startup debounce pass queued a release beep while the
@@ -1330,6 +1412,7 @@ int main(void)
 				hold_rf_gain_setting = 0xff; /* force update */
 				hold_audio_gain = 0xff; /* force update */
 				hold_audio_filter_mode = AUDIO_FILTER_MODE_INVALID; /* force update */
+				hold_cw_offset_setting = UINT8_MAX; /* force update */
 				hold_pushbutton_audio_feedback = 0xff; /* force update */
 				hold_turn_tick_audio_feedback = 0xff; /* force update */
 				hold_gain_indicator_audio_feedback = 0xff; /* force update */
@@ -1337,6 +1420,7 @@ int main(void)
 				hold_goertzel_rssi = 0; /* force update */
 				hold_menuRow = INVALID_MENU; /* force update */
 				hold_soundMenuRow = INVALID_SOUND_MENU; /* force update */
+				hold_settingsMenuRow = INVALID_SETTINGS_MENU; /* force update */
 				hold_battery_row0[0] = '\0'; /* force update */
 				hold_battery_row2[0] = '\0'; /* force update */
 				hold_battery_row3[0] = '\0'; /* force update */
@@ -1473,31 +1557,60 @@ int main(void)
 
 				case MenuSettings:
 				case MenuSetAudioFilter:
+				case MenuSetCwOffset:
 				{
+					const bool showAudioFilter = currentMenu == MenuSetAudioFilter ||
+						(currentMenu == MenuSettings &&
+							settingsMenuRow == SETTING_AUDIO_FILTER);
 					const AudioFilterMode mode = g_audio_filter_mode;
-					if (hold_audio_filter_mode != mode)
+					const uint8_t offsetSetting = g_cw_offset_setting;
+					if (hold_settingsMenuRow != settingsMenuRow ||
+						hold_audio_filter_mode != mode ||
+						hold_cw_offset_setting != offsetSetting)
 					{
+						hold_settingsMenuRow = settingsMenuRow;
 						hold_audio_filter_mode = mode;
-						g_text_buff.putString("00Audio Filt");
+						hold_cw_offset_setting = offsetSetting;
+						g_text_buff.putString(showAudioFilter
+							? "00Audio Filt" : "00CW Offset ");
 						g_text_buff.putString("10          ");
 
-						const char selection = currentMenu == MenuSetAudioFilter ? '>' : ' ';
-						const uint16_t bandwidth = audioFilterBandwidthHz(mode);
-						if (bandwidth)
+						const char selection = currentMenu == MenuSettings ? ' ' : '>';
+						if (showAudioFilter)
 						{
-							snprintf(g_tempStr, 13, "20%c%3u Hz", selection,
-								(unsigned int)bandwidth);
-							g_text_buff.putString(g_tempStr);
-							snprintf(g_tempStr, 13, "30%u-%uHz",
-								(unsigned int)(AUDIO_CW_OFFSET_HZ - bandwidth / 2U),
-								(unsigned int)(AUDIO_CW_OFFSET_HZ + bandwidth / 2U));
-							g_text_buff.putString(g_tempStr);
+							const uint16_t bandwidth = audioFilterBandwidthHz(mode);
+							const uint16_t centerHz = cwOffsetHz(offsetSetting);
+							if (bandwidth)
+							{
+								snprintf(g_tempStr, 13, "20%c%3u Hz", selection,
+									(unsigned int)bandwidth);
+								g_text_buff.putString(g_tempStr);
+								if (centerHz)
+								{
+									snprintf(g_tempStr, 13, "30%u-%uHz",
+										(unsigned int)(centerHz - bandwidth / 2U),
+										(unsigned int)(centerHz + bandwidth / 2U));
+									g_text_buff.putString(g_tempStr);
+								}
+								else
+								{
+									g_text_buff.putString("30ZERO BYP  ");
+								}
+							}
+							else
+							{
+								snprintf(g_tempStr, 13, "20%cOFF     ", selection);
+								g_text_buff.putString(g_tempStr);
+								g_text_buff.putString("30BYPASS    ");
+							}
 						}
 						else
 						{
-							snprintf(g_tempStr, 13, "20%cOFF     ", selection);
+							snprintf(g_tempStr, 13, "20%c%4u Hz", selection,
+								(unsigned int)cwOffsetHz(offsetSetting));
 							g_text_buff.putString(g_tempStr);
-							g_text_buff.putString("30BYPASS");
+							g_text_buff.putString(offsetSetting == CW_OFFSET_ZERO_SETTING
+								? "30ZERO BEAT " : "30HIGH-SIDE ");
 						}
 					}
 				}
@@ -1834,8 +1947,8 @@ int main(void)
 						}
 						else if(g_frequency_mode == MODE_MEMORY)
 						{
-							g_rx_frequency = g_channel_frequency[g_active_memory];
-							si5351_set_quad_frequency(g_rx_frequency);					
+							(void)tuneReceiverTo(
+								g_channel_frequency[g_active_memory]);
 						}
 					}
 				
@@ -1875,8 +1988,8 @@ int main(void)
 						}
 						else if(g_frequency_mode == MODE_MEMORY)
 						{
-							g_rx_frequency = g_channel_frequency[g_active_memory];
-							si5351_set_quad_frequency(g_rx_frequency);					
+							(void)tuneReceiverTo(
+								g_channel_frequency[g_active_memory]);
 						}
 					}
 				
@@ -1929,8 +2042,8 @@ int main(void)
 						}
 						else if(g_frequency_mode == MODE_MEMORY)
 						{
-							g_rx_frequency = g_channel_frequency[g_active_memory];
-							si5351_set_quad_frequency(g_rx_frequency);					
+							(void)tuneReceiverTo(
+								g_channel_frequency[g_active_memory]);
 						}
 					}
 				
@@ -1970,8 +2083,8 @@ int main(void)
 						}
 						else if(g_frequency_mode == MODE_MEMORY)
 						{
-							g_rx_frequency = g_channel_frequency[g_active_memory];
-							si5351_set_quad_frequency(g_rx_frequency);					
+							(void)tuneReceiverTo(
+								g_channel_frequency[g_active_memory]);
 						}
 					}
 				
@@ -1998,9 +2111,10 @@ int main(void)
 				{
 					if((g_frequency_mode == MODE_VFO) && advanceActiveMemory(UP))
 					{
-						g_frequency_mode = MODE_MEMORY;
-						g_rx_frequency = g_channel_frequency[g_active_memory];
-						si5351_set_quad_frequency(g_rx_frequency);					
+						if (tuneReceiverTo(g_channel_frequency[g_active_memory]))
+						{
+							g_frequency_mode = MODE_MEMORY;
+						}
 					}
 					else
 					{
@@ -2086,13 +2200,23 @@ int main(void)
 
 						case MenuSettings:
 						{
-							g_audio_filter_edit_original = g_audio_filter_mode;
-							g_audio_filter_edit_active = true;
-							setMenu(MenuSetAudioFilter);
+							if (settingsMenuRow == SETTING_CW_OFFSET)
+							{
+								g_cw_offset_edit_original = g_cw_offset_setting;
+								g_cw_offset_edit_active = true;
+								setMenu(MenuSetCwOffset);
+							}
+							else
+							{
+								g_audio_filter_edit_original = g_audio_filter_mode;
+								g_audio_filter_edit_active = true;
+								setMenu(MenuSetAudioFilter);
+							}
 						}
 						break;
 
 						case MenuSetAudioFilter:
+						case MenuSetCwOffset:
 						{
 							commitMenuEditsIfActive();
 							setMenu(MenuBackOne);
@@ -2199,14 +2323,15 @@ int main(void)
 									uint32_t step_hz = g_encoderswitch_pressed ? 1000 : 100;
 									if(receiverFrequencyStep(g_rx_frequency, 1, step_hz, &requested_frequency))
 									{
-										g_rx_frequency = requested_frequency;
+									(void)tuneReceiverTo(requested_frequency);
 									}
 								}
 								else
 								{
 									if(advanceActiveMemory(UP))
 									{
-										g_rx_frequency = g_channel_frequency[g_active_memory];
+									(void)tuneReceiverTo(
+										g_channel_frequency[g_active_memory]);
 									}
 									else
 									{
@@ -2215,8 +2340,6 @@ int main(void)
 									}
 								}
 
-								si5351_set_quad_frequency(g_rx_frequency);
-							
 								scheduleTurnTickAudioFeedback();
 							}
 							else if(g_leftsense_pressed)
@@ -2237,7 +2360,6 @@ int main(void)
 									MAX_PWM_SETTING - getPWM());
 							}
 						
-							g_rx_frequency = si5351_get_frequency(SI5351_CLK0);			
 							g_rf_gain_setting = getPWM();
 						}
 						break;
@@ -2250,12 +2372,12 @@ int main(void)
 						
 							Frequency_Hz f = g_channel_frequency[g_active_memory];
 							
-							if((f < RX_MAXIMUM_80M_FREQUENCY) && (f > RX_MINIMUM_80M_FREQUENCY))
+							if((f <= RX_MAXIMUM_80M_FREQUENCY) &&
+								(f >= RX_MINIMUM_80M_FREQUENCY))
 							{
-								g_rx_frequency = g_channel_frequency[g_active_memory];
+								(void)tuneReceiverTo(
+									g_channel_frequency[g_active_memory]);
 							}
-						
-							si5351_set_quad_frequency(g_rx_frequency);							
 						}
 						break;
 					
@@ -2313,6 +2435,28 @@ int main(void)
 						{
 							g_audio_filter_mode = nextAudioFilterMode(
 								g_audio_filter_mode, true);
+						}
+						break;
+
+						case MenuSetCwOffset:
+						{
+							const uint8_t nextSetting = nextCwOffsetSetting(
+								g_cw_offset_setting, true);
+							if (nextSetting != g_cw_offset_setting)
+							{
+								(void)applyCwOffsetSetting(nextSetting);
+							}
+						}
+						break;
+
+						case MenuSettings:
+						{
+							settingsMenuRow = (SettingsMenu_t)(
+								(uint8_t)settingsMenuRow + 1);
+							if (settingsMenuRow == NUMBER_OF_SETTINGS_MENUS)
+							{
+								settingsMenuRow = SETTING_AUDIO_FILTER;
+							}
 						}
 						break;
 
@@ -2377,14 +2521,15 @@ int main(void)
 									uint32_t step_hz = g_encoderswitch_pressed ? 1000 : 100;
 									if(receiverFrequencyStep(g_rx_frequency, -1, step_hz, &requested_frequency))
 									{
-										g_rx_frequency = requested_frequency;
+									(void)tuneReceiverTo(requested_frequency);
 									}
 								}
 								else
 								{
 									if(advanceActiveMemory(!UP))
 									{
-										g_rx_frequency = g_channel_frequency[g_active_memory];
+									(void)tuneReceiverTo(
+										g_channel_frequency[g_active_memory]);
 									}
 									else
 									{
@@ -2393,8 +2538,6 @@ int main(void)
 									}
 								}
 
-								si5351_set_quad_frequency(g_rx_frequency);
-							
 								scheduleTurnTickAudioFeedback();
 							}
 							else if(g_leftsense_pressed)
@@ -2415,7 +2558,6 @@ int main(void)
 									MAX_PWM_SETTING - getPWM());
 							}
 						
-							g_rx_frequency = si5351_get_frequency(SI5351_CLK0);			
 							g_rf_gain_setting = getPWM();
 						}
 						break;
@@ -2434,12 +2576,12 @@ int main(void)
 							Frequency_Hz f = g_channel_frequency[g_active_memory];
 							refresh_display = true;
 													
-							if((f < RX_MAXIMUM_80M_FREQUENCY) && (f > RX_MINIMUM_80M_FREQUENCY))
+							if((f <= RX_MAXIMUM_80M_FREQUENCY) &&
+								(f >= RX_MINIMUM_80M_FREQUENCY))
 							{
-								g_rx_frequency = g_channel_frequency[g_active_memory];
+								(void)tuneReceiverTo(
+									g_channel_frequency[g_active_memory]);
 							}
-						
-							si5351_set_quad_frequency(g_rx_frequency);							
 						}
 						break;				
 					
@@ -2508,6 +2650,31 @@ int main(void)
 						}
 						break;
 
+						case MenuSetCwOffset:
+						{
+							const uint8_t nextSetting = nextCwOffsetSetting(
+								g_cw_offset_setting, false);
+							if (nextSetting != g_cw_offset_setting)
+							{
+								(void)applyCwOffsetSetting(nextSetting);
+							}
+						}
+						break;
+
+						case MenuSettings:
+						{
+							if (settingsMenuRow == SETTING_AUDIO_FILTER)
+							{
+								settingsMenuRow = SETTING_CW_OFFSET;
+							}
+							else
+							{
+								settingsMenuRow = (SettingsMenu_t)(
+									(uint8_t)settingsMenuRow - 1);
+							}
+						}
+						break;
+
 						case MenuSounds:
 						{
 							if (soundMenuRow == SOUND_BEEP)
@@ -2568,7 +2735,8 @@ int main(void)
 		}
 		
 //======================================================		
-		if(g_goertzel.SamplesReady() && !atomicReadU16(&g_rssi_countdown))
+		if(g_cw_offset_setting != CW_OFFSET_ZERO_SETTING &&
+			g_goertzel.SamplesReady() && !atomicReadU16(&g_rssi_countdown))
 		{
 			static uint8_t init = NOMINAL_BUFF_SIZE;
 			float level;
@@ -2579,6 +2747,23 @@ int main(void)
 			static uint16_t consecutiveDetect=0, consecutiveNoise=0;
 			static uint8_t holdPWM = 255;
 			bool sigDetected = false;
+
+			if (g_signal_analysis_reset_requested)
+			{
+				/* Levels from different detector centers are not comparable. */
+				g_nominal_buff.reset();
+				g_high_water_buff.reset();
+				g_rssi_buff.reset();
+				init = NOMINAL_BUFF_SIZE;
+				highSigDetectThreshold = 0.0f;
+				low_water = 999999.0f;
+				nominal = 0.0f;
+				high_water = 0.0f;
+				consecutiveDetect = 0;
+				consecutiveNoise = 0;
+				holdPWM = 255;
+				g_signal_analysis_reset_requested = false;
+			}
 								
 			atomicWriteU16(&g_rssi_countdown, 5);
 

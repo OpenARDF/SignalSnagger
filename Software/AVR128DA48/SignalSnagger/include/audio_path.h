@@ -2,6 +2,7 @@
 #define AUDIO_PATH_H_
 
 #include <stdint.h>
+#include "receiver_frequency.h"
 
 /* The ADC stays at a conventional high audio rate while the narrow-band DSP
  * runs at a lower rate with substantially more CPU time per output sample. */
@@ -10,11 +11,11 @@
 #define AUDIO_DSP_SAMPLE_RATE_HZ (AUDIO_ADC_SAMPLE_RATE_HZ / AUDIO_DECIMATION_FACTOR)
 #define AUDIO_GOERTZEL_SAMPLE_COUNT UINT8_C(120)
 
-/* CW is tuned for an approximately 800 Hz beat note. The adjacent exact
- * Goertzel bins retain +/-100 Hz tolerance without widening the audio filter. */
-#define AUDIO_CW_DETECTOR_LOW_HZ UINT16_C(700)
-#define AUDIO_CW_OFFSET_HZ UINT16_C(800)
-#define AUDIO_CW_DETECTOR_HIGH_HZ UINT16_C(900)
+/* The default retains the released 800 Hz pitch. Runtime-selected detector
+ * bins remain exactly 100 Hz apart at this sample rate and block length. */
+#define AUDIO_CW_DEFAULT_OFFSET_HZ \
+	((uint16_t)CW_OFFSET_DEFAULT_SETTING * UINT16_C(100))
+#define AUDIO_CW_DETECTOR_SPACING_HZ UINT16_C(100)
 
 #define AUDIO_ADC_CENTER INT16_C(2048)
 #define AUDIO_DAC_CENTER INT16_C(512)
@@ -58,15 +59,16 @@ public:
 	AudioPathProcessor(const AudioPathProcessor&) = delete;
 	AudioPathProcessor& operator=(const AudioPathProcessor&) = delete;
 
-	void Reset(AudioFilterMode mode = AUDIO_FILTER_DEFAULT_MODE);
+	void Reset(AudioFilterMode mode = AUDIO_FILTER_DEFAULT_MODE,
+		uint8_t offsetSetting = CW_OFFSET_DEFAULT_SETTING);
 	bool WillProduceFrame(void) const;
 	bool CaptureAdcSample(uint16_t adcSample, int16_t* decimatedSample);
 	void ProcessFrame(int16_t decimatedSample, uint8_t gain, bool feedthrough,
 		int16_t injectedSample, AudioFilterMode requestedMode,
-		AudioFrame* frame);
+		uint8_t requestedOffsetSetting, AudioFrame* frame);
 	bool ProcessAdcSample(uint16_t adcSample, uint8_t gain, bool feedthrough,
 		int16_t injectedSample, AudioFilterMode requestedMode,
-		AudioFrame* frame);
+		uint8_t requestedOffsetSetting, AudioFrame* frame);
 	uint16_t LastDacValue(void) const;
 
 private:
@@ -87,7 +89,7 @@ private:
 
 	static int16_t ProcessBandpassSection(int16_t input, BiquadState* state,
 		const BiquadCoefficients& coefficients);
-	void ActivateFilterMode(AudioFilterMode mode);
+	void ActivateFilterProfile(AudioFilterMode mode, uint8_t offsetSetting);
 	void ClearBandpassState(void);
 	int16_t ProcessListeningSample(int16_t source);
 
@@ -97,6 +99,8 @@ private:
 	BiquadCoefficients coefficients_;
 	AudioFilterMode activeMode_;
 	AudioFilterMode pendingMode_;
+	uint8_t activeOffsetSetting_;
+	uint8_t pendingOffsetSetting_;
 	uint8_t transitionFramesRemaining_;
 	uint16_t lastDacValue_;
 };

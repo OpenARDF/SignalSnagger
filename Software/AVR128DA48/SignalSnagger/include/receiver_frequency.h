@@ -10,7 +10,29 @@
 #define RECEIVER_FREQUENCY_MIN_HZ UINT32_C(3500000)
 #define RECEIVER_FREQUENCY_MAX_HZ UINT32_C(4000000)
 
-/** Return whether a requested oscillator frequency is in the supported range. */
+/* EEPROM stores these compact values in hundreds of hertz. Zero is a distinct
+ * zero-beat mode; 100 through 400 Hz are intentionally not selectable. */
+#define CW_OFFSET_ZERO_SETTING UINT8_C(0)
+#define CW_OFFSET_MIN_SETTING UINT8_C(5)
+#define CW_OFFSET_MAX_SETTING UINT8_C(10)
+#define CW_OFFSET_DEFAULT_SETTING UINT8_C(8)
+#define CW_OFFSET_SETTING_COUNT UINT8_C(7)
+
+bool cwOffsetSettingIsValid(uint8_t setting);
+uint8_t cwOffsetSettingFromStored(uint8_t storedSetting);
+uint16_t cwOffsetHz(uint8_t setting);
+
+/** Move among 0, 500, ..., 1000 Hz without wrapping at either endpoint. */
+uint8_t nextCwOffsetSetting(uint8_t setting, bool up);
+
+/**
+ * Convert a displayed carrier frequency to the high-side oscillator frequency.
+ * The result remains unchanged if the frequency or offset setting is invalid.
+ */
+bool receiverOscillatorFrequency(uint32_t carrierFrequencyHz,
+	uint8_t offsetSetting, uint32_t* oscillatorFrequencyHz);
+
+/** Return whether a displayed/stored carrier frequency is in the supported range. */
 bool receiverFrequencyIsSupported(uint32_t frequencyHz);
 
 /**

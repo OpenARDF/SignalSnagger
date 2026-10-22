@@ -86,9 +86,10 @@ ASSERT_EEPROM_OFFSET(pushbutton_audio_feedback, Pushbutton_Audio_Feedback);
 ASSERT_EEPROM_OFFSET(turn_tick_audio_feedback, Turn_Tick_Audio_Feedback);
 ASSERT_EEPROM_OFFSET(gain_indicator_audio_feedback,
 	Gain_Indicator_Audio_Feedback);
+ASSERT_EEPROM_OFFSET(cw_offset_setting, Cw_Offset_Setting);
 static_assert(sizeof(EE_prom) ==
-	Gain_Indicator_Audio_Feedback + sizeof(uint8_t),
-	"EEPROM layout size must end after gain_indicator_audio_feedback");
+	Cw_Offset_Setting + sizeof(uint8_t),
+	"EEPROM layout size must end after cw_offset_setting");
 
 #undef ASSERT_EEPROM_OFFSET
 
@@ -215,7 +216,8 @@ const struct EE_prom EEMEM EepromManager::ee_vars
 	(uint8_t)AUDIO_FILTER_DEFAULT_MODE, // uint8_t audio_filter_mode
 	PUSHBUTTON_AUDIO_FEEDBACK_ENABLED, // uint8_t pushbutton_audio_feedback
 	TURN_TICK_AUDIO_FEEDBACK_ENABLED, // uint8_t turn_tick_audio_feedback
-	GAIN_INDICATOR_AUDIO_FEEDBACK_ENABLED // uint8_t gain_indicator_audio_feedback
+	GAIN_INDICATOR_AUDIO_FEEDBACK_ENABLED, // uint8_t gain_indicator_audio_feedback
+	CW_OFFSET_DEFAULT_SETTING // uint8_t cw_offset_setting
 };
 
 bool g_isMaster = UNUSED_VAR;
@@ -894,6 +896,16 @@ void EepromManager::updateEEPROMVar(EE_var_t v, void* val)
 		}
 		break;
 
+		case Cw_Offset_Setting:
+		{
+			if (*(uint8_t*)val != eeprom_read_byte(
+				(uint8_t*)&(EepromManager::ee_vars.cw_offset_setting)))
+			{
+				avr_eeprom_write_byte(Cw_Offset_Setting, *(uint8_t*)val);
+			}
+		}
+		break;
+
 		default:
 		{
 
@@ -959,6 +971,8 @@ void EepromManager::saveAllEEPROM(void)
 		g_gain_indicator_audio_feedback_enabled);
 	updateEEPROMVar(Gain_Indicator_Audio_Feedback,
 		(void*)&gainIndicatorAudioFeedback);
+	uint8_t cwOffsetSetting = g_cw_offset_setting;
+	updateEEPROMVar(Cw_Offset_Setting, (void*)&cwOffsetSetting);
 }
 
 
@@ -1102,6 +1116,10 @@ bool EepromManager::readNonVols(void)
 		g_gain_indicator_audio_feedback_enabled =
 			gainIndicatorAudioFeedbackFromStored(eeprom_read_byte((uint8_t*)&(
 				EepromManager::ee_vars.gain_indicator_audio_feedback)));
+			/* The appended byte is erased on receivers upgraded from older firmware.
+			 * Normalize it to 800 Hz without disturbing any preceding settings. */
+			g_cw_offset_setting = cwOffsetSettingFromStored(eeprom_read_byte(
+				(uint8_t*)&(EepromManager::ee_vars.cw_offset_setting)));
 
 		failure = false;
 	}
@@ -1289,6 +1307,10 @@ bool EepromManager::readNonVols(void)
 			avr_eeprom_write_byte(Gain_Indicator_Audio_Feedback,
 				gainIndicatorAudioFeedbackToStored(
 					g_gain_indicator_audio_feedback_enabled));
+
+				g_cw_offset_setting = CW_OFFSET_DEFAULT_SETTING;
+				avr_eeprom_write_byte(Cw_Offset_Setting,
+					g_cw_offset_setting);
 			
 			/* Done */
 

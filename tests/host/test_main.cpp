@@ -43,7 +43,8 @@ static_assert(ADCCENTER == 2048, "released firmware uses 12-bit ADC centering");
 static_assert(SATURATION == (9 * ADCCENTER / 5), "preserve released clipping threshold");
 static_assert(AUDIO_ADC_SAMPLE_RATE_HZ == 48000, "audio ADC rate must remain explicit");
 static_assert(AUDIO_DSP_SAMPLE_RATE_HZ == 12000, "audio DSP rate must track decimation");
-static_assert(AUDIO_CW_OFFSET_HZ == 800, "CW listening offset must remain explicit");
+static_assert(AUDIO_CW_DEFAULT_OFFSET_HZ == 800,
+	"default CW listening offset must remain explicit");
 static_assert(AUDIO_FILTER_TRANSITION_FRAMES == 16,
 	"filter changes must use the bounded anti-click transition");
 
@@ -294,18 +295,63 @@ void testReceiverFrequencyStepProducesValidatedResult()
 	CHECK(!receiverFrequencyStep(result, 1, 100, 0));
 }
 
+void testCwOffsetSettingsNormalizeAndClampWithoutWrapping()
+{
+	CHECK(cwOffsetSettingFromStored(0xff) == CW_OFFSET_DEFAULT_SETTING);
+	CHECK(cwOffsetSettingFromStored(1) == CW_OFFSET_DEFAULT_SETTING);
+	CHECK(cwOffsetSettingFromStored(CW_OFFSET_ZERO_SETTING) ==
+		CW_OFFSET_ZERO_SETTING);
+	CHECK(cwOffsetHz(CW_OFFSET_ZERO_SETTING) == 0);
+	CHECK(cwOffsetHz(CW_OFFSET_MIN_SETTING) == 500);
+	CHECK(cwOffsetHz(CW_OFFSET_MAX_SETTING) == 1000);
+	CHECK(nextCwOffsetSetting(CW_OFFSET_ZERO_SETTING, false) ==
+		CW_OFFSET_ZERO_SETTING);
+	CHECK(nextCwOffsetSetting(CW_OFFSET_ZERO_SETTING, true) ==
+		CW_OFFSET_MIN_SETTING);
+	CHECK(nextCwOffsetSetting(CW_OFFSET_MIN_SETTING, false) ==
+		CW_OFFSET_ZERO_SETTING);
+	CHECK(nextCwOffsetSetting(CW_OFFSET_MAX_SETTING, true) ==
+		CW_OFFSET_MAX_SETTING);
+	CHECK(nextCwOffsetSetting(CW_OFFSET_MAX_SETTING, false) ==
+		CW_OFFSET_MAX_SETTING - 1);
+}
+
+void testCarrierFrequencyMapsToHighSideOscillator()
+{
+	uint32_t oscillator = 123;
+	CHECK(receiverOscillatorFrequency(UINT32_C(3600000),
+		CW_OFFSET_DEFAULT_SETTING, &oscillator));
+	CHECK(oscillator == UINT32_C(3600800));
+	CHECK(receiverOscillatorFrequency(RECEIVER_FREQUENCY_MAX_HZ,
+		CW_OFFSET_MAX_SETTING, &oscillator));
+	CHECK(oscillator == UINT32_C(4001000));
+	CHECK(receiverOscillatorFrequency(UINT32_C(3600000),
+		CW_OFFSET_ZERO_SETTING, &oscillator));
+	CHECK(oscillator == UINT32_C(3600000));
+
+	oscillator = 456;
+	CHECK(!receiverOscillatorFrequency(RECEIVER_FREQUENCY_MIN_HZ - 1,
+		CW_OFFSET_DEFAULT_SETTING, &oscillator));
+	CHECK(!receiverOscillatorFrequency(UINT32_C(3600000), 4, &oscillator));
+	CHECK(!receiverOscillatorFrequency(UINT32_C(3600000),
+		CW_OFFSET_DEFAULT_SETTING, 0));
+	CHECK(oscillator == 456);
+}
+
 void testReceiverAppliesInclusiveBandEdges()
 {
 	resetReceiverHardwareStubs();
 	Frequency_Hz frequency = RECEIVER_FREQUENCY_MIN_HZ;
 	CHECK(!rxSetFrequency(&frequency, false));
 	CHECK(receiverSetFrequencyCalls() == 1);
-	CHECK(receiverLastFrequency() == RECEIVER_FREQUENCY_MIN_HZ);
+	CHECK(receiverLastFrequency() == RECEIVER_FREQUENCY_MIN_HZ +
+		AUDIO_CW_DEFAULT_OFFSET_HZ);
 
 	frequency = RECEIVER_FREQUENCY_MAX_HZ;
 	CHECK(!rxSetFrequency(&frequency, false));
 	CHECK(receiverSetFrequencyCalls() == 2);
-	CHECK(receiverLastFrequency() == RECEIVER_FREQUENCY_MAX_HZ);
+	CHECK(receiverLastFrequency() == RECEIVER_FREQUENCY_MAX_HZ +
+		AUDIO_CW_DEFAULT_OFFSET_HZ);
 }
 
 void testReceiverRejectsInvalidFrequencyAndPropagatesHardwareFailure()
@@ -322,12 +368,29 @@ void testReceiverRejectsInvalidFrequencyAndPropagatesHardwareFailure()
 	CHECK(receiverSetFrequencyCalls() == 1);
 }
 
+void testReceiverOffsetChangeCommitsOnlyAfterSuccessfulRetune()
+{
+	resetReceiverHardwareStubs();
+	g_rx_frequency = UINT32_C(3600000);
+	CHECK(!rxSetCwOffsetSetting(CW_OFFSET_MIN_SETTING));
+	CHECK(g_cw_offset_setting == CW_OFFSET_MIN_SETTING);
+	CHECK(receiverLastFrequency() == UINT32_C(3600500));
+
+	setReceiverFrequencyResult(ERROR_CODE_CLKGEN_NONRESPONSIVE);
+	CHECK(rxSetCwOffsetSetting(CW_OFFSET_MAX_SETTING));
+	CHECK(g_cw_offset_setting == CW_OFFSET_MIN_SETTING);
+	CHECK(receiverLastFrequency() == UINT32_C(3601000));
+	CHECK(rxSetCwOffsetSetting(4));
+	CHECK(receiverSetFrequencyCalls() == 2);
+}
+
 void testReceiverInitializationRejectsInvalidFrequency()
 {
 	resetReceiverHardwareStubs();
 	CHECK(init_receiver(RECEIVER_FREQUENCY_MIN_HZ) == ERROR_CODE_NO_ERROR);
 	CHECK(receiverInitializeQuadratureCalls() == 1);
-	CHECK(receiverLastFrequency() == RECEIVER_FREQUENCY_MIN_HZ);
+	CHECK(receiverLastFrequency() == RECEIVER_FREQUENCY_MIN_HZ +
+		AUDIO_CW_DEFAULT_OFFSET_HZ);
 	CHECK(rxIsInitialized());
 	shutdown_receiver();
 	CHECK(!rxIsInitialized());
@@ -346,7 +409,7 @@ void testMemoryFrequencyStepTunesReceiverBeforeCommittingValues()
 
 	CHECK(rxTuneMemoryStep(&receiverFrequency, &memoryFrequency, 1, 100));
 	CHECK(receiverSetFrequencyCalls() == 1);
-	CHECK(receiverLastFrequency() == UINT32_C(3570600));
+	CHECK(receiverLastFrequency() == UINT32_C(3571400));
 	CHECK(receiverFrequency == UINT32_C(3570600));
 	CHECK(memoryFrequency == UINT32_C(3570600));
 
@@ -587,29 +650,35 @@ void testGoertzelUsesReleasedSaturationThreshold()
 	CHECK(highCount == MINN);
 }
 
-void testGoertzelAnalyzesThreeExactBinsInOnePass()
+void testGoertzelAnalyzesSelectedCwOffsetBinsInOnePass()
 {
-	Goertzel detector(AUDIO_GOERTZEL_SAMPLE_COUNT,
-		AUDIO_DSP_SAMPLE_RATE_HZ);
-	const float targets[MAX_GOERTZEL_TARGETS] = {
-		AUDIO_CW_DETECTOR_LOW_HZ, AUDIO_CW_OFFSET_HZ,
-		AUDIO_CW_DETECTOR_HIGH_HZ
-	};
-	detector.SetTargetFrequencies(targets, MAX_GOERTZEL_TARGETS);
-
 	const double pi = 3.14159265358979323846;
-	for (uint16_t index = 0; index < AUDIO_GOERTZEL_SAMPLE_COUNT; ++index) {
-		const int sample = ADCCENTER + (int)(500.0 * std::sin(
-			2.0 * pi * AUDIO_CW_OFFSET_HZ * index /
-			AUDIO_DSP_SAMPLE_RATE_HZ));
-		detector.DataPoint(sample);
-	}
+	for (uint8_t setting = CW_OFFSET_MIN_SETTING;
+		setting <= CW_OFFSET_MAX_SETTING; ++setting)
+	{
+		Goertzel detector(AUDIO_GOERTZEL_SAMPLE_COUNT,
+			AUDIO_DSP_SAMPLE_RATE_HZ);
+		const uint16_t centerHz = cwOffsetHz(setting);
+		const float targets[MAX_GOERTZEL_TARGETS] = {
+			(float)(centerHz - AUDIO_CW_DETECTOR_SPACING_HZ),
+			(float)centerHz,
+			(float)(centerHz + AUDIO_CW_DETECTOR_SPACING_HZ)
+		};
+		detector.SetTargetFrequencies(targets, MAX_GOERTZEL_TARGETS);
 
-	float magnitudes[MAX_GOERTZEL_TARGETS] = {};
-	CHECK(detector.Magnitudes2(magnitudes, MAX_GOERTZEL_TARGETS, 0) ==
-		MAX_GOERTZEL_TARGETS);
-	CHECK(magnitudes[1] > 100.0f * magnitudes[0]);
-	CHECK(magnitudes[1] > 100.0f * magnitudes[2]);
+		for (uint16_t index = 0; index < AUDIO_GOERTZEL_SAMPLE_COUNT; ++index)
+		{
+			const int sample = ADCCENTER + (int)(500.0 * std::sin(
+				2.0 * pi * centerHz * index / AUDIO_DSP_SAMPLE_RATE_HZ));
+			detector.DataPoint(sample);
+		}
+
+		float magnitudes[MAX_GOERTZEL_TARGETS] = {};
+		CHECK(detector.Magnitudes2(magnitudes, MAX_GOERTZEL_TARGETS, 0) ==
+			MAX_GOERTZEL_TARGETS);
+		CHECK(magnitudes[1] > 100.0f * magnitudes[0]);
+		CHECK(magnitudes[1] > 100.0f * magnitudes[2]);
+	}
 }
 
 void testAudioPathUsesSignedSaturatingGainAndDacScaling()
@@ -633,16 +702,18 @@ void testAudioPathDecimatesAtAnExactFourToOneRatio()
 	for (uint8_t index = 0; index < AUDIO_DECIMATION_FACTOR - 1; ++index) {
 		CHECK(!processor.WillProduceFrame());
 		CHECK(!processor.ProcessAdcSample(AUDIO_ADC_CENTER, AUDIO_NEUTRAL_GAIN,
-			true, 0, AUDIO_FILTER_DEFAULT_MODE, &frame));
+				true, 0, AUDIO_FILTER_DEFAULT_MODE, CW_OFFSET_DEFAULT_SETTING,
+				&frame));
 	}
 	CHECK(processor.WillProduceFrame());
 	CHECK(processor.ProcessAdcSample(AUDIO_ADC_CENTER, AUDIO_NEUTRAL_GAIN,
-		true, 0, AUDIO_FILTER_DEFAULT_MODE, &frame));
+		true, 0, AUDIO_FILTER_DEFAULT_MODE, CW_OFFSET_DEFAULT_SETTING, &frame));
 	CHECK(frame.analysisSample == AUDIO_ADC_CENTER);
 	CHECK(frame.dacValue == AUDIO_DAC_CENTER);
 }
 
-double audioPathRmsAtFrequency(double frequency, AudioFilterMode mode)
+double audioPathRmsAtFrequency(double frequency, AudioFilterMode mode,
+	uint8_t offsetSetting = CW_OFFSET_DEFAULT_SETTING)
 {
 	AudioPathProcessor processor;
 	AudioFrame frame = {};
@@ -655,7 +726,8 @@ double audioPathRmsAtFrequency(double frequency, AudioFilterMode mode)
 		const int32_t adc = AUDIO_ADC_CENTER +
 			(int32_t)(800.0 * std::sin(phase));
 		if (processor.ProcessAdcSample((uint16_t)adc, AUDIO_NEUTRAL_GAIN,
-			true, 0, mode, &frame) && index >= AUDIO_ADC_SAMPLE_RATE_HZ / 4) {
+			true, 0, mode, offsetSetting, &frame) &&
+			index >= AUDIO_ADC_SAMPLE_RATE_HZ / 4) {
 			const double centered = (double)frame.dacValue - AUDIO_DAC_CENTER;
 			sumSquares += centered * centered;
 			++measuredFrames;
@@ -666,12 +738,14 @@ double audioPathRmsAtFrequency(double frequency, AudioFilterMode mode)
 
 void testAudioPathBandpassRejectsOutOfBandSignals()
 {
-	const double center = audioPathRmsAtFrequency(AUDIO_CW_OFFSET_HZ,
+	const double center = audioPathRmsAtFrequency(AUDIO_CW_DEFAULT_OFFSET_HZ,
 		AUDIO_FILTER_200_HZ);
 	const double lowerEdge = audioPathRmsAtFrequency(
-		AUDIO_CW_DETECTOR_LOW_HZ, AUDIO_FILTER_200_HZ);
+		AUDIO_CW_DEFAULT_OFFSET_HZ - AUDIO_CW_DETECTOR_SPACING_HZ,
+		AUDIO_FILTER_200_HZ);
 	const double upperEdge = audioPathRmsAtFrequency(
-		AUDIO_CW_DETECTOR_HIGH_HZ, AUDIO_FILTER_200_HZ);
+		AUDIO_CW_DEFAULT_OFFSET_HZ + AUDIO_CW_DETECTOR_SPACING_HZ,
+		AUDIO_FILTER_200_HZ);
 	const double lowerAdjacent = audioPathRmsAtFrequency(600.0,
 		AUDIO_FILTER_200_HZ);
 	const double upperAdjacent = audioPathRmsAtFrequency(1000.0,
@@ -687,7 +761,7 @@ void testAudioPathBandpassRejectsOutOfBandSignals()
 	CHECK(center > 8.0 * above);
 }
 
-void testAudioFilterModesNormalizeCycleAndReportBandwidth()
+void testAudioFilterModesNormalizeClampAndReportBandwidth()
 {
 	CHECK(audioFilterModeFromStored(0xff) == AUDIO_FILTER_DEFAULT_MODE);
 	CHECK(audioFilterModeFromStored(0x00) == AUDIO_FILTER_DEFAULT_MODE);
@@ -696,8 +770,8 @@ void testAudioFilterModesNormalizeCycleAndReportBandwidth()
 	CHECK(audioFilterBandwidthHz(AUDIO_FILTER_400_HZ) == 400);
 	CHECK(audioFilterBandwidthHz(AUDIO_FILTER_800_HZ) == 800);
 	CHECK(nextAudioFilterMode(AUDIO_FILTER_OFF, true) == AUDIO_FILTER_200_HZ);
-	CHECK(nextAudioFilterMode(AUDIO_FILTER_800_HZ, true) == AUDIO_FILTER_OFF);
-	CHECK(nextAudioFilterMode(AUDIO_FILTER_OFF, false) == AUDIO_FILTER_800_HZ);
+	CHECK(nextAudioFilterMode(AUDIO_FILTER_800_HZ, true) == AUDIO_FILTER_800_HZ);
+	CHECK(nextAudioFilterMode(AUDIO_FILTER_OFF, false) == AUDIO_FILTER_OFF);
 }
 
 void testPushbuttonAudioFeedbackStorageDefaultsSafely()
@@ -895,19 +969,46 @@ void testAudioFilterProfilesWidenWithoutMovingTheCwPeak()
 		wideCenter * 0.7);
 }
 
+void testAudioFilterProfilesFollowEveryNonzeroCwOffset()
+{
+	for (uint8_t setting = CW_OFFSET_MIN_SETTING;
+		setting <= CW_OFFSET_MAX_SETTING; ++setting)
+	{
+		const double centerHz = cwOffsetHz(setting);
+		const double center = audioPathRmsAtFrequency(centerHz,
+			AUDIO_FILTER_200_HZ, setting);
+		const double below = audioPathRmsAtFrequency(centerHz - 300.0,
+			AUDIO_FILTER_200_HZ, setting);
+		const double above = audioPathRmsAtFrequency(centerHz + 300.0,
+			AUDIO_FILTER_200_HZ, setting);
+		CHECK(center > 90.0);
+		CHECK(center > 2.0 * below);
+		CHECK(center > 2.0 * above);
+	}
+}
+
+void testZeroBeatModeBypassesConfiguredAudioFilter()
+{
+	const double filtered = audioPathRmsAtFrequency(200.0,
+		AUDIO_FILTER_200_HZ, CW_OFFSET_DEFAULT_SETTING);
+	const double zeroBeatBypass = audioPathRmsAtFrequency(200.0,
+		AUDIO_FILTER_200_HZ, CW_OFFSET_ZERO_SETTING);
+	CHECK(zeroBeatBypass > 5.0 * filtered);
+}
+
 void testAudioFilterOffBypassesOnlyTheBandpass()
 {
 	AudioPathProcessor processor;
 	AudioFrame frame = {};
 	for (uint8_t index = 0; index <= AUDIO_FILTER_TRANSITION_FRAMES; ++index) {
 		processor.ProcessFrame(400, AUDIO_NEUTRAL_GAIN, true, 0,
-			AUDIO_FILTER_OFF, &frame);
+			AUDIO_FILTER_OFF, CW_OFFSET_DEFAULT_SETTING, &frame);
 	}
 	CHECK(frame.dacValue == AUDIO_DAC_CENTER + 100);
 	CHECK(frame.analysisSample == AUDIO_ADC_CENTER + 400);
 
 	processor.ProcessFrame(400, AUDIO_NEUTRAL_GAIN, false, 0,
-		AUDIO_FILTER_OFF, &frame);
+		AUDIO_FILTER_OFF, CW_OFFSET_DEFAULT_SETTING, &frame);
 	CHECK(frame.dacValue == AUDIO_DAC_CENTER);
 	CHECK(frame.analysisSample == AUDIO_ADC_CENTER + 400);
 }
@@ -982,8 +1083,11 @@ int main()
 	testReceiverFrequencyBoundsAreInclusive();
 	testReceiverFrequencyStepRejectsOutOfBandResult();
 	testReceiverFrequencyStepProducesValidatedResult();
+	testCwOffsetSettingsNormalizeAndClampWithoutWrapping();
+	testCarrierFrequencyMapsToHighSideOscillator();
 	testReceiverAppliesInclusiveBandEdges();
 	testReceiverRejectsInvalidFrequencyAndPropagatesHardwareFailure();
+	testReceiverOffsetChangeCommitsOnlyAfterSuccessfulRetune();
 	testReceiverInitializationRejectsInvalidFrequency();
 	testMemoryFrequencyStepTunesReceiverBeforeCommittingValues();
 	testMemoryFrequencyStepRejectsInvalidInputWithoutRetuning();
@@ -1000,17 +1104,19 @@ int main()
 	testGoertzelRetuneKeepsReadyBlockUntilRelease();
 	testGoertzelReadyBlockIsNotOverwritten();
 	testGoertzelUsesReleasedSaturationThreshold();
-	testGoertzelAnalyzesThreeExactBinsInOnePass();
+	testGoertzelAnalyzesSelectedCwOffsetBinsInOnePass();
 	testAudioPathUsesSignedSaturatingGainAndDacScaling();
 	testAudioPathDecimatesAtAnExactFourToOneRatio();
 	testAudioPathBandpassRejectsOutOfBandSignals();
-	testAudioFilterModesNormalizeCycleAndReportBandwidth();
+	testAudioFilterModesNormalizeClampAndReportBandwidth();
 	testPushbuttonAudioFeedbackStorageDefaultsSafely();
 	testTurnTickAudioFeedbackStorageDefaultsSafely();
 	testGainIndicatorAudioFeedbackStorageDefaultsSafely();
 	testRfGainAudioCueMatchesApprovedMorseTiming();
 	testRfGainAudioCueLatestRequestWinsAndInvalidCancels();
 	testAudioFilterProfilesWidenWithoutMovingTheCwPeak();
+	testAudioFilterProfilesFollowEveryNonzeroCwOffset();
+	testZeroBeatModeBypassesConfiguredAudioFilter();
 	testAudioFilterOffBypassesOnlyTheBandpass();
 	testDisplayTextValidationRejectsControlBytes();
 	testDigitValidationHandlesNullAndEmptyInputs();
