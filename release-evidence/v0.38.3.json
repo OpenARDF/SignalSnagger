@@ -1,0 +1,37 @@
+{
+  "format": "signalsnagger-release-evidence-v1",
+  "version": "0.38.3",
+  "tag": "v0.38.3",
+  "tagCommit": "47edd276e5e537100f3d8db39f6dcc592fd0696c",
+  "releaseUrl": "https://github.com/OpenARDF/SignalSnagger/releases/tag/v0.38.3",
+  "publishedUtc": "2026-10-22T00:50:31Z",
+  "verifiedUtc": "2026-10-22T00:50:54Z",
+  "releaseNotes": {
+    "fileName": "release-notes/v0.38.3.md",
+    "sha256": "b6b4837d1b1ebde8e97bc56b7347784e93ce93b249156a992b76443034141cb4",
+    "matchesGitHubBody": true
+  },
+  "assets": [
+    {
+      "fileName": "SignalSnagger-v0.38.3.hex",
+      "sizeBytes": 130637,
+      "sha256": "773a13d8b5b09ac63a0829a21413df7886882337905de7e32826d1bd1db20b80"
+    },
+    {
+      "fileName": "SignalSnagger-v0.38.3-Release-Files.zip",
+      "sizeBytes": 48946,
+      "sha256": "7a12bc25c3aba712ff259ae4b572357516a2012b9f8d66e9f292ca16d82586f2"
+    }
+  ],
+  "verification": {
+    "annotatedTag": true,
+    "tagTargetMatchesPackageCommit": true,
+    "packageBuiltFromCleanTree": true,
+    "freshDownloadHasExactAssetSet": true,
+    "freshDownloadChecksumsMatch": true,
+    "zipContentsAndBytesMatch": true,
+    "embeddedVersionMatchesTag": true,
+    "exactReleaseImageProgrammedOnHardware": false,
+    "hardwareEvidence": "Inherited from the immediately preceding 0.38.3l candidate under the documented pre-1.0 version-only promotion rule. That candidate passed programmer verification, independent full-flash readback, and protected-memory comparisons; the operator accepted the focused CW offset and audio-filter behavior. Only SW_REVISION changed for 0.38.3. See release-notes/v0.38.3.md."
+  }
+}
