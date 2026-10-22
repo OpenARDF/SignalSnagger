@@ -26,6 +26,10 @@ policy-check:
 test:
     ./scripts/test-host.sh
 
+# Verify receiver-path SPICE model definitions and KiCad assignments.
+spice-check:
+    ./scripts/check-spice-models.sh
+
 # Reproducible firmware build using the pinned released toolchain inputs.
 avr-build:
     ./scripts/avr-build.sh

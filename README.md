@@ -50,3 +50,12 @@ Every GitHub release follows the mandatory ordered process in
 [RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md), including a reviewed release commit,
 clean deterministic packaging, an immutable annotated tag, exact two-asset
 publication, fresh-download verification, and checked post-tag evidence.
+
+## Receiver simulation
+
+The KiCad receiver-path simulation uses repository-local ngspice models and a
+staged validation plan. See the [receiver simulation roadmap](Docs/receiver-simulation-roadmap.md)
+for the current Stage 1 scope and the hardware-correlation, antenna, and DSP
+work explicitly scheduled for Stage 2. Independent reviewers can follow the
+[Stage 1 receiver SPICE review guide](Docs/receiver-spice-review-guide.md) to
+check out the correct branch, reproduce validation, and report model findings.
