@@ -1,6 +1,59 @@
 #include "signal_score.h"
 #include <math.h>
 
+SignalDetectorStability::SignalDetectorStability()
+{
+	Reset();
+}
+
+void SignalDetectorStability::Reset()
+{
+	smoothedLevel_ = 0.0f;
+	smoothingInitialized_ = false;
+	signalDetected_ = false;
+}
+
+float SignalDetectorStability::Smooth(float level)
+{
+	if (!smoothingInitialized_)
+	{
+		smoothedLevel_ = level;
+		smoothingInitialized_ = true;
+	}
+	else
+	{
+		/* Equal weighting suppresses isolated block-to-block magnitude changes
+		 * without adding more than one detector update of significant lag. */
+		smoothedLevel_ = 0.5f * (smoothedLevel_ + level);
+	}
+
+	return smoothedLevel_;
+}
+
+bool SignalDetectorStability::Update(float level, float nominalNoise,
+	float detectedThreshold)
+{
+	if (!(detectedThreshold > nominalNoise))
+	{
+		signalDetected_ = false;
+		return false;
+	}
+
+	if (!signalDetected_)
+	{
+		signalDetected_ = level > detectedThreshold;
+	}
+	else
+	{
+		const float releaseThreshold = nominalNoise +
+			0.7f * (detectedThreshold - nominalNoise);
+		/* The ordered comparison also releases a latched detection for NaN. */
+		signalDetected_ = level >= releaseThreshold;
+	}
+
+	return signalDetected_;
+}
+
 uint16_t receiverSignalScore(float detectedThreshold, float nominalNoise)
 {
 	const float baseline = nominalNoise + 20.0f;

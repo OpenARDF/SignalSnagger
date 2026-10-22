@@ -305,6 +305,7 @@ static void rollbackMenuEditsIfActive(void);
 static void acceptOperationalFrequencyUpdate(uint8_t* displayedMemory,
 	Frequency_Hz* displayedFrequency);
 static bool tuneReceiverTo(Frequency_Hz carrierFrequency);
+static bool tuneActiveMemoryStep(int8_t direction, uint32_t stepHz);
 static void configureCwDetector(void);
 static bool applyCwOffsetSetting(uint8_t setting);
 
@@ -1003,6 +1004,23 @@ static bool tuneReceiverTo(Frequency_Hz carrierFrequency)
 		return false;
 	}
 	g_rx_frequency = carrierFrequency;
+	/* RF retuning changes the detector input spectrum. Do not compare its first
+	 * blocks at the new frequency with thresholds learned at the old frequency. */
+	g_signal_analysis_reset_requested = true;
+	return true;
+}
+
+static bool tuneActiveMemoryStep(int8_t direction, uint32_t stepHz)
+{
+	if (!rxTuneMemoryStep(&g_rx_frequency,
+		&g_channel_frequency[g_active_memory], direction, stepHz))
+	{
+		return false;
+	}
+
+	/* Memory editing tunes through its shared receiver helper rather than
+	 * tuneReceiverTo(), so it must invalidate the same analysis history here. */
+	g_signal_analysis_reset_requested = true;
 	return true;
 }
 
@@ -1019,12 +1037,9 @@ static void configureCwDetector(void)
 		return;
 	}
 
-	const float targets[MAX_GOERTZEL_TARGETS] = {
-		(float)(centerHz - AUDIO_CW_DETECTOR_SPACING_HZ),
-		(float)centerHz,
-		(float)(centerHz + AUDIO_CW_DETECTOR_SPACING_HZ)
-	};
-	g_goertzel.SetTargetFrequencies(targets, MAX_GOERTZEL_TARGETS);
+	/* This test candidate intentionally measures only the filter-center bin so
+	 * hardware evaluation can compare it directly with the released three-bin sum. */
+	g_goertzel.SetTargetFrequency((float)centerHz);
 	/* A completed block may belong to the previous center frequency. Discard it;
 	 * the ISR-owned capture buffer can continue safely because it stores raw data. */
 	if (g_goertzel.SamplesReady())
@@ -2384,10 +2399,7 @@ int main(void)
 						case MenuSetMemFreq:
 						{
 							uint32_t step_hz = g_encoderswitch_pressed ? 1000 : 100;
-							(void)rxTuneMemoryStep(&g_rx_frequency,
-								&g_channel_frequency[g_active_memory],
-								1,
-								step_hz);
+							(void)tuneActiveMemoryStep(1, step_hz);
 						}
 						break;
 					
@@ -2588,10 +2600,7 @@ int main(void)
 						case MenuSetMemFreq:
 						{
 							uint32_t step_hz = g_encoderswitch_pressed ? 1000 : 100;
-							(void)rxTuneMemoryStep(&g_rx_frequency,
-								&g_channel_frequency[g_active_memory],
-								-1,
-								step_hz);
+							(void)tuneActiveMemoryStep(-1, step_hz);
 						}
 						break;
 					
@@ -2746,6 +2755,7 @@ int main(void)
 			uint16_t signal_to_noise = 0.;
 			static uint16_t consecutiveDetect=0, consecutiveNoise=0;
 			static uint8_t holdPWM = 255;
+			static SignalDetectorStability detectorStability;
 			bool sigDetected = false;
 
 			if (g_signal_analysis_reset_requested)
@@ -2762,6 +2772,7 @@ int main(void)
 				consecutiveDetect = 0;
 				consecutiveNoise = 0;
 				holdPWM = 255;
+				detectorStability.Reset();
 				g_signal_analysis_reset_requested = false;
 			}
 								
@@ -2769,12 +2780,8 @@ int main(void)
 
 			int clipCount = 0;
 
-			float levels[MAX_GOERTZEL_TARGETS] = {};
-			g_goertzel.Magnitudes2(levels, MAX_GOERTZEL_TARGETS,
-				&clipCount);
+			level = g_goertzel.Magnitude2(&clipCount);
 			g_goertzel.ReleaseSamples();
-
-			level = levels[0] + levels[1] + levels[2];
 
 			if(1)
 			{		
@@ -2785,7 +2792,10 @@ int main(void)
 					low_water = 999999.;
 					nominal = 0.;
 					init = 20;
+					detectorStability.Reset();
 				}
+
+				level = detectorStability.Smooth(level);
 				
 				if(init)
 				{
@@ -2812,13 +2822,17 @@ int main(void)
 						g_high_water_buff.put(high_water);
 						highSigDetectThreshold = nominal + (g_high_water_buff.olympic() / 4.);
 						
-						sigDetected = level > highSigDetectThreshold;					
 					}
 					else // if(level < (nominal - 100.)) 
 					{
 						low_water = ((9. * low_water + level) / 10.);
 						g_nominal_buff.put(low_water);
 					}
+
+					/* A lower release threshold prevents one noisy block from breaking
+					 * a valid tone while retaining the established acquisition level. */
+					sigDetected = detectorStability.Update(level, nominal,
+						highSigDetectThreshold);
 										
 					g_rssi_buff.put(receiverSignalScore(highSigDetectThreshold, nominal));
 					signal_to_noise = g_rssi_buff.olympic();

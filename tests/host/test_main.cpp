@@ -534,6 +534,38 @@ void testSignalScoreIsBounded()
 	CHECK(largeScore > 3600 && largeScore < 3700);
 }
 
+void testSignalDetectorSmoothingSeedsAndAverages()
+{
+	SignalDetectorStability stability;
+	CHECK(stability.Smooth(10.0f) == 10.0f);
+	CHECK(stability.Smooth(30.0f) == 20.0f);
+	CHECK(stability.Smooth(20.0f) == 20.0f);
+
+	stability.Reset();
+	CHECK(stability.Smooth(40.0f) == 40.0f);
+}
+
+void testSignalDetectorHysteresisStabilizesRelease()
+{
+	SignalDetectorStability stability;
+	const float nominal = 100.0f;
+	const float acquire = 200.0f;
+	const float release = 170.0f;
+
+	CHECK(!stability.Update(acquire, nominal, acquire));
+	CHECK(stability.Update(acquire + 1.0f, nominal, acquire));
+	CHECK(stability.Update(release, nominal, acquire));
+	CHECK(!stability.Update(release - 1.0f, nominal, acquire));
+}
+
+void testSignalDetectorHysteresisRejectsInvalidThreshold()
+{
+	SignalDetectorStability stability;
+	CHECK(stability.Update(201.0f, 100.0f, 200.0f));
+	CHECK(!stability.Update(201.0f, 100.0f, 100.0f));
+	CHECK(!stability.Update(201.0f, 100.0f, 99.0f));
+}
+
 void testDateTimeParserAcceptsSupportedFormats()
 {
 	struct tm parsed = {};
@@ -650,32 +682,34 @@ void testGoertzelUsesReleasedSaturationThreshold()
 	CHECK(highCount == MINN);
 }
 
-void testGoertzelAnalyzesSelectedCwOffsetBinsInOnePass()
+void testGoertzelAnalyzesSelectedCwOffsetCenter()
 {
 	const double pi = 3.14159265358979323846;
 	for (uint8_t setting = CW_OFFSET_MIN_SETTING;
 		setting <= CW_OFFSET_MAX_SETTING; ++setting)
 	{
-		Goertzel detector(AUDIO_GOERTZEL_SAMPLE_COUNT,
-			AUDIO_DSP_SAMPLE_RATE_HZ);
 		const uint16_t centerHz = cwOffsetHz(setting);
-		const float targets[MAX_GOERTZEL_TARGETS] = {
-			(float)(centerHz - AUDIO_CW_DETECTOR_SPACING_HZ),
-			(float)centerHz,
-			(float)(centerHz + AUDIO_CW_DETECTOR_SPACING_HZ)
+		const uint16_t toneFrequencies[] = {
+			(uint16_t)(centerHz - AUDIO_CW_DETECTOR_SPACING_HZ),
+			centerHz,
+			(uint16_t)(centerHz + AUDIO_CW_DETECTOR_SPACING_HZ)
 		};
-		detector.SetTargetFrequencies(targets, MAX_GOERTZEL_TARGETS);
-
-		for (uint16_t index = 0; index < AUDIO_GOERTZEL_SAMPLE_COUNT; ++index)
+		float magnitudes[3] = {};
+		for (uint8_t tone = 0; tone < 3; ++tone)
 		{
-			const int sample = ADCCENTER + (int)(500.0 * std::sin(
-				2.0 * pi * centerHz * index / AUDIO_DSP_SAMPLE_RATE_HZ));
-			detector.DataPoint(sample);
+			Goertzel detector(AUDIO_GOERTZEL_SAMPLE_COUNT,
+				AUDIO_DSP_SAMPLE_RATE_HZ);
+			detector.SetTargetFrequency((float)centerHz);
+			for (uint16_t index = 0; index < AUDIO_GOERTZEL_SAMPLE_COUNT;
+				++index)
+			{
+				const int sample = ADCCENTER + (int)(500.0 * std::sin(
+					2.0 * pi * toneFrequencies[tone] * index /
+					AUDIO_DSP_SAMPLE_RATE_HZ));
+				detector.DataPoint(sample);
+			}
+			magnitudes[tone] = detector.Magnitude2(0);
 		}
-
-		float magnitudes[MAX_GOERTZEL_TARGETS] = {};
-		CHECK(detector.Magnitudes2(magnitudes, MAX_GOERTZEL_TARGETS, 0) ==
-			MAX_GOERTZEL_TARGETS);
 		CHECK(magnitudes[1] > 100.0f * magnitudes[0]);
 		CHECK(magnitudes[1] > 100.0f * magnitudes[2]);
 	}
@@ -1098,13 +1132,16 @@ int main()
 	testSenseSwitchesRetainOperationalCardioidBehavior();
 	testSignalScoreRejectsInvalidLogarithmInputs();
 	testSignalScoreIsBounded();
+	testSignalDetectorSmoothingSeedsAndAverages();
+	testSignalDetectorHysteresisStabilizesRelease();
+	testSignalDetectorHysteresisRejectsInvalidThreshold();
 	testDateTimeParserAcceptsSupportedFormats();
 	testDateTimeParserRejectsMalformedDatesWithoutMutation();
 	testDateTimeEpochConversion();
 	testGoertzelRetuneKeepsReadyBlockUntilRelease();
 	testGoertzelReadyBlockIsNotOverwritten();
 	testGoertzelUsesReleasedSaturationThreshold();
-	testGoertzelAnalyzesSelectedCwOffsetBinsInOnePass();
+	testGoertzelAnalyzesSelectedCwOffsetCenter();
 	testAudioPathUsesSignedSaturatingGainAndDacScaling();
 	testAudioPathDecimatesAtAnExactFourToOneRatio();
 	testAudioPathBandpassRejectsOutOfBandSignals();
