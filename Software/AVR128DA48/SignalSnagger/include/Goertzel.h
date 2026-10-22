@@ -39,6 +39,7 @@
 #define MINN 21
 #define ADCCENTER 2048
 #define SATURATION (9*ADCCENTER/5)
+#define MAX_GOERTZEL_TARGETS 3
 
 /* Adjustments that can be made to tune performance:
 	N,
@@ -55,8 +56,10 @@ Goertzel(float, float);
 Goertzel(const Goertzel&) = delete;
 Goertzel& operator=(const Goertzel&) = delete;
 void SetTargetFrequency(float);
+void SetTargetFrequencies(const float*, uint8_t);
 bool DataPoint(int);
 float Magnitude2(int *highCount);
+uint8_t Magnitudes2(float*, uint8_t, int *highCount);
 bool SamplesReady(void);
 /** Release the analyzed block so the ISR can publish the next completed block. */
 void ReleaseSamples(void);
@@ -65,14 +68,13 @@ void Flush(void);
 private:
 void ProcessSample(int);
 void ResetAnalysis(void);
-void PublishCapturedBlock(void);
 
 float samplingFrequency_;
-float targetFrequency_;
 uint8_t sampleCount_;
-float coefficient_;
-float q1_;
-float q2_;
+uint8_t targetCount_;
+float coefficients_[MAX_GOERTZEL_TARGETS];
+float q1_[MAX_GOERTZEL_TARGETS];
+float q2_[MAX_GOERTZEL_TARGETS];
 volatile uint8_t captureIndex_;
 volatile uint8_t captureBuffer_;
 volatile uint8_t readyBuffer_;

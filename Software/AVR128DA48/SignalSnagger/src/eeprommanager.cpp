@@ -24,8 +24,10 @@
 
 #include "defs.h"
 #include "eeprommanager.h"
+#include "audio_path.h"
 #include "i2c.h"
 #include "receiver.h"
+#include "sound_settings.h"
 #include <avr/pgmspace.h>
 #include <stddef.h>
 #include <string.h>
@@ -79,8 +81,15 @@ ASSERT_EEPROM_OFFSET(frequency_mode, Frequency_Mode);
 ASSERT_EEPROM_OFFSET(battery_capacity, Battery_Capacity);
 ASSERT_EEPROM_OFFSET(battery_threshold, Battery_Threshold);
 ASSERT_EEPROM_OFFSET(active_memory, Active_Memory);
-static_assert(sizeof(EE_prom) == Active_Memory + sizeof(uint8_t),
-	"EEPROM layout size must end after active_memory");
+ASSERT_EEPROM_OFFSET(audio_filter_mode, Audio_Filter_Mode);
+ASSERT_EEPROM_OFFSET(pushbutton_audio_feedback, Pushbutton_Audio_Feedback);
+ASSERT_EEPROM_OFFSET(turn_tick_audio_feedback, Turn_Tick_Audio_Feedback);
+ASSERT_EEPROM_OFFSET(gain_indicator_audio_feedback,
+	Gain_Indicator_Audio_Feedback);
+ASSERT_EEPROM_OFFSET(cw_offset_setting, Cw_Offset_Setting);
+static_assert(sizeof(EE_prom) ==
+	Cw_Offset_Setting + sizeof(uint8_t),
+	"EEPROM layout size must end after cw_offset_setting");
 
 #undef ASSERT_EEPROM_OFFSET
 
@@ -203,7 +212,12 @@ const struct EE_prom EEMEM EepromManager::ee_vars
 	(FrequencyMode_t)0x00,		//  uint8_t frequency_mode
 	(BatteryCapacity_t)0x00,       //  uint8_t battery_capacity
 	0x00,       //  uint8_t battery_threshold
-	0x00		// uint8_t active_memory
+	0x00,       // uint8_t active_memory
+	(uint8_t)AUDIO_FILTER_DEFAULT_MODE, // uint8_t audio_filter_mode
+	PUSHBUTTON_AUDIO_FEEDBACK_ENABLED, // uint8_t pushbutton_audio_feedback
+	TURN_TICK_AUDIO_FEEDBACK_ENABLED, // uint8_t turn_tick_audio_feedback
+	GAIN_INDICATOR_AUDIO_FEEDBACK_ENABLED, // uint8_t gain_indicator_audio_feedback
+	CW_OFFSET_DEFAULT_SETTING // uint8_t cw_offset_setting
 };
 
 bool g_isMaster = UNUSED_VAR;
@@ -248,7 +262,7 @@ uint16_t g_i2c_failure_count = UNUSED_VAR;
 extern char g_tempStr[];
 
 /* default constructor */
-EepromManager::EepromManager()
+EepromManager::EepromManager() : deferredWrites_(), deferredWriteInProgress_(false)
 {
 }   /*EepromManager */
 
@@ -309,6 +323,75 @@ void avr_eeprom_write_float(eeprom_addr_t index, float in) {
 	_PROTECTED_WRITE_SPM(NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
 }
 
+void EepromManager::queueEEPROMBytes(uint16_t address, const uint8_t* bytes,
+	size_t length)
+{
+	if(!bytes)
+	{
+		return;
+	}
+
+	for(size_t i = 0; i < length; ++i)
+	{
+		/* This queue is private to the six tuning-state addresses, so repeated
+		 * acceptances coalesce and cannot exhaust its fixed capacity. */
+		(void)deferredWrites_.put(address + i, bytes[i]);
+	}
+}
+
+void EepromManager::queueTuningPersistence(Frequency_Hz frequency,
+	FrequencyMode_t mode, uint8_t activeMemory)
+{
+	const uint8_t modeByte = (uint8_t)mode;
+
+	queueEEPROMBytes(Frequency, (const uint8_t*)&frequency, sizeof(frequency));
+	queueEEPROMBytes(Frequency_Mode, &modeByte, sizeof(modeByte));
+	queueEEPROMBytes(Active_Memory, &activeMemory, sizeof(activeMemory));
+}
+
+void EepromManager::serviceQueuedWrites()
+{
+	if(NVMCTRL.STATUS & NVMCTRL_EEBUSY_bm)
+	{
+		return;
+	}
+
+	if(deferredWriteInProgress_)
+	{
+		_PROTECTED_WRITE_SPM(NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
+		deferredWriteInProgress_ = false;
+	}
+
+	DeferredByteWrite write;
+	while(deferredWrites_.front(&write))
+	{
+		if(eeprom_read_byte((const uint8_t*)write.address) == write.value)
+		{
+			(void)deferredWrites_.removeFront();
+			continue;
+		}
+
+		/* Start only one byte per service call. Never access mapped EEPROM again
+		 * until NVM reports ready, so audio interrupts can run during the write. */
+		_PROTECTED_WRITE_SPM(NVMCTRL.CTRLA, NVMCTRL_CMD_EEERWR_gc);
+		*(uint8_t*)(eeprom_addr_t)(MAPPED_EEPROM_START + write.address) = write.value;
+		(void)deferredWrites_.removeFront();
+		deferredWriteInProgress_ = true;
+		return;
+	}
+}
+
+void EepromManager::flushQueuedWrites()
+{
+	while(deferredWriteInProgress_ || !deferredWrites_.empty())
+	{
+		if(!eepromWaitReady())
+		{
+			return;
+		}
+		serviceQueuedWrites();
+	}
+}
 
 void EepromManager::updateEEPROMVar(EE_var_t v, void* val)
 {
@@ -772,6 +855,57 @@ void EepromManager::updateEEPROMVar(EE_var_t v, void* val)
 		}
 		break;
 
+		case Audio_Filter_Mode:
+		{
+			if (*(uint8_t*)val != eeprom_read_byte(
+				(uint8_t*)&(EepromManager::ee_vars.audio_filter_mode)))
+			{
+				avr_eeprom_write_byte(Audio_Filter_Mode, *(uint8_t*)val);
+			}
+		}
+		break;
+
+		case Pushbutton_Audio_Feedback:
+		{
+			if (*(uint8_t*)val != eeprom_read_byte(
+				(uint8_t*)&(EepromManager::ee_vars.pushbutton_audio_feedback)))
+			{
+				avr_eeprom_write_byte(Pushbutton_Audio_Feedback, *(uint8_t*)val);
+			}
+		}
+		break;
+
+		case Turn_Tick_Audio_Feedback:
+		{
+			if (*(uint8_t*)val != eeprom_read_byte(
+				(uint8_t*)&(EepromManager::ee_vars.turn_tick_audio_feedback)))
+			{
+				avr_eeprom_write_byte(Turn_Tick_Audio_Feedback, *(uint8_t*)val);
+			}
+		}
+		break;
+
+		case Gain_Indicator_Audio_Feedback:
+		{
+			if (*(uint8_t*)val != eeprom_read_byte((uint8_t*)&(
+				EepromManager::ee_vars.gain_indicator_audio_feedback)))
+			{
+				avr_eeprom_write_byte(Gain_Indicator_Audio_Feedback,
+					*(uint8_t*)val);
+			}
+		}
+		break;
+
+		case Cw_Offset_Setting:
+		{
+			if (*(uint8_t*)val != eeprom_read_byte(
+				(uint8_t*)&(EepromManager::ee_vars.cw_offset_setting)))
+			{
+				avr_eeprom_write_byte(Cw_Offset_Setting, *(uint8_t*)val);
+			}
+		}
+		break;
+
 		default:
 		{
 
@@ -785,6 +919,8 @@ void EepromManager::updateEEPROMVar(EE_var_t v, void* val)
  */
 void EepromManager::saveAllEEPROM(void)
 {
+	/* Power-down and menu saves must finish any accepted tuning state first. */
+	flushQueuedWrites();
 	updateEEPROMVar(Id_codespeed, (void*)&g_id_codespeed);	
 	updateEEPROMVar(Fox_setting_none, (void*)&g_fox[EVENT_NONE]);
 	updateEEPROMVar(Fox_setting_classic, (void*)&g_fox[EVENT_CLASSIC]);
@@ -822,6 +958,21 @@ void EepromManager::saveAllEEPROM(void)
 	updateEEPROMVar(Battery_Capacity, (void*)&g_battery_capacity);
 	updateEEPROMVar(Battery_Threshold, (void*)&g_battery_warning_threshold);
 	updateEEPROMVar(Active_Memory, (void*)&g_active_memory);
+	uint8_t audioFilterMode = (uint8_t)g_audio_filter_mode;
+	updateEEPROMVar(Audio_Filter_Mode, (void*)&audioFilterMode);
+	uint8_t pushbuttonAudioFeedback = pushbuttonAudioFeedbackToStored(
+		g_pushbutton_audio_feedback_enabled);
+	updateEEPROMVar(Pushbutton_Audio_Feedback,
+		(void*)&pushbuttonAudioFeedback);
+	uint8_t turnTickAudioFeedback = turnTickAudioFeedbackToStored(
+		g_turn_tick_audio_feedback_enabled);
+	updateEEPROMVar(Turn_Tick_Audio_Feedback, (void*)&turnTickAudioFeedback);
+	uint8_t gainIndicatorAudioFeedback = gainIndicatorAudioFeedbackToStored(
+		g_gain_indicator_audio_feedback_enabled);
+	updateEEPROMVar(Gain_Indicator_Audio_Feedback,
+		(void*)&gainIndicatorAudioFeedback);
+	uint8_t cwOffsetSetting = g_cw_offset_setting;
+	updateEEPROMVar(Cw_Offset_Setting, (void*)&cwOffsetSetting);
 }
 
 
@@ -948,6 +1099,27 @@ bool EepromManager::readNonVols(void)
 		
 		g_active_memory = (uint8_t)eeprom_read_byte((uint8_t*)&(EepromManager::ee_vars.active_memory));
 		if((uint8_t)g_active_memory >= NUMBER_OF_FREQUENCY_CHANNELS) g_active_memory = 0;
+
+		/* Older firmware leaves this appended byte erased. Normalize 0xff to the
+		 * current 200 Hz default without resetting any preceding user settings. */
+		g_audio_filter_mode = audioFilterModeFromStored(eeprom_read_byte(
+			(uint8_t*)&(EepromManager::ee_vars.audio_filter_mode)));
+
+		/* Only the explicit disabled token mutes feedback. Legacy values retain
+		 * the enabled default without forcing an EEPROM-wide reset. */
+		g_pushbutton_audio_feedback_enabled = pushbuttonAudioFeedbackFromStored(
+			eeprom_read_byte((uint8_t*)&(
+				EepromManager::ee_vars.pushbutton_audio_feedback)));
+		g_turn_tick_audio_feedback_enabled = turnTickAudioFeedbackFromStored(
+			eeprom_read_byte((uint8_t*)&(
+				EepromManager::ee_vars.turn_tick_audio_feedback)));
+		g_gain_indicator_audio_feedback_enabled =
+			gainIndicatorAudioFeedbackFromStored(eeprom_read_byte((uint8_t*)&(
+				EepromManager::ee_vars.gain_indicator_audio_feedback)));
+			/* The appended byte is erased on receivers upgraded from older firmware.
+			 * Normalize it to 800 Hz without disturbing any preceding settings. */
+			g_cw_offset_setting = cwOffsetSettingFromStored(eeprom_read_byte(
+				(uint8_t*)&(EepromManager::ee_vars.cw_offset_setting)));
 
 		failure = false;
 	}
@@ -1110,6 +1282,35 @@ bool EepromManager::readNonVols(void)
 			
 			g_battery_warning_threshold = 10;
 			avr_eeprom_write_byte(Battery_Threshold, g_battery_warning_threshold);
+
+			g_active_memory = 0;
+			avr_eeprom_write_byte(Active_Memory, g_active_memory);
+
+			g_audio_filter_mode = AUDIO_FILTER_DEFAULT_MODE;
+			avr_eeprom_write_byte(Audio_Filter_Mode,
+				(uint8_t)g_audio_filter_mode);
+
+			g_pushbutton_audio_feedback_enabled =
+				PUSHBUTTON_AUDIO_FEEDBACK_DEFAULT;
+			avr_eeprom_write_byte(Pushbutton_Audio_Feedback,
+				pushbuttonAudioFeedbackToStored(
+					g_pushbutton_audio_feedback_enabled));
+
+			g_turn_tick_audio_feedback_enabled =
+				TURN_TICK_AUDIO_FEEDBACK_DEFAULT;
+			avr_eeprom_write_byte(Turn_Tick_Audio_Feedback,
+				turnTickAudioFeedbackToStored(
+					g_turn_tick_audio_feedback_enabled));
+
+			g_gain_indicator_audio_feedback_enabled =
+				GAIN_INDICATOR_AUDIO_FEEDBACK_DEFAULT;
+			avr_eeprom_write_byte(Gain_Indicator_Audio_Feedback,
+				gainIndicatorAudioFeedbackToStored(
+					g_gain_indicator_audio_feedback_enabled));
+
+				g_cw_offset_setting = CW_OFFSET_DEFAULT_SETTING;
+				avr_eeprom_write_byte(Cw_Offset_Setting,
+					g_cw_offset_setting);
 			
 			/* Done */
 

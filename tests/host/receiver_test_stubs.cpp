@@ -16,6 +16,7 @@ void resetReceiverHardwareStubs(void)
 	setFrequencyCallCount = 0;
 	initializeQuadratureCallCount = 0;
 	lastFrequency = 0;
+	g_cw_offset_setting = CW_OFFSET_DEFAULT_SETTING;
 }
 
 void setReceiverFrequencyResult(uint8_t result)

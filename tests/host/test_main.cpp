@@ -1,19 +1,25 @@
 #include <cstdio>
+#include <cmath>
 #include <cstring>
 #include <type_traits>
 
+#include "audio_path.h"
+#include "battery_estimator.h"
 #include "CircularFloatBuff.h"
 #include "CircularStringBuff.h"
 #include "CircularUintBuff.h"
 #include "Goertzel.h"
 #include "datetime_utils.h"
+#include "deferred_byte_write_queue.h"
 #include "memory_channels.h"
 #include "periodic_countdown.h"
 #include "receiver.h"
 #include "receiver_frequency.h"
 #include "receiver_test_stubs.h"
+#include "rf_gain_audio_cue.h"
 #include "sense_switches.h"
 #include "signal_score.h"
+#include "sound_settings.h"
 #include "status_wait.h"
 #include "text_utils.h"
 
@@ -35,6 +41,12 @@ static_assert(!std::is_copy_assignable<CircularUintBuff>::value,
 	"CircularUintBuff must not copy its owning buffer pointer");
 static_assert(ADCCENTER == 2048, "released firmware uses 12-bit ADC centering");
 static_assert(SATURATION == (9 * ADCCENTER / 5), "preserve released clipping threshold");
+static_assert(AUDIO_ADC_SAMPLE_RATE_HZ == 48000, "audio ADC rate must remain explicit");
+static_assert(AUDIO_DSP_SAMPLE_RATE_HZ == 12000, "audio DSP rate must track decimation");
+static_assert(AUDIO_CW_DEFAULT_OFFSET_HZ == 800,
+	"default CW listening offset must remain explicit");
+static_assert(AUDIO_FILTER_TRANSITION_FRAMES == 16,
+	"filter changes must use the bounded anti-click transition");
 
 namespace {
 
@@ -212,6 +224,44 @@ void testPeriodicCountdownRejectsInvalidArguments()
 	CHECK(ticksRemaining == 6);
 }
 
+void testDeferredByteWritesPreserveOrderAndCoalesceAddresses()
+{
+	DeferredByteWriteQueue<3> queue;
+	DeferredByteWrite write = {};
+
+	CHECK(queue.put(10, 1));
+	CHECK(queue.put(11, 2));
+	CHECK(queue.put(10, 3));
+	CHECK(queue.size() == 2);
+	CHECK(queue.front(&write));
+	CHECK(write.address == 10);
+	CHECK(write.value == 3);
+	CHECK(queue.removeFront());
+	CHECK(queue.front(&write));
+	CHECK(write.address == 11);
+	CHECK(write.value == 2);
+	CHECK(queue.removeFront());
+	CHECK(queue.empty());
+	CHECK(!queue.front(&write));
+	CHECK(!queue.removeFront());
+}
+
+void testDeferredByteWritesRejectOverflowButStillCoalesce()
+{
+	DeferredByteWriteQueue<2> queue;
+	DeferredByteWrite write = {};
+
+	CHECK(queue.put(20, 1));
+	CHECK(queue.put(21, 2));
+	CHECK(!queue.put(22, 3));
+	CHECK(queue.put(20, 4));
+	CHECK(queue.size() == 2);
+	CHECK(queue.front(&write));
+	CHECK(write.address == 20);
+	CHECK(write.value == 4);
+	CHECK(!queue.front(0));
+}
+
 void testReceiverFrequencyBoundsAreInclusive()
 {
 	CHECK(receiverFrequencyIsSupported(RECEIVER_FREQUENCY_MIN_HZ));
@@ -245,18 +295,63 @@ void testReceiverFrequencyStepProducesValidatedResult()
 	CHECK(!receiverFrequencyStep(result, 1, 100, 0));
 }
 
+void testCwOffsetSettingsNormalizeAndClampWithoutWrapping()
+{
+	CHECK(cwOffsetSettingFromStored(0xff) == CW_OFFSET_DEFAULT_SETTING);
+	CHECK(cwOffsetSettingFromStored(1) == CW_OFFSET_DEFAULT_SETTING);
+	CHECK(cwOffsetSettingFromStored(CW_OFFSET_ZERO_SETTING) ==
+		CW_OFFSET_ZERO_SETTING);
+	CHECK(cwOffsetHz(CW_OFFSET_ZERO_SETTING) == 0);
+	CHECK(cwOffsetHz(CW_OFFSET_MIN_SETTING) == 500);
+	CHECK(cwOffsetHz(CW_OFFSET_MAX_SETTING) == 1000);
+	CHECK(nextCwOffsetSetting(CW_OFFSET_ZERO_SETTING, false) ==
+		CW_OFFSET_ZERO_SETTING);
+	CHECK(nextCwOffsetSetting(CW_OFFSET_ZERO_SETTING, true) ==
+		CW_OFFSET_MIN_SETTING);
+	CHECK(nextCwOffsetSetting(CW_OFFSET_MIN_SETTING, false) ==
+		CW_OFFSET_ZERO_SETTING);
+	CHECK(nextCwOffsetSetting(CW_OFFSET_MAX_SETTING, true) ==
+		CW_OFFSET_MAX_SETTING);
+	CHECK(nextCwOffsetSetting(CW_OFFSET_MAX_SETTING, false) ==
+		CW_OFFSET_MAX_SETTING - 1);
+}
+
+void testCarrierFrequencyMapsToHighSideOscillator()
+{
+	uint32_t oscillator = 123;
+	CHECK(receiverOscillatorFrequency(UINT32_C(3600000),
+		CW_OFFSET_DEFAULT_SETTING, &oscillator));
+	CHECK(oscillator == UINT32_C(3600800));
+	CHECK(receiverOscillatorFrequency(RECEIVER_FREQUENCY_MAX_HZ,
+		CW_OFFSET_MAX_SETTING, &oscillator));
+	CHECK(oscillator == UINT32_C(4001000));
+	CHECK(receiverOscillatorFrequency(UINT32_C(3600000),
+		CW_OFFSET_ZERO_SETTING, &oscillator));
+	CHECK(oscillator == UINT32_C(3600000));
+
+	oscillator = 456;
+	CHECK(!receiverOscillatorFrequency(RECEIVER_FREQUENCY_MIN_HZ - 1,
+		CW_OFFSET_DEFAULT_SETTING, &oscillator));
+	CHECK(!receiverOscillatorFrequency(UINT32_C(3600000), 4, &oscillator));
+	CHECK(!receiverOscillatorFrequency(UINT32_C(3600000),
+		CW_OFFSET_DEFAULT_SETTING, 0));
+	CHECK(oscillator == 456);
+}
+
 void testReceiverAppliesInclusiveBandEdges()
 {
 	resetReceiverHardwareStubs();
 	Frequency_Hz frequency = RECEIVER_FREQUENCY_MIN_HZ;
 	CHECK(!rxSetFrequency(&frequency, false));
 	CHECK(receiverSetFrequencyCalls() == 1);
-	CHECK(receiverLastFrequency() == RECEIVER_FREQUENCY_MIN_HZ);
+	CHECK(receiverLastFrequency() == RECEIVER_FREQUENCY_MIN_HZ +
+		AUDIO_CW_DEFAULT_OFFSET_HZ);
 
 	frequency = RECEIVER_FREQUENCY_MAX_HZ;
 	CHECK(!rxSetFrequency(&frequency, false));
 	CHECK(receiverSetFrequencyCalls() == 2);
-	CHECK(receiverLastFrequency() == RECEIVER_FREQUENCY_MAX_HZ);
+	CHECK(receiverLastFrequency() == RECEIVER_FREQUENCY_MAX_HZ +
+		AUDIO_CW_DEFAULT_OFFSET_HZ);
 }
 
 void testReceiverRejectsInvalidFrequencyAndPropagatesHardwareFailure()
@@ -273,12 +368,29 @@ void testReceiverRejectsInvalidFrequencyAndPropagatesHardwareFailure()
 	CHECK(receiverSetFrequencyCalls() == 1);
 }
 
+void testReceiverOffsetChangeCommitsOnlyAfterSuccessfulRetune()
+{
+	resetReceiverHardwareStubs();
+	g_rx_frequency = UINT32_C(3600000);
+	CHECK(!rxSetCwOffsetSetting(CW_OFFSET_MIN_SETTING));
+	CHECK(g_cw_offset_setting == CW_OFFSET_MIN_SETTING);
+	CHECK(receiverLastFrequency() == UINT32_C(3600500));
+
+	setReceiverFrequencyResult(ERROR_CODE_CLKGEN_NONRESPONSIVE);
+	CHECK(rxSetCwOffsetSetting(CW_OFFSET_MAX_SETTING));
+	CHECK(g_cw_offset_setting == CW_OFFSET_MIN_SETTING);
+	CHECK(receiverLastFrequency() == UINT32_C(3601000));
+	CHECK(rxSetCwOffsetSetting(4));
+	CHECK(receiverSetFrequencyCalls() == 2);
+}
+
 void testReceiverInitializationRejectsInvalidFrequency()
 {
 	resetReceiverHardwareStubs();
 	CHECK(init_receiver(RECEIVER_FREQUENCY_MIN_HZ) == ERROR_CODE_NO_ERROR);
 	CHECK(receiverInitializeQuadratureCalls() == 1);
-	CHECK(receiverLastFrequency() == RECEIVER_FREQUENCY_MIN_HZ);
+	CHECK(receiverLastFrequency() == RECEIVER_FREQUENCY_MIN_HZ +
+		AUDIO_CW_DEFAULT_OFFSET_HZ);
 	CHECK(rxIsInitialized());
 	shutdown_receiver();
 	CHECK(!rxIsInitialized());
@@ -297,7 +409,7 @@ void testMemoryFrequencyStepTunesReceiverBeforeCommittingValues()
 
 	CHECK(rxTuneMemoryStep(&receiverFrequency, &memoryFrequency, 1, 100));
 	CHECK(receiverSetFrequencyCalls() == 1);
-	CHECK(receiverLastFrequency() == UINT32_C(3570600));
+	CHECK(receiverLastFrequency() == UINT32_C(3571400));
 	CHECK(receiverFrequency == UINT32_C(3570600));
 	CHECK(memoryFrequency == UINT32_C(3570600));
 
@@ -538,6 +650,369 @@ void testGoertzelUsesReleasedSaturationThreshold()
 	CHECK(highCount == MINN);
 }
 
+void testGoertzelAnalyzesSelectedCwOffsetBinsInOnePass()
+{
+	const double pi = 3.14159265358979323846;
+	for (uint8_t setting = CW_OFFSET_MIN_SETTING;
+		setting <= CW_OFFSET_MAX_SETTING; ++setting)
+	{
+		Goertzel detector(AUDIO_GOERTZEL_SAMPLE_COUNT,
+			AUDIO_DSP_SAMPLE_RATE_HZ);
+		const uint16_t centerHz = cwOffsetHz(setting);
+		const float targets[MAX_GOERTZEL_TARGETS] = {
+			(float)(centerHz - AUDIO_CW_DETECTOR_SPACING_HZ),
+			(float)centerHz,
+			(float)(centerHz + AUDIO_CW_DETECTOR_SPACING_HZ)
+		};
+		detector.SetTargetFrequencies(targets, MAX_GOERTZEL_TARGETS);
+
+		for (uint16_t index = 0; index < AUDIO_GOERTZEL_SAMPLE_COUNT; ++index)
+		{
+			const int sample = ADCCENTER + (int)(500.0 * std::sin(
+				2.0 * pi * centerHz * index / AUDIO_DSP_SAMPLE_RATE_HZ));
+			detector.DataPoint(sample);
+		}
+
+		float magnitudes[MAX_GOERTZEL_TARGETS] = {};
+		CHECK(detector.Magnitudes2(magnitudes, MAX_GOERTZEL_TARGETS, 0) ==
+			MAX_GOERTZEL_TARGETS);
+		CHECK(magnitudes[1] > 100.0f * magnitudes[0]);
+		CHECK(magnitudes[1] > 100.0f * magnitudes[2]);
+	}
+}
+
+void testAudioPathUsesSignedSaturatingGainAndDacScaling()
+{
+	CHECK(audioScaleAndSaturate(100, AUDIO_NEUTRAL_GAIN, 0) == 100);
+	CHECK(audioScaleAndSaturate(100, AUDIO_NEUTRAL_GAIN + 1, 0) == 200);
+	CHECK(audioScaleAndSaturate(100, AUDIO_NEUTRAL_GAIN - 1, 0) == 50);
+	CHECK(audioScaleAndSaturate(100, AUDIO_NEUTRAL_GAIN, -25) == 75);
+	CHECK(audioScaleAndSaturate(100, 10, 0) == 2047);
+	CHECK(audioScaleAndSaturate(-100, 10, 0) == -2048);
+
+	CHECK(audioCenteredToDac(-2048) == 0);
+	CHECK(audioCenteredToDac(0) == 512);
+	CHECK(audioCenteredToDac(2047) == 1023);
+}
+
+void testAudioPathDecimatesAtAnExactFourToOneRatio()
+{
+	AudioPathProcessor processor;
+	AudioFrame frame = {};
+	for (uint8_t index = 0; index < AUDIO_DECIMATION_FACTOR - 1; ++index) {
+		CHECK(!processor.WillProduceFrame());
+		CHECK(!processor.ProcessAdcSample(AUDIO_ADC_CENTER, AUDIO_NEUTRAL_GAIN,
+				true, 0, AUDIO_FILTER_DEFAULT_MODE, CW_OFFSET_DEFAULT_SETTING,
+				&frame));
+	}
+	CHECK(processor.WillProduceFrame());
+	CHECK(processor.ProcessAdcSample(AUDIO_ADC_CENTER, AUDIO_NEUTRAL_GAIN,
+		true, 0, AUDIO_FILTER_DEFAULT_MODE, CW_OFFSET_DEFAULT_SETTING, &frame));
+	CHECK(frame.analysisSample == AUDIO_ADC_CENTER);
+	CHECK(frame.dacValue == AUDIO_DAC_CENTER);
+}
+
+double audioPathRmsAtFrequency(double frequency, AudioFilterMode mode,
+	uint8_t offsetSetting = CW_OFFSET_DEFAULT_SETTING)
+{
+	AudioPathProcessor processor;
+	AudioFrame frame = {};
+	const double pi = 3.14159265358979323846;
+	double sumSquares = 0.0;
+	uint32_t measuredFrames = 0;
+	for (uint32_t index = 0; index < AUDIO_ADC_SAMPLE_RATE_HZ; ++index) {
+		const double phase = 2.0 * pi * frequency * index /
+			AUDIO_ADC_SAMPLE_RATE_HZ;
+		const int32_t adc = AUDIO_ADC_CENTER +
+			(int32_t)(800.0 * std::sin(phase));
+		if (processor.ProcessAdcSample((uint16_t)adc, AUDIO_NEUTRAL_GAIN,
+			true, 0, mode, offsetSetting, &frame) &&
+			index >= AUDIO_ADC_SAMPLE_RATE_HZ / 4) {
+			const double centered = (double)frame.dacValue - AUDIO_DAC_CENTER;
+			sumSquares += centered * centered;
+			++measuredFrames;
+		}
+	}
+	return std::sqrt(sumSquares / measuredFrames);
+}
+
+void testAudioPathBandpassRejectsOutOfBandSignals()
+{
+	const double center = audioPathRmsAtFrequency(AUDIO_CW_DEFAULT_OFFSET_HZ,
+		AUDIO_FILTER_200_HZ);
+	const double lowerEdge = audioPathRmsAtFrequency(
+		AUDIO_CW_DEFAULT_OFFSET_HZ - AUDIO_CW_DETECTOR_SPACING_HZ,
+		AUDIO_FILTER_200_HZ);
+	const double upperEdge = audioPathRmsAtFrequency(
+		AUDIO_CW_DEFAULT_OFFSET_HZ + AUDIO_CW_DETECTOR_SPACING_HZ,
+		AUDIO_FILTER_200_HZ);
+	const double lowerAdjacent = audioPathRmsAtFrequency(600.0,
+		AUDIO_FILTER_200_HZ);
+	const double upperAdjacent = audioPathRmsAtFrequency(1000.0,
+		AUDIO_FILTER_200_HZ);
+	const double below = audioPathRmsAtFrequency(250.0, AUDIO_FILTER_200_HZ);
+	const double above = audioPathRmsAtFrequency(1500.0, AUDIO_FILTER_200_HZ);
+	CHECK(center > 100.0);
+	CHECK(lowerEdge > center * 0.6);
+	CHECK(upperEdge > center * 0.6);
+	CHECK(lowerAdjacent < center * 0.5);
+	CHECK(upperAdjacent < center * 0.5);
+	CHECK(center > 8.0 * below);
+	CHECK(center > 8.0 * above);
+}
+
+void testAudioFilterModesNormalizeClampAndReportBandwidth()
+{
+	CHECK(audioFilterModeFromStored(0xff) == AUDIO_FILTER_DEFAULT_MODE);
+	CHECK(audioFilterModeFromStored(0x00) == AUDIO_FILTER_DEFAULT_MODE);
+	CHECK(audioFilterBandwidthHz(AUDIO_FILTER_OFF) == 0);
+	CHECK(audioFilterBandwidthHz(AUDIO_FILTER_200_HZ) == 200);
+	CHECK(audioFilterBandwidthHz(AUDIO_FILTER_400_HZ) == 400);
+	CHECK(audioFilterBandwidthHz(AUDIO_FILTER_800_HZ) == 800);
+	CHECK(nextAudioFilterMode(AUDIO_FILTER_OFF, true) == AUDIO_FILTER_200_HZ);
+	CHECK(nextAudioFilterMode(AUDIO_FILTER_800_HZ, true) == AUDIO_FILTER_800_HZ);
+	CHECK(nextAudioFilterMode(AUDIO_FILTER_OFF, false) == AUDIO_FILTER_OFF);
+}
+
+void testPushbuttonAudioFeedbackStorageDefaultsSafely()
+{
+	CHECK(PUSHBUTTON_AUDIO_FEEDBACK_DEFAULT);
+	CHECK(!pushbuttonAudioFeedbackFromStored(
+		PUSHBUTTON_AUDIO_FEEDBACK_DISABLED));
+	CHECK(pushbuttonAudioFeedbackFromStored(
+		PUSHBUTTON_AUDIO_FEEDBACK_ENABLED));
+	CHECK(pushbuttonAudioFeedbackFromStored(0x00));
+	CHECK(pushbuttonAudioFeedbackFromStored(0xff));
+	CHECK(pushbuttonAudioFeedbackToStored(false) ==
+		PUSHBUTTON_AUDIO_FEEDBACK_DISABLED);
+	CHECK(pushbuttonAudioFeedbackToStored(true) ==
+		PUSHBUTTON_AUDIO_FEEDBACK_ENABLED);
+}
+
+void testTurnTickAudioFeedbackStorageDefaultsSafely()
+{
+	CHECK(TURN_TICK_AUDIO_FEEDBACK_DEFAULT);
+	CHECK(!turnTickAudioFeedbackFromStored(
+		TURN_TICK_AUDIO_FEEDBACK_DISABLED));
+	CHECK(turnTickAudioFeedbackFromStored(
+		TURN_TICK_AUDIO_FEEDBACK_ENABLED));
+	CHECK(turnTickAudioFeedbackFromStored(0x00));
+	CHECK(turnTickAudioFeedbackFromStored(0xff));
+	CHECK(turnTickAudioFeedbackToStored(false) ==
+		TURN_TICK_AUDIO_FEEDBACK_DISABLED);
+	CHECK(turnTickAudioFeedbackToStored(true) ==
+		TURN_TICK_AUDIO_FEEDBACK_ENABLED);
+}
+
+void testGainIndicatorAudioFeedbackStorageDefaultsSafely()
+{
+	CHECK(GAIN_INDICATOR_AUDIO_FEEDBACK_DEFAULT);
+	CHECK(!gainIndicatorAudioFeedbackFromStored(
+		GAIN_INDICATOR_AUDIO_FEEDBACK_DISABLED));
+	CHECK(gainIndicatorAudioFeedbackFromStored(
+		GAIN_INDICATOR_AUDIO_FEEDBACK_ENABLED));
+	CHECK(gainIndicatorAudioFeedbackFromStored(0x00));
+	CHECK(gainIndicatorAudioFeedbackFromStored(0xff));
+	CHECK(gainIndicatorAudioFeedbackToStored(false) ==
+		GAIN_INDICATOR_AUDIO_FEEDBACK_DISABLED);
+	CHECK(gainIndicatorAudioFeedbackToStored(true) ==
+		GAIN_INDICATOR_AUDIO_FEEDBACK_ENABLED);
+}
+
+struct CapturedRfGainCue
+{
+	uint16_t leadingSilence;
+	uint16_t toneFrames[5];
+	uint16_t gapFrames[4];
+	uint8_t toneCount;
+};
+
+CapturedRfGainCue captureRfGainCue(uint8_t displayedGain)
+{
+	CapturedRfGainCue captured = {};
+	RfGainAudioCue cue;
+	cue.Schedule(displayedGain);
+	bool previousFrameWasTone = false;
+	uint32_t guard = 60000;
+
+	while (cue.Active() && guard--)
+	{
+		bool toneStarted = false;
+		const bool tone = cue.NextFrame(&toneStarted);
+		if (tone)
+		{
+			if (toneStarted)
+			{
+				CHECK(!previousFrameWasTone);
+				CHECK(captured.toneCount < 5);
+				if (captured.toneCount < 5)
+				{
+					++captured.toneCount;
+				}
+			}
+			if (captured.toneCount)
+			{
+				++captured.toneFrames[captured.toneCount - 1];
+			}
+			previousFrameWasTone = true;
+		}
+		else
+		{
+			previousFrameWasTone = false;
+			if (!captured.toneCount)
+			{
+				++captured.leadingSilence;
+			}
+			else if (cue.Active() && captured.toneCount < 5)
+			{
+				++captured.gapFrames[captured.toneCount - 1];
+			}
+		}
+	}
+
+	CHECK(guard > 0);
+	return captured;
+}
+
+void testRfGainAudioCueMatchesApprovedMorseTiming()
+{
+	static const uint8_t expectedToneCounts[11] = {
+		1, 1, 2, 3, 4, 5, 5, 5, 5, 5, 2
+	};
+	static const uint16_t expectedToneFrames[11][5] = {
+		{RF_GAIN_CUE_LONG_FRAMES, 0, 0, 0, 0},
+		{RF_GAIN_CUE_DOT_FRAMES, 0, 0, 0, 0},
+		{RF_GAIN_CUE_DOT_FRAMES, RF_GAIN_CUE_DOT_FRAMES, 0, 0, 0},
+		{RF_GAIN_CUE_DOT_FRAMES, RF_GAIN_CUE_DOT_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES, 0, 0},
+		{RF_GAIN_CUE_DOT_FRAMES, RF_GAIN_CUE_DOT_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES, RF_GAIN_CUE_DOT_FRAMES, 0},
+		{RF_GAIN_CUE_DOT_FRAMES, RF_GAIN_CUE_DOT_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES, RF_GAIN_CUE_DOT_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES},
+		{RF_GAIN_CUE_DASH_FRAMES, RF_GAIN_CUE_DOT_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES, RF_GAIN_CUE_DOT_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES},
+		{RF_GAIN_CUE_DASH_FRAMES, RF_GAIN_CUE_DASH_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES, RF_GAIN_CUE_DOT_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES},
+		{RF_GAIN_CUE_DASH_FRAMES, RF_GAIN_CUE_DASH_FRAMES,
+			RF_GAIN_CUE_DASH_FRAMES, RF_GAIN_CUE_DOT_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES},
+		{RF_GAIN_CUE_DASH_FRAMES, RF_GAIN_CUE_DASH_FRAMES,
+			RF_GAIN_CUE_DASH_FRAMES, RF_GAIN_CUE_DASH_FRAMES,
+			RF_GAIN_CUE_DOT_FRAMES},
+		{RF_GAIN_CUE_LONG_FRAMES, RF_GAIN_CUE_LONG_FRAMES, 0, 0, 0}
+	};
+
+	CHECK(RF_GAIN_CUE_DOT_FRAMES == 800);
+	CHECK(RF_GAIN_CUE_DASH_FRAMES == 2400);
+	CHECK(RF_GAIN_CUE_GAP_FRAMES == 800);
+	CHECK(RF_GAIN_CUE_LONG_FRAMES == 3600);
+	for (uint8_t gain = 0; gain <= RF_GAIN_CUE_MAX_DISPLAYED_GAIN; ++gain)
+	{
+		const CapturedRfGainCue captured = captureRfGainCue(gain);
+		CHECK(captured.leadingSilence == RF_GAIN_CUE_SETTLE_FRAMES);
+		CHECK(captured.toneCount == expectedToneCounts[gain]);
+		for (uint8_t tone = 0; tone < expectedToneCounts[gain]; ++tone)
+		{
+			CHECK(captured.toneFrames[tone] == expectedToneFrames[gain][tone]);
+			if (tone + 1 < expectedToneCounts[gain])
+			{
+				CHECK(captured.gapFrames[tone] == RF_GAIN_CUE_GAP_FRAMES);
+			}
+		}
+	}
+}
+
+void testRfGainAudioCueLatestRequestWinsAndInvalidCancels()
+{
+	RfGainAudioCue cue;
+	cue.Schedule(3);
+	for (uint16_t frame = 0; frame < 100; ++frame)
+	{
+		CHECK(!cue.NextFrame(0));
+	}
+	cue.Schedule(10);
+	CHECK(cue.DisplayedGain() == 10);
+	for (uint16_t frame = 0; frame < RF_GAIN_CUE_SETTLE_FRAMES; ++frame)
+	{
+		CHECK(!cue.NextFrame(0));
+	}
+	bool toneStarted = false;
+	CHECK(cue.NextFrame(&toneStarted));
+	CHECK(toneStarted);
+
+	cue.Schedule(RF_GAIN_CUE_MAX_DISPLAYED_GAIN + 1);
+	CHECK(!cue.Active());
+	CHECK(cue.DisplayedGain() == RF_GAIN_CUE_NO_REQUEST);
+}
+
+void testAudioFilterProfilesWidenWithoutMovingTheCwPeak()
+{
+	const double narrowCenter = audioPathRmsAtFrequency(800.0,
+		AUDIO_FILTER_200_HZ);
+	const double mediumCenter = audioPathRmsAtFrequency(800.0,
+		AUDIO_FILTER_400_HZ);
+	const double wideCenter = audioPathRmsAtFrequency(800.0,
+		AUDIO_FILTER_800_HZ);
+	CHECK(narrowCenter > audioPathRmsAtFrequency(600.0, AUDIO_FILTER_200_HZ));
+	CHECK(mediumCenter > audioPathRmsAtFrequency(400.0, AUDIO_FILTER_400_HZ));
+	CHECK(wideCenter > audioPathRmsAtFrequency(250.0, AUDIO_FILTER_800_HZ));
+	CHECK(audioPathRmsAtFrequency(600.0, AUDIO_FILTER_400_HZ) >
+		narrowCenter * 0.6);
+	CHECK(audioPathRmsAtFrequency(1000.0, AUDIO_FILTER_400_HZ) >
+		narrowCenter * 0.6);
+	CHECK(audioPathRmsAtFrequency(400.0, AUDIO_FILTER_800_HZ) >
+		wideCenter * 0.45);
+	CHECK(audioPathRmsAtFrequency(1200.0, AUDIO_FILTER_800_HZ) >
+		wideCenter * 0.7);
+}
+
+void testAudioFilterProfilesFollowEveryNonzeroCwOffset()
+{
+	for (uint8_t setting = CW_OFFSET_MIN_SETTING;
+		setting <= CW_OFFSET_MAX_SETTING; ++setting)
+	{
+		const double centerHz = cwOffsetHz(setting);
+		const double center = audioPathRmsAtFrequency(centerHz,
+			AUDIO_FILTER_200_HZ, setting);
+		const double below = audioPathRmsAtFrequency(centerHz - 300.0,
+			AUDIO_FILTER_200_HZ, setting);
+		const double above = audioPathRmsAtFrequency(centerHz + 300.0,
+			AUDIO_FILTER_200_HZ, setting);
+		CHECK(center > 90.0);
+		CHECK(center > 2.0 * below);
+		CHECK(center > 2.0 * above);
+	}
+}
+
+void testZeroBeatModeBypassesConfiguredAudioFilter()
+{
+	const double filtered = audioPathRmsAtFrequency(200.0,
+		AUDIO_FILTER_200_HZ, CW_OFFSET_DEFAULT_SETTING);
+	const double zeroBeatBypass = audioPathRmsAtFrequency(200.0,
+		AUDIO_FILTER_200_HZ, CW_OFFSET_ZERO_SETTING);
+	CHECK(zeroBeatBypass > 5.0 * filtered);
+}
+
+void testAudioFilterOffBypassesOnlyTheBandpass()
+{
+	AudioPathProcessor processor;
+	AudioFrame frame = {};
+	for (uint8_t index = 0; index <= AUDIO_FILTER_TRANSITION_FRAMES; ++index) {
+		processor.ProcessFrame(400, AUDIO_NEUTRAL_GAIN, true, 0,
+			AUDIO_FILTER_OFF, CW_OFFSET_DEFAULT_SETTING, &frame);
+	}
+	CHECK(frame.dacValue == AUDIO_DAC_CENTER + 100);
+	CHECK(frame.analysisSample == AUDIO_ADC_CENTER + 400);
+
+	processor.ProcessFrame(400, AUDIO_NEUTRAL_GAIN, false, 0,
+		AUDIO_FILTER_OFF, CW_OFFSET_DEFAULT_SETTING, &frame);
+	CHECK(frame.dacValue == AUDIO_DAC_CENTER);
+	CHECK(frame.analysisSample == AUDIO_ADC_CENTER + 400);
+}
+
 void testDisplayTextValidationRejectsControlBytes()
 {
 	CHECK(isDisplayable("Signal", 6));
@@ -555,6 +1030,40 @@ void testDigitValidationHandlesNullAndEmptyInputs()
 	CHECK(!only_digits(0));
 }
 
+void testBatteryVoltageConversionPreservesCalibration()
+{
+	CHECK(std::fabs(batteryVoltageFromAdcCounts(0.0f) - 0.2f) < 0.0001f);
+	const float countsAtEightVolts = (8.0f - 0.2f) * 4096.0f / 28.8f;
+	CHECK(std::fabs(batteryVoltageFromAdcCounts(countsAtEightVolts) - 8.0f) < 0.001f);
+}
+
+void testBatteryChargeEstimateInterpolatesAndClamps()
+{
+	CHECK(batteryChargePercentFromVoltage(8.5f) == 100.0f);
+	CHECK(batteryChargePercentFromVoltage(8.2f) == 90.0f);
+	CHECK(std::fabs(batteryChargePercentFromVoltage(7.55f) - 32.5f) < 0.01f);
+	CHECK(batteryChargePercentFromVoltage(7.4f) == 10.0f);
+	CHECK(batteryChargePercentFromVoltage(6.5f) == 0.0f);
+
+	float previous = batteryChargePercentFromVoltage(6.5f);
+	for(float voltage = 6.51f; voltage <= 8.5f; voltage += 0.01f)
+	{
+		const float current = batteryChargePercentFromVoltage(voltage);
+		CHECK(current >= previous);
+		previous = current;
+	}
+}
+
+void testBatteryDisplayRoundingSuppressesFalsePrecision()
+{
+	CHECK(batteryVoltageTenthsForDisplay(7.84f) == 78);
+	CHECK(batteryVoltageTenthsForDisplay(7.85f) == 79);
+	CHECK(batteryVoltageTenthsForDisplay(8.4f) == 84);
+	CHECK(batteryPercentForDisplay(12.4f) == 10);
+	CHECK(batteryPercentForDisplay(12.5f) == 15);
+	CHECK(batteryPercentForDisplay(101.0f) == 100);
+}
+
 } // namespace
 
 int main()
@@ -569,11 +1078,16 @@ int main()
 	testCircularUintAverageUsesOnlyInitializedEntries();
 	testPeriodicCountdownDoesNotDriftAtByteWrap();
 	testPeriodicCountdownRejectsInvalidArguments();
+	testDeferredByteWritesPreserveOrderAndCoalesceAddresses();
+	testDeferredByteWritesRejectOverflowButStillCoalesce();
 	testReceiverFrequencyBoundsAreInclusive();
 	testReceiverFrequencyStepRejectsOutOfBandResult();
 	testReceiverFrequencyStepProducesValidatedResult();
+	testCwOffsetSettingsNormalizeAndClampWithoutWrapping();
+	testCarrierFrequencyMapsToHighSideOscillator();
 	testReceiverAppliesInclusiveBandEdges();
 	testReceiverRejectsInvalidFrequencyAndPropagatesHardwareFailure();
+	testReceiverOffsetChangeCommitsOnlyAfterSuccessfulRetune();
 	testReceiverInitializationRejectsInvalidFrequency();
 	testMemoryFrequencyStepTunesReceiverBeforeCommittingValues();
 	testMemoryFrequencyStepRejectsInvalidInputWithoutRetuning();
@@ -590,8 +1104,25 @@ int main()
 	testGoertzelRetuneKeepsReadyBlockUntilRelease();
 	testGoertzelReadyBlockIsNotOverwritten();
 	testGoertzelUsesReleasedSaturationThreshold();
+	testGoertzelAnalyzesSelectedCwOffsetBinsInOnePass();
+	testAudioPathUsesSignedSaturatingGainAndDacScaling();
+	testAudioPathDecimatesAtAnExactFourToOneRatio();
+	testAudioPathBandpassRejectsOutOfBandSignals();
+	testAudioFilterModesNormalizeClampAndReportBandwidth();
+	testPushbuttonAudioFeedbackStorageDefaultsSafely();
+	testTurnTickAudioFeedbackStorageDefaultsSafely();
+	testGainIndicatorAudioFeedbackStorageDefaultsSafely();
+	testRfGainAudioCueMatchesApprovedMorseTiming();
+	testRfGainAudioCueLatestRequestWinsAndInvalidCancels();
+	testAudioFilterProfilesWidenWithoutMovingTheCwPeak();
+	testAudioFilterProfilesFollowEveryNonzeroCwOffset();
+	testZeroBeatModeBypassesConfiguredAudioFilter();
+	testAudioFilterOffBypassesOnlyTheBandpass();
 	testDisplayTextValidationRejectsControlBytes();
 	testDigitValidationHandlesNullAndEmptyInputs();
+	testBatteryVoltageConversionPreservesCalibration();
+	testBatteryChargeEstimateInterpolatesAndClamps();
+	testBatteryDisplayRoundingSuppressesFalsePrecision();
 
 	if (failures != 0) {
 		std::fprintf(stderr, "%d regression test(s) failed\n", failures);

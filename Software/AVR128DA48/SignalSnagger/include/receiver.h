@@ -55,6 +55,9 @@ typedef int16_t Attenuation;
 #define RX_MINIMUM_80M_FREQUENCY RECEIVER_FREQUENCY_MIN_HZ
 #define RX_MAXIMUM_80M_FREQUENCY RECEIVER_FREQUENCY_MAX_HZ
 
+/* Byte-sized so foreground menu changes and the audio ISR share it atomically. */
+extern volatile uint8_t g_cw_offset_setting;
+
 /**
  */
  void shutdown_receiver(void);
@@ -79,6 +82,9 @@ EC init_receiver(Frequency_Hz freq);
 /**
  */
  bool rxSetFrequency(Frequency_Hz *freq, bool leaveClockOff);
+
+/** Retune the current carrier with a new CW offset, committing only on success. */
+ bool rxSetCwOffsetSetting(uint8_t setting);
 
 /**
  * Step a memory frequency, tune the receiver, and commit both values only when

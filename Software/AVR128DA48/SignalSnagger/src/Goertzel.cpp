@@ -47,17 +47,15 @@ uint8_t boundedSampleCount(float requested)
 
 Goertzel::Goertzel(float N, float sampling_frequency) :
 	samplingFrequency_(sampling_frequency),
-	targetFrequency_(0),
 	sampleCount_(boundedSampleCount(N)),
-	coefficient_(0),
-	q1_(0),
-	q2_(0),
+	targetCount_(1),
 	captureIndex_(0),
 	captureBuffer_(0),
 	readyBuffer_(0),
 	samplesReady_(false),
 	highValueCount_(0)
 {
+	memset(coefficients_, 0x00, sizeof(coefficients_));
 	Flush();
 }
 
@@ -73,61 +71,85 @@ void Goertzel::Flush(void)
 
 void Goertzel::SetTargetFrequency(float target_frequency)
 {
-	float floatN = (float)sampleCount_;
+	SetTargetFrequencies(&target_frequency, 1);
+}
 
-	targetFrequency_ = target_frequency;   /* Ideally, an integer multiple of sample rate/N. */
-	int k = (int)(0.5 + ((floatN * targetFrequency_) / samplingFrequency_));
+void Goertzel::SetTargetFrequencies(const float* targetFrequencies,
+	uint8_t targetCount)
+{
+	if (!targetFrequencies || targetCount == 0)
+	{
+		return;
+	}
+	if (targetCount > MAX_GOERTZEL_TARGETS)
+	{
+		targetCount = MAX_GOERTZEL_TARGETS;
+	}
+	targetCount_ = targetCount;
+
+	const float floatN = (float)sampleCount_;
 	const double pi = 3.141592653589793;
-	float w = (2.0 * pi * k) / floatN;
-	coefficient_ = 2.0 * cos(w);
+	for (uint8_t target = 0; target < targetCount_; ++target)
+	{
+		/* Exact sample-rate/N bin centers avoid spectral leakage. */
+		const int k = (int)(0.5 + ((floatN * targetFrequencies[target]) /
+			samplingFrequency_));
+		const float w = (float)((2.0 * pi * k) / floatN);
+		coefficients_[target] = 2.0f * cosf(w);
+	}
 	ResetAnalysis();
 }
 
 void Goertzel::ResetAnalysis(void)
 {
-	q2_ = 0;
-	q1_ = 0;
+	memset(q1_, 0x00, sizeof(q1_));
+	memset(q2_, 0x00, sizeof(q2_));
 }
 
 /* Call this routine for every sample. */
 void Goertzel::ProcessSample(int sample)
 {
-	float q0 = coefficient_ * q1_ - q2_ + (float)(sample - ADCCENTER);
-
 	if(sample > SATURATION)
 	{
 		highValueCount_++;
 	}
 
-	q2_ = q1_;
-	q1_ = q0;
-}
-
-void Goertzel::PublishCapturedBlock(void)
-{
-	if (captureIndex_ < sampleCount_ || samplesReady_)
+	const float centered = (float)(sample - ADCCENTER);
+	for (uint8_t target = 0; target < targetCount_; ++target)
 	{
-		return;
+		const float q0 = coefficients_[target] * q1_[target] -
+			q2_[target] + centered;
+		q2_[target] = q1_[target];
+		q1_[target] = q0;
 	}
-
-	readyBuffer_ = captureBuffer_;
-	captureBuffer_ ^= 1;
-	captureIndex_ = 0;
-	/* Publish last so foreground never sees partially initialized ownership. */
-	samplesReady_ = true;
 }
 
 bool Goertzel::DataPoint(int data)
 
 {
-	/* Publish a completed pending buffer after foreground releases the prior one. */
-	PublishCapturedBlock();
-
-	if (captureIndex_ < sampleCount_)
+	/* If both buffers are occupied, hold the completed capture until foreground
+	 * releases the published block. No sample can overwrite either owner. */
+	if (captureIndex_ >= sampleCount_)
 	{
-		testData_[captureBuffer_][captureIndex_++] = data;
+		if (samplesReady_)
+		{
+			return true;
+		}
+		readyBuffer_ = captureBuffer_;
+		captureBuffer_ ^= 1;
+		captureIndex_ = 0;
+		samplesReady_ = true;
 	}
-	PublishCapturedBlock();
+
+	testData_[captureBuffer_][captureIndex_++] = data;
+	if (captureIndex_ >= sampleCount_ && !samplesReady_)
+	{
+		readyBuffer_ = captureBuffer_;
+		captureBuffer_ ^= 1;
+		captureIndex_ = 0;
+		/* Publish last so foreground never sees partial ownership state. */
+		samplesReady_ = true;
+	}
 
 	return samplesReady_;
 }
@@ -145,7 +167,19 @@ void Goertzel::ReleaseSamples(void)
 
 float Goertzel::Magnitude2(int *highCount)
 {
-	float magnitude2;
+	float magnitude = 0;
+	(void)Magnitudes2(&magnitude, 1, highCount);
+	return magnitude;
+}
+
+uint8_t Goertzel::Magnitudes2(float* magnitudes, uint8_t capacity,
+	int *highCount)
+{
+	if (!magnitudes || capacity == 0)
+	{
+		if (highCount) *highCount = 0;
+		return 0;
+	}
 
 	if (!samplesReady_)
 	{
@@ -165,8 +199,13 @@ float Goertzel::Magnitude2(int *highCount)
 
 	if(highCount) *highCount = highValueCount_;
 
-	magnitude2 = q1_ * q1_ + q2_ * q2_ - coefficient_ * q1_ * q2_;
-
-	return( magnitude2);
+	const uint8_t resultCount = (capacity < targetCount_) ? capacity : targetCount_;
+	for (uint8_t target = 0; target < resultCount; ++target)
+	{
+		magnitudes[target] = q1_[target] * q1_[target] +
+			q2_[target] * q2_[target] - coefficients_[target] *
+			q1_[target] * q2_[target];
+	}
+	return resultCount;
 }
 #endif // !defined(INIT_EEPROM_ONLY) || !INIT_EEPROM_ONLY

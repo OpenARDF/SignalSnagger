@@ -26,6 +26,7 @@
 #define __EEPROMMANAGER_H__
 
 #include "defs.h"
+#include "deferred_byte_write_queue.h"
 
 #ifdef ATMEL_STUDIO_7
 #include <avr/eeprom.h>
@@ -109,6 +110,11 @@ struct EE_prom
 	BatteryCapacity_t battery_capacity;
 	uint8_t battery_threshold;
 	uint8_t active_memory;
+	uint8_t audio_filter_mode;
+	uint8_t pushbutton_audio_feedback;
+	uint8_t turn_tick_audio_feedback;
+	uint8_t gain_indicator_audio_feedback;
+	uint8_t cw_offset_setting;
 
 };
 
@@ -184,7 +190,12 @@ typedef enum
 	Frequency_Mode = Channel_Name + NUMBER_OF_FREQUENCY_CHANNELS * sizeof(uint8_t),
 	Battery_Capacity = Frequency_Mode + sizeof(uint8_t),
 	Battery_Threshold = Battery_Capacity + sizeof(uint8_t),
-	Active_Memory = Battery_Threshold + sizeof(uint8_t)
+	Active_Memory = Battery_Threshold + sizeof(uint8_t),
+	Audio_Filter_Mode = Active_Memory + sizeof(uint8_t),
+	Pushbutton_Audio_Feedback = Audio_Filter_Mode + sizeof(uint8_t),
+	Turn_Tick_Audio_Feedback = Pushbutton_Audio_Feedback + sizeof(uint8_t),
+	Gain_Indicator_Audio_Feedback = Turn_Tick_Audio_Feedback + sizeof(uint8_t),
+	Cw_Offset_Setting = Gain_Indicator_Audio_Feedback + sizeof(uint8_t)
 } EE_var_t;
 
 
@@ -205,10 +216,19 @@ class EepromManager
 	bool initializeEEPROMVars(void);
 	bool readNonVols(void);
 	void updateEEPROMVar(EE_var_t v, void* val);
+	void queueTuningPersistence(Frequency_Hz frequency, FrequencyMode_t mode,
+		uint8_t activeMemory);
+	void serviceQueuedWrites();
 	void saveAllEEPROM();
 
 	protected:
 	private:
+	static const size_t TUNING_WRITE_QUEUE_CAPACITY = sizeof(Frequency_Hz) + 2;
+	DeferredByteWriteQueue<TUNING_WRITE_QUEUE_CAPACITY> deferredWrites_;
+	bool deferredWriteInProgress_;
+
+	void queueEEPROMBytes(uint16_t address, const uint8_t* bytes, size_t length);
+	void flushQueuedWrites();
 	EepromManager( const EepromManager &c );
 	EepromManager& operator=( const EepromManager &c );
 };  /*EepromManager */

@@ -148,6 +148,7 @@
       <Value>%24(PackRepoDir)\atmel\AVR-Dx_DFP\1.9.103\include\</Value>
     </ListValues>
   </avrgcc.compiler.directories.IncludePaths>
+  <avrgcc.compiler.optimization.level>Optimize more (-O2)</avrgcc.compiler.optimization.level>
   <avrgcc.compiler.optimization.PackStructureMembers>True</avrgcc.compiler.optimization.PackStructureMembers>
   <avrgcc.compiler.optimization.DebugLevel>Default (-g2)</avrgcc.compiler.optimization.DebugLevel>
   <avrgcc.compiler.warnings.AllWarnings>True</avrgcc.compiler.warnings.AllWarnings>
@@ -171,6 +172,7 @@
       <Value>%24(PackRepoDir)\atmel\AVR-Dx_DFP\1.9.103\include\</Value>
     </ListValues>
   </avrgcccpp.compiler.directories.IncludePaths>
+  <avrgcccpp.compiler.optimization.level>Optimize more (-O2)</avrgcccpp.compiler.optimization.level>
   <avrgcccpp.compiler.optimization.DebugLevel>Default (-g2)</avrgcccpp.compiler.optimization.DebugLevel>
   <avrgcccpp.compiler.warnings.AllWarnings>True</avrgcccpp.compiler.warnings.AllWarnings>
   <avrgcccpp.compiler.miscellaneous.OtherFlags>-fno-threadsafe-statics</avrgcccpp.compiler.miscellaneous.OtherFlags>
@@ -202,6 +204,18 @@
     <Compile Include="include\adc.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="include\audio_path.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="include\battery_estimator.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="include\rf_gain_audio_cue.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="include\sound_settings.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="include\atmel_start_pins.h">
       <SubType>compile</SubType>
     </Compile>
@@ -221,6 +235,9 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="include\datetime_utils.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="include\deferred_byte_write_queue.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="include\memory_channels.h">
@@ -317,6 +334,15 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\adc.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\audio_path.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\battery_estimator.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\rf_gain_audio_cue.cpp">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\binio.cpp">

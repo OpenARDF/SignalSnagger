@@ -35,6 +35,7 @@ static void VREF_init(void);
 #define VREF_STARTUP_TIME_MS        (10)
 /* Mask needed to get the 2 LSb for DAC Data Register */
 #define LSB_MASK                 (0x03)
+#define DAC_MAX_VALUE            (1023)
 
 
 
@@ -77,6 +78,10 @@ void DAC0_init(void)
 
 void DAC0_setVal(uint16_t value)
 {
+	if (value > DAC_MAX_VALUE)
+	{
+		value = DAC_MAX_VALUE;
+	}
     /* Store the two LSbs in DAC0.DATAL */
     DAC0.DATAL = (value & LSB_MASK) << 6;
     /* Store the eight MSbs in DAC0.DATAH */

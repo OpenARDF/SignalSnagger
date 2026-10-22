@@ -161,7 +161,8 @@ fi
 if rg -q 'g_active_memory[[:space:]]*=[[:space:]]*nextActiveMemory' "$firmware_root/main.cpp"; then
 	fail "memory selection must validate INVALID_CHANNEL before updating the active array index"
 fi
-if ! rg -q 'static_assert\(sizeof\(EE_prom\) == Active_Memory' "$firmware_root/src/eeprommanager.cpp"; then
+if ! rg -Uq 'static_assert\(sizeof\(EE_prom\)[[:space:]]*==[[:space:]]*Cw_Offset_Setting' \
+	"$firmware_root/src/eeprommanager.cpp"; then
 	fail "EEPROM address constants require compile-time layout verification"
 fi
 if rg -q 'while\s*\(\s*!ADC0_conversionDone\(\)\s*\)' \
@@ -180,6 +181,16 @@ fi
 eeprom_completion_waits="$(rg -c '\(void\)eepromWaitReady\(\);' "$firmware_root/src/eeprommanager.cpp" || true)"
 if [[ "$eeprom_completion_waits" != "4" ]]; then
 	fail "each EEPROM write helper must wait for its own operation to complete"
+fi
+if ! rg -q 'EEPromMgr\.queueTuningPersistence\(' "$firmware_root/main.cpp" ||
+	! rg -q 'EEPromMgr\.serviceQueuedWrites\(\);' "$firmware_root/main.cpp"; then
+	fail "accepted tuning must use foreground-serviced EEPROM persistence"
+fi
+deferred_eeprom_service="$(sed -n '/void EepromManager::serviceQueuedWrites/,/void EepromManager::flushQueuedWrites/p' "$firmware_root/src/eeprommanager.cpp")"
+if [[ "$deferred_eeprom_service" == *"eepromWaitReady"* ||
+	"$deferred_eeprom_service" != *"NVMCTRL_EEBUSY_bm"* ||
+	"$deferred_eeprom_service" != *"deferredWriteInProgress_ = true"* ]]; then
+	fail "foreground EEPROM service must start one byte without waiting for completion"
 fi
 if ! rg -q 'sine_period_steps <= MAX_SINE_PERIOD_STEPS' "$firmware_root/main.cpp"; then
 	fail "diagnostic sine generation must not write beyond its sample table"

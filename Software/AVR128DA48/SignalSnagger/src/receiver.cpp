@@ -40,6 +40,7 @@ Frequency_Hz g_frequency_low = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 Frequency_Hz g_frequency_med = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 Frequency_Hz g_frequency_hi = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 Frequency_Hz g_frequency_beacon = EEPROM_TX_80M_FREQUENCY_DEFAULT;
+volatile uint8_t g_cw_offset_setting = CW_OFFSET_DEFAULT_SETTING;
 
 Frequency_Hz g_channel_frequency[NUMBER_OF_FREQUENCY_CHANNELS];
 
@@ -53,9 +54,26 @@ bool rxSetFrequency(Frequency_Hz *freq, bool leaveClockOff)
 	/* The released implementation does not yet support leaving clocks off. */
 	(void)leaveClockOff;
 
-	if(!freq || !receiverFrequencyIsSupported(*freq)) return(true);
+	Frequency_Hz oscillatorFrequency = 0;
+	if(!freq || !receiverOscillatorFrequency(*freq, g_cw_offset_setting,
+		&oscillatorFrequency)) return(true);
 
-	return(si5351_set_quad_frequency(*freq) != ERROR_CODE_NO_ERROR);
+	return(si5351_set_quad_frequency(oscillatorFrequency) != ERROR_CODE_NO_ERROR);
+}
+
+bool rxSetCwOffsetSetting(uint8_t setting)
+{
+	Frequency_Hz oscillatorFrequency = 0;
+	if(!receiverOscillatorFrequency(g_rx_frequency, setting,
+		&oscillatorFrequency)) return true;
+	if(si5351_set_quad_frequency(oscillatorFrequency) != ERROR_CODE_NO_ERROR)
+	{
+		return true;
+	}
+
+	/* Commit only after the oscillator accepts the matching hardware state. */
+	g_cw_offset_setting = setting;
+	return false;
 }
 
 bool rxTuneMemoryStep(Frequency_Hz *receiverFrequency,
@@ -116,10 +134,13 @@ EC init_receiver(Frequency_Hz freq)
 EC init_receiver(void)
 {
 	EC code = ERROR_CODE_NO_ERROR;
+	Frequency_Hz oscillatorFrequency = 0;
 	g_rx_initialized = false;
 
-	/* Validate before touching the experimentally established clock setup. */
-	if(!receiverFrequencyIsSupported(g_rx_frequency))
+	/* Validate and translate before touching the experimentally established
+	 * clock setup. Stored frequencies remain operator-facing carrier values. */
+	if(!receiverOscillatorFrequency(g_rx_frequency, g_cw_offset_setting,
+		&oscillatorFrequency))
 	{
 		return(ERROR_CODE_SW_LOGIC_ERROR);
 	}
@@ -151,7 +172,7 @@ EC init_receiver(void)
 		return(code);
 	}
 
-	if((code = si5351_init_for_quad(g_rx_frequency)))
+	if((code = si5351_init_for_quad(oscillatorFrequency)))
 	{
 		return(code);
 	}

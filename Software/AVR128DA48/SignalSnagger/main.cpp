@@ -12,6 +12,8 @@
 #include "receiver.h"
 #include "morse.h"
 #include "adc.h"
+#include "audio_path.h"
+#include "battery_estimator.h"
 #include "Goertzel.h"
 #include "util.h"
 #include "binio.h"
@@ -28,9 +30,11 @@
 #include "memory_channels.h"
 #include "periodic_countdown.h"
 #include "receiver_frequency.h"
+#include "rf_gain_audio_cue.h"
 #include "sense_switches.h"
 #include "shared_state.h"
 #include "signal_score.h"
+#include "sound_settings.h"
 
 #include <cpuint.h>
 #include <ccp.h>
@@ -84,6 +88,13 @@ enum MenuState_t {
 	MenuSetmAh,
 	MenuSetBatThresh,
 	MenuClock,
+	MenuSounds,
+	MenuSetPushbuttonAudioFeedback,
+	MenuSetTurnTickAudioFeedback,
+	MenuSetGainIndicatorAudioFeedback,
+	MenuSettings,
+	MenuSetAudioFilter,
+	MenuSetCwOffset,
 	MenuAbout,
 	MenuInactivityPoweroff,
 	MenuNoHeadphones,
@@ -109,6 +120,21 @@ enum PrimaryMenu_t {
 	NUMBER_OF_MENUS,
 	INVALID_MENU
 	};
+
+enum SoundsMenu_t {
+	SOUND_BEEP,
+	SOUND_TURN_TICK,
+	SOUND_GAIN_INDICATOR,
+	NUMBER_OF_SOUND_MENUS,
+	INVALID_SOUND_MENU
+};
+
+enum SettingsMenu_t {
+	SETTING_AUDIO_FILTER,
+	SETTING_CW_OFFSET,
+	NUMBER_OF_SETTINGS_MENUS,
+	INVALID_SETTINGS_MENU
+};
 
 // #define NUMBER_OF_MENUS 5
 const char menuTitle[NUMBER_OF_MENUS][10] = {"MEMORIES", "BATTERY", "CLOCK", "EVENT", "SOUNDS", "SETTINGS", "ABOUT"};
@@ -176,8 +202,15 @@ static Awakened_t g_awakenedBy = POWER_UP_START;
 static const int16_t g_adcChannel2Slot[TOTAL_OF_ALL_ADC_CHANNELS] = { -1, -1, -1, -1, -1, -1, -1, 0 };
 static uint16_t g_lastConversionResult[NUMBER_OF_POLLED_ADC_CHANNELS] = { 0 };
 
+/* Battery-menu sampling is deliberately slower than the foreground loop so
+ * ADC noise does not continually redraw the estimated charge. */
+static const uint8_t BATTERY_SAMPLE_PERIOD_TICKS = 75; /* 4 Hz at 300 Hz. */
+static volatile uint8_t g_battery_sample_countdown = 0;
+
 extern Goertzel g_goertzel;
 uint16_t g_goertzel_rssi = 0;
+/* Foreground analysis recalibrates after its detector bins move. */
+static bool g_signal_analysis_reset_requested = false;
 
 /* These counters are private to TCB0_INT_vect. */
 static uint16_t g_leftsense_closed_time = 0;
@@ -212,6 +245,30 @@ static volatile bool g_suppress_cardioid_until_side_release = false;
 /* Values are 1..10; keeping this byte-sized makes ISR/foreground access atomic. */
 volatile uint8_t g_audio_gain = 4;
 volatile bool g_enable_audio_feedthrough = true;
+volatile AudioFilterMode g_audio_filter_mode = AUDIO_FILTER_DEFAULT_MODE;
+/* Foreground restores this snapshot when live filter preview is cancelled. */
+static AudioFilterMode g_audio_filter_edit_original = AUDIO_FILTER_DEFAULT_MODE;
+static bool g_audio_filter_edit_active = false;
+/* Offset previews retune immediately; cancellation restores this coherent
+ * oscillator, detector, and filter-center snapshot. */
+static uint8_t g_cw_offset_edit_original = CW_OFFSET_DEFAULT_SETTING;
+static bool g_cw_offset_edit_active = false;
+volatile bool g_pushbutton_audio_feedback_enabled =
+	PUSHBUTTON_AUDIO_FEEDBACK_DEFAULT;
+/* Foreground restores this snapshot when live feedback preview is cancelled. */
+static bool g_pushbutton_audio_feedback_edit_original =
+	PUSHBUTTON_AUDIO_FEEDBACK_DEFAULT;
+static bool g_pushbutton_audio_feedback_edit_active = false;
+volatile bool g_turn_tick_audio_feedback_enabled =
+	TURN_TICK_AUDIO_FEEDBACK_DEFAULT;
+static bool g_turn_tick_audio_feedback_edit_original =
+	TURN_TICK_AUDIO_FEEDBACK_DEFAULT;
+static bool g_turn_tick_audio_feedback_edit_active = false;
+volatile bool g_gain_indicator_audio_feedback_enabled =
+	GAIN_INDICATOR_AUDIO_FEEDBACK_DEFAULT;
+static bool g_gain_indicator_audio_feedback_edit_original =
+	GAIN_INDICATOR_AUDIO_FEEDBACK_DEFAULT;
+static bool g_gain_indicator_audio_feedback_edit_active = false;
 
 Display display = Display();
 leds LEDS = leds();
@@ -225,41 +282,71 @@ static CircularUintBuff g_rssi_buff(HIGH_WATER_BUFF_SIZE);
 
 EepromManager EEPromMgr;
 
-#define Goertzel_N 209
-#define SAMPLE_RATE 96154 /* 480965 12080  13868 */
-const int N = Goertzel_N;
-//const float threshold = 500000. * (Goertzel_N / 100);
-const float sampling_freq = SAMPLE_RATE;
-const float pitch_frequencies[3] = { 600., 700., 800.}; /* should be an integer multiple of SAMPLING_RATE/N (SAMPLE_RATE / Goertzel_N) */
 volatile uint16_t g_rssi_countdown = 100;
 
 volatile bool g_audio_test = false;
+static AudioPathProcessor g_audio_path;
+static volatile int16_t g_pending_audio_sample = 0;
+static volatile bool g_audio_frame_ready = false;
+/* Debugger-visible deadline evidence: nonzero means 12 kHz DSP lost a frame. */
+static volatile uint16_t g_audio_dropped_frames = 0;
 
 /* VREF start-up time */
 #define VREF_STARTUP_TIME       (50)
-/* Mask needed to get the 2 LSb for DAC Data Register */
-#define LSB_MASK                (0x03)
 /* Number of samples for a sine wave period */
 #define SINE_PERIOD_STEPS       (25)
 #define MAX_SINE_PERIOD_STEPS   (201)
-/* Sine wave amplitude */
-#define SINE_AMPLITUDE          (1) // (511)
-/* Sine wave DC offset */
-#define SINE_DC_OFFSET          (2048) //(512)
-/* Frequency of the sine wave */
-// #define SINE_FREQ               (200)
-// /* Step delay for the loop */
-// #define STEP_DELAY_TIME         1./13868.
+#define SINE_AMPLITUDE          (256)
 
 static void sineWaveInit(int sine_period_steps);
+static void startAudioFlow(void);
+static void commitMenuEditsIfActive(void);
+static void rollbackMenuEditsIfActive(void);
 static void acceptOperationalFrequencyUpdate(uint8_t* displayedMemory,
 	Frequency_Hz* displayedFrequency);
+static bool tuneReceiverTo(Frequency_Hz carrierFrequency);
+static void configureCwDetector(void);
+static bool applyCwOffsetSetting(uint8_t setting);
 
 /* Buffer to store the sine wave samples */
-uint16_t sineWave[MAX_SINE_PERIOD_STEPS];
+int16_t sineWave[MAX_SINE_PERIOD_STEPS];
 static volatile uint8_t g_sine_period_steps = 25;
 static volatile uint16_t g_beep = 0;
 static volatile uint8_t g_tick = 0;
+static volatile uint8_t g_requested_rf_gain_cue = RF_GAIN_CUE_NO_REQUEST;
+static RfGainAudioCue g_rf_gain_audio_cue;
+
+/* User-interface sounds have independent settings; safety alerts remain
+ * audible because they use separate feedback paths. */
+static void schedulePushbuttonAudioFeedback(void)
+{
+	if (g_pushbutton_audio_feedback_enabled)
+	{
+		g_beep = 1000;
+	}
+}
+
+static void scheduleTurnTickAudioFeedback(void)
+{
+	if (g_turn_tick_audio_feedback_enabled)
+	{
+		g_tick++;
+	}
+}
+
+static void scheduleRfGainAudioFeedback(uint8_t displayedGain)
+{
+	/* RF-gain detents retain the normal tick while the delayed value cue can be
+	 * independently silenced for operators who do not need eyes-free feedback. */
+	scheduleTurnTickAudioFeedback();
+	if (g_gain_indicator_audio_feedback_enabled &&
+		displayedGain <= RF_GAIN_CUE_MAX_DISPLAYED_GAIN)
+	{
+		/* The request is one byte and is consumed only by the audio ISR. A newer
+		 * detent safely replaces an older request before it is consumed. */
+		g_requested_rf_gain_cue = displayedGain;
+	}
+}
 
 
 /***********************************************************************
@@ -314,92 +401,91 @@ ADC Result Ready Interrupt
 */
 ISR(ADC0_RESRDY_vect)
 {
-	uint8_t x = ADC0.INTFLAGS;
-	
-	if(x & ADC_RESRDY_bm)
+	const uint16_t sample = ADC0.RES; /* Reading RES clears RESRDY. */
+	int16_t decimatedSample = 0;
+	if (g_audio_path.CaptureAdcSample(sample, &decimatedSample))
 	{
-// 		static uint8_t indexSingleConversionInProcess = NO_ADC_SELECTED;
-		static uint8_t sineIndex = 0;
-		uint16_t sample = ADC0.RES;
-		uint16_t result = 0;
-// 		bool passAudio = true;
-
-		if(g_enable_audio_feedthrough)
+		if (g_audio_frame_ready)
 		{
-			result = sample;
-		}
-				
-// 		if(g_active_ADC_sample != ADC_I_AMPED)
-// 		{			
-// 			if(indexSingleConversionInProcess == NO_ADC_SELECTED) /* set up to take a single sample of another channel */
-// 			{
-// 				ADC0.MUXPOS = indexSingleConversionInProcess;
-// 				indexSingleConversionInProcess = g_active_ADC_sample;
-// 				ADC0.CTRLC = ADC_PRESC_DIV2_gc;
-// 				ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
-// 					| ADC_RESSEL_12BIT_gc      /* 12-bit mode */
-// 					| ADC_FREERUN_bm;          /* Enable Free-Run mode */
-// 			}
-// 			else /* read result of a single sample of another channel */
-// 			{
-// 					int16_t slot = g_adcChannel2Slot[indexSingleConversionInProcess];
-// 					g_lastConversionResult[slot] = result;
-// 					g_adcUpdated[slot] = true;
-// 					ADC0.MUXPOS = ADC_I_AMPED;
-// 					g_active_ADC_sample = ADC_I_AMPED;
-// 					ADC0.CTRLC = ADC_PRESC_DIV128_gc;
-// 					ADC0.CTRLA = ADC_ENABLE_bm /* ADC Enable: enabled */
-// 					| ADC_RESSEL_10BIT_gc      /* 10-bit mode */
-// 					| ADC_FREERUN_bm;          /* Enable Free-Run mode */
-//					indexSingleConversionInProcess = NO_ADC_SELECTED;
-// 					passAudio = false;
-// 			}
-// 		}
-		
- 		if(g_audio_test)
-		{
-			if(g_sine_period_steps)
-			{
-				if(g_beep)
-				{
-					result += sineWave[sineIndex++];
-					if(sineIndex >= g_sine_period_steps) sineIndex = 0;
-					g_beep--;
-				}
-				DAC0_setVal(result);
-				g_goertzel.DataPoint(result);
-			}
+			g_audio_dropped_frames++;
 		}
 		else
 		{
-			if(g_beep)
-			{
-				result += sineWave[sineIndex++];
-				if(sineIndex >= g_sine_period_steps) sineIndex = 0;
-				g_beep--;
-			}
-			else if(g_tick)
-			{
-				g_tick--;
-				result = 0;
-			}
-		
-			if(g_audio_gain > 4)
-			{
-				result = result << (g_audio_gain - 4);
-			}
-			else
-			{
-				result = result >> (4 - g_audio_gain);
-			}
-		
-			DAC0_setVal(result);
-			g_goertzel.DataPoint(sample);
-// 				PORTC_toggle_pin_level(5);
+			g_pending_audio_sample = decimatedSample;
+			g_audio_frame_ready = true;
+			ADC0_scheduleAudioFrame();
 		}
 	}
-	
-	ADC0.INTFLAGS = (ADC_RESRDY_bm | ADC_WCMP_bm);
+}
+
+/* CPUINT level 1 lets the ADC preempt this level-0 ISR without globally
+ * enabling same-level UI interrupts, which would add DAC timing jitter. */
+ISR(TCA1_CMP0_vect)
+{
+	static uint8_t sineIndex = 0;
+	ADC0_audioFrameHandled();
+	if (!g_audio_frame_ready)
+	{
+		return;
+	}
+
+	const int16_t decimatedSample = g_pending_audio_sample;
+	g_audio_frame_ready = false;
+	int16_t injectedSample = 0;
+	bool feedthrough = g_enable_audio_feedthrough && !g_audio_test;
+	const uint8_t gain = g_audio_test ? AUDIO_NEUTRAL_GAIN : g_audio_gain;
+	const uint8_t requestedRfGainCue = g_requested_rf_gain_cue;
+	if (!g_gain_indicator_audio_feedback_enabled)
+	{
+		/* Cancel in the owning ISR so foreground menu edits never race the cue
+		 * sequencer's multi-byte frame counters. */
+		g_requested_rf_gain_cue = RF_GAIN_CUE_NO_REQUEST;
+		g_rf_gain_audio_cue.Cancel();
+	}
+	else if (requestedRfGainCue != RF_GAIN_CUE_NO_REQUEST)
+	{
+		g_requested_rf_gain_cue = RF_GAIN_CUE_NO_REQUEST;
+		g_rf_gain_audio_cue.Schedule(requestedRfGainCue);
+	}
+
+	/* Tone/tick durations are counted at the 12 ksample/s output rate. */
+	if (g_beep && g_sine_period_steps)
+	{
+		injectedSample = sineWave[sineIndex++];
+		if(sineIndex >= g_sine_period_steps) sineIndex = 0;
+		g_beep--;
+	}
+	else
+	{
+		bool gainCueToneStarted = false;
+		if (g_rf_gain_audio_cue.NextFrame(&gainCueToneStarted) &&
+			g_sine_period_steps)
+		{
+			/* Every demonstrated element spans an integer number of 480 Hz cycles;
+			 * restarting at phase zero keeps each edge free of waveform steps. */
+			if (gainCueToneStarted)
+			{
+				sineIndex = 0;
+			}
+			injectedSample = sineWave[sineIndex++];
+			if(sineIndex >= g_sine_period_steps) sineIndex = 0;
+		}
+		else if (g_tick)
+		{
+			g_tick--;
+			feedthrough = false;
+		}
+	}
+
+	AudioFrame frame;
+	const uint8_t cwOffsetSetting = g_cw_offset_setting;
+	g_audio_path.ProcessFrame(decimatedSample, gain, feedthrough,
+		injectedSample, g_audio_filter_mode, cwOffsetSetting, &frame);
+	DAC0_setVal(frame.dacValue);
+	if (cwOffsetSetting != CW_OFFSET_ZERO_SETTING)
+	{
+		g_goertzel.DataPoint(frame.analysisSample);
+	}
 }
 
 
@@ -424,6 +510,7 @@ ISR(TCB0_INT_vect)
 		static uint16_t rotaryNoMotionCountdown = 0;
 		
 		if(g_rssi_countdown) g_rssi_countdown--;
+		if(g_battery_sample_countdown) g_battery_sample_countdown--;
 		
 		if(periodicCountdownTick(&switchScanTicksRemaining, 6))
 		{
@@ -529,7 +616,7 @@ ISR(TCB0_INT_vect)
 				}
 				else if(g_doublesense_closed_time)
 				{
-					g_beep = 1000;
+					schedulePushbuttonAudioFeedback();
 					g_doublesense_closed_time = 0;
 					doublesenseAction = SwitchRelease;
 				}
@@ -539,7 +626,7 @@ ISR(TCB0_INT_vect)
 
 					if(leftsenseAction == SwitchRelease)
 					{
-						g_beep = 1000;
+						schedulePushbuttonAudioFeedback();
 						g_leftsense_closed_time = 0;
 						leftsenseLongPressEnabled = true;
 					}
@@ -550,7 +637,7 @@ ISR(TCB0_INT_vect)
 					
 					if(rightsenseAction == SwitchRelease)
 					{
-						g_beep = 1000;
+						schedulePushbuttonAudioFeedback();
 						g_rightsense_closed_time = 0;
 						rightsenseLongPressEnabled = true;
 					}
@@ -569,7 +656,7 @@ ISR(TCB0_INT_vect)
 					}
 					else
 					{
-						g_beep = 1000;
+						schedulePushbuttonAudioFeedback();
 						g_encoder_closed_time = 0;
  						encoderLongPressEnabled = true;
 						encoderswitchAction = SwitchRelease;
@@ -899,12 +986,74 @@ static void sineWaveInit(int sine_period_steps)
 	
 		for(i = 0; i < sine_period_steps; i++)
 		{
-			sineWave[i] = SINE_DC_OFFSET + SINE_AMPLITUDE * sin(2 * M_PI * i / sine_period_steps);
+			sineWave[i] = (int16_t)(SINE_AMPLITUDE *
+				sin(2 * M_PI * i / sine_period_steps));
 		}
 	
 		g_sine_period_steps = sine_period_steps;
 		g_audio_test = hold_at;
 	}
+}
+
+static bool tuneReceiverTo(Frequency_Hz carrierFrequency)
+{
+	if (rxSetFrequency(&carrierFrequency, false))
+	{
+		g_hardware_error |= (uint16_t)HARDWARE_NO_SI5351;
+		return false;
+	}
+	g_rx_frequency = carrierFrequency;
+	return true;
+}
+
+static void configureCwDetector(void)
+{
+	const uint16_t centerHz = cwOffsetHz(g_cw_offset_setting);
+	g_goertzel_rssi = 0;
+	g_signal_analysis_reset_requested = true;
+	if (centerHz == 0)
+	{
+		/* The ISR stops publishing samples before this foreground reset, avoiding
+		 * an unusable DC detector and clearing any stale tuning indication. */
+		g_goertzel.Flush();
+		return;
+	}
+
+	const float targets[MAX_GOERTZEL_TARGETS] = {
+		(float)(centerHz - AUDIO_CW_DETECTOR_SPACING_HZ),
+		(float)centerHz,
+		(float)(centerHz + AUDIO_CW_DETECTOR_SPACING_HZ)
+	};
+	g_goertzel.SetTargetFrequencies(targets, MAX_GOERTZEL_TARGETS);
+	/* A completed block may belong to the previous center frequency. Discard it;
+	 * the ISR-owned capture buffer can continue safely because it stores raw data. */
+	if (g_goertzel.SamplesReady())
+	{
+		g_goertzel.ReleaseSamples();
+	}
+}
+
+static bool applyCwOffsetSetting(uint8_t setting)
+{
+	if (!cwOffsetSettingIsValid(setting) || rxSetCwOffsetSetting(setting))
+	{
+		g_hardware_error |= (uint16_t)HARDWARE_NO_SI5351;
+		return false;
+	}
+	configureCwDetector();
+	return true;
+}
+
+static void startAudioFlow(void)
+{
+	g_audio_frame_ready = false;
+	g_audio_dropped_frames = 0;
+	g_requested_rf_gain_cue = RF_GAIN_CUE_NO_REQUEST;
+	g_rf_gain_audio_cue.Cancel();
+	g_audio_path.Reset(g_audio_filter_mode, g_cw_offset_setting);
+	g_goertzel.Flush();
+	ADC0.MUXPOS = ADC_I_AMPED;
+	ADC0_SYSTEM_init(ADC12BIT, true);
 }
 
 static void acceptOperationalFrequencyUpdate(uint8_t* displayedMemory,
@@ -913,10 +1062,9 @@ static void acceptOperationalFrequencyUpdate(uint8_t* displayedMemory,
 	g_suppress_cardioid_until_side_release = true;
 	g_frequency_updates_enabled = false;
 
-	/* Acceptance persists tuning without coupling it to a full-screen refresh. */
-	EEPromMgr.updateEEPROMVar(Frequency, (void*)&g_rx_frequency);
-	EEPromMgr.updateEEPROMVar(Frequency_Mode, (void*)&g_frequency_mode);
-	EEPromMgr.updateEEPROMVar(Active_Memory, (void*)&g_active_memory);
+	/* EEPROM persistence is serviced one byte at a time from the foreground loop
+	 * so acceptance cannot stall the ADC audio interrupt. */
+	EEPromMgr.queueTuningPersistence(g_rx_frequency, g_frequency_mode, g_active_memory);
 
 	if(g_frequency_mode == MODE_MEMORY)
 	{
@@ -930,6 +1078,9 @@ static void acceptOperationalFrequencyUpdate(uint8_t* displayedMemory,
 
 void powerdown(void)
 {
+	/* Power loss is not a normal sense-button exit. Restore all live previews
+	 * before the general EEPROM save records the receiver state. */
+	rollbackMenuEditsIfActive();
 	EEPromMgr.saveAllEEPROM();
 	PORTA_set_pin_level(PWR_5V_ENABLE, LOW);	
 	PORTA_set_pin_level(POWER_ENABLE, LOW);
@@ -986,6 +1137,92 @@ MenuState_t setMenu(MenuState_t menu)
 	return(menuStateTrace[menuIndex]);
 }
 
+static void commitMenuEditsIfActive(void)
+{
+	if (g_audio_filter_edit_active)
+	{
+		g_audio_filter_edit_original = g_audio_filter_mode;
+		uint8_t storedMode = (uint8_t)g_audio_filter_mode;
+		EEPromMgr.updateEEPROMVar(Audio_Filter_Mode, &storedMode);
+		g_audio_filter_edit_active = false;
+	}
+
+	if (g_cw_offset_edit_active)
+	{
+		g_cw_offset_edit_original = g_cw_offset_setting;
+		uint8_t storedSetting = g_cw_offset_setting;
+		EEPromMgr.updateEEPROMVar(Cw_Offset_Setting, &storedSetting);
+		g_cw_offset_edit_active = false;
+	}
+
+	if (g_pushbutton_audio_feedback_edit_active)
+	{
+		g_pushbutton_audio_feedback_edit_original =
+			g_pushbutton_audio_feedback_enabled;
+		uint8_t storedSetting = pushbuttonAudioFeedbackToStored(
+			g_pushbutton_audio_feedback_enabled);
+		EEPromMgr.updateEEPROMVar(Pushbutton_Audio_Feedback, &storedSetting);
+		g_pushbutton_audio_feedback_edit_active = false;
+	}
+
+	if (g_turn_tick_audio_feedback_edit_active)
+	{
+		g_turn_tick_audio_feedback_edit_original =
+			g_turn_tick_audio_feedback_enabled;
+		uint8_t storedSetting = turnTickAudioFeedbackToStored(
+			g_turn_tick_audio_feedback_enabled);
+		EEPromMgr.updateEEPROMVar(Turn_Tick_Audio_Feedback, &storedSetting);
+		g_turn_tick_audio_feedback_edit_active = false;
+	}
+
+	if (g_gain_indicator_audio_feedback_edit_active)
+	{
+		g_gain_indicator_audio_feedback_edit_original =
+			g_gain_indicator_audio_feedback_enabled;
+		uint8_t storedSetting = gainIndicatorAudioFeedbackToStored(
+			g_gain_indicator_audio_feedback_enabled);
+		EEPromMgr.updateEEPROMVar(Gain_Indicator_Audio_Feedback,
+			&storedSetting);
+		g_gain_indicator_audio_feedback_edit_active = false;
+	}
+}
+
+static void rollbackMenuEditsIfActive(void)
+{
+	if (g_audio_filter_edit_active)
+	{
+		g_audio_filter_mode = g_audio_filter_edit_original;
+		g_audio_filter_edit_active = false;
+	}
+
+	if (g_cw_offset_edit_active)
+	{
+		(void)applyCwOffsetSetting(g_cw_offset_edit_original);
+		g_cw_offset_edit_active = false;
+	}
+
+	if (g_pushbutton_audio_feedback_edit_active)
+	{
+		g_pushbutton_audio_feedback_enabled =
+			g_pushbutton_audio_feedback_edit_original;
+		g_pushbutton_audio_feedback_edit_active = false;
+	}
+
+	if (g_turn_tick_audio_feedback_edit_active)
+	{
+		g_turn_tick_audio_feedback_enabled =
+			g_turn_tick_audio_feedback_edit_original;
+		g_turn_tick_audio_feedback_edit_active = false;
+	}
+
+	if (g_gain_indicator_audio_feedback_edit_active)
+	{
+		g_gain_indicator_audio_feedback_enabled =
+			g_gain_indicator_audio_feedback_edit_original;
+		g_gain_indicator_audio_feedback_edit_active = false;
+	}
+}
+
 int main(void)
 {
 	sineWaveInit(25);
@@ -996,11 +1233,25 @@ int main(void)
 	
 	PrimaryMenu_t hold_menuRow = MEMORIES;
 	PrimaryMenu_t menuRow = MEMORIES;
+	SoundsMenu_t hold_soundMenuRow = INVALID_SOUND_MENU;
+	SoundsMenu_t soundMenuRow = SOUND_BEEP;
+	SettingsMenu_t hold_settingsMenuRow = INVALID_SETTINGS_MENU;
+	SettingsMenu_t settingsMenuRow = SETTING_AUDIO_FILTER;
 
 	Frequency_Hz hold_rx_frequency = 0;
 	uint8_t hold_rf_gain_setting = 255;
 //	uint16_t hold_assi_result = 0;
 	uint8_t hold_audio_gain = 0;
+	AudioFilterMode hold_audio_filter_mode = AUDIO_FILTER_MODE_INVALID;
+	uint8_t hold_cw_offset_setting = UINT8_MAX;
+	uint8_t hold_pushbutton_audio_feedback = 0xff;
+	uint8_t hold_turn_tick_audio_feedback = 0xff;
+	uint8_t hold_gain_indicator_audio_feedback = 0xff;
+	char hold_battery_row0[13] = "";
+	char hold_battery_row2[13] = "";
+	char hold_battery_row3[13] = "";
+	float filtered_battery_adc_counts = 0.0f;
+	bool battery_filter_initialized = false;
 	uint16_t hold_goertzel_rssi = 0;
 	bool hold_headphone_state = true;
 	bool refresh_display = true;
@@ -1020,6 +1271,16 @@ int main(void)
 	
 	EEPromMgr.initializeEEPROMVars();
 	EEPromMgr.readNonVols();
+	configureCwDetector();
+
+	/* Switch scanning starts with the system timers, before EEPROM settings are
+	 * restored. If the startup debounce pass queued a release beep while the
+	 * default was enabled, honor the restored disabled setting by discarding
+	 * that stale UI tone. Safety alerts are scheduled later and are unaffected. */
+	if (!g_pushbutton_audio_feedback_enabled)
+	{
+		atomicWriteU16(&g_beep, 0);
+	}
 
 	ec = init_receiver(g_rx_frequency);
 	
@@ -1108,13 +1369,13 @@ int main(void)
 	LEDS.blink(LEDS_OFF);
 	g_text_buff.putString(g_tempStr);
 	
-	/* Start audio flow */
-	ADC0.MUXPOS = ADC_I_AMPED; 
-	ADC0_SYSTEM_init(ADC12BIT, true);
- 	ADC0_startConversion();
+	/* Start the timer/event-driven audio flow. */
+	startAudioFlow();
 
 	while (1) 
 	{
+		EEPromMgr.serviceQueuedWrites();
+
 		if(!g_display_active_countdown)
 		{
 			MenuState_t currentMenu = setMenu(MenuGetCurrent);
@@ -1122,14 +1383,26 @@ int main(void)
 			if(refresh_display || (currentMenu != hold_menuState))
 			{
 				refresh_display = false;
+				const bool currentIsBatteryMenu =
+					(currentMenu == MenuBattery) || (currentMenu == MenuSetmAh) ||
+					(currentMenu == MenuSetBatThresh);
+				const bool previousWasBatteryMenu =
+					(hold_menuState == MenuBattery) || (hold_menuState == MenuSetmAh) ||
+					(hold_menuState == MenuSetBatThresh);
+				if(currentIsBatteryMenu)
+				{
+					g_battery_sample_countdown = 0;
+					if(!previousWasBatteryMenu)
+					{
+						battery_filter_initialized = false;
+					}
+				}
 				
-				if((hold_menuState == MenuBattery) || (hold_menuState == MenuSetmAh) || (hold_menuState == MenuSetBatThresh))
+				if(previousWasBatteryMenu)
 				{
 					if((currentMenu != MenuBattery) && (currentMenu != MenuSetmAh) && (currentMenu != MenuSetBatThresh))
 					{
-						ADC0.MUXPOS = ADC_I_AMPED; 
-						ADC0_SYSTEM_init(ADC12BIT, true);
- 						ADC0_startConversion();
+						startAudioFlow();
 					}
 				}
 				
@@ -1138,9 +1411,19 @@ int main(void)
 				hold_rx_frequency = 0; /* force update */
 				hold_rf_gain_setting = 0xff; /* force update */
 				hold_audio_gain = 0xff; /* force update */
+				hold_audio_filter_mode = AUDIO_FILTER_MODE_INVALID; /* force update */
+				hold_cw_offset_setting = UINT8_MAX; /* force update */
+				hold_pushbutton_audio_feedback = 0xff; /* force update */
+				hold_turn_tick_audio_feedback = 0xff; /* force update */
+				hold_gain_indicator_audio_feedback = 0xff; /* force update */
 				hold_activeMemory = 0xff; /* force update */
 				hold_goertzel_rssi = 0; /* force update */
 				hold_menuRow = INVALID_MENU; /* force update */
+				hold_soundMenuRow = INVALID_SOUND_MENU; /* force update */
+				hold_settingsMenuRow = INVALID_SETTINGS_MENU; /* force update */
+				hold_battery_row0[0] = '\0'; /* force update */
+				hold_battery_row2[0] = '\0'; /* force update */
+				hold_battery_row3[0] = '\0'; /* force update */
 				
 				if(currentMenu == MenuOperational)
 				{
@@ -1231,52 +1514,177 @@ int main(void)
 					}									
 				}
 				break;
+
+				case MenuSounds:
+				case MenuSetPushbuttonAudioFeedback:
+				case MenuSetTurnTickAudioFeedback:
+				case MenuSetGainIndicatorAudioFeedback:
+				{
+					const bool showGainIndicator =
+						currentMenu == MenuSetGainIndicatorAudioFeedback ||
+						(currentMenu == MenuSounds &&
+							soundMenuRow == SOUND_GAIN_INDICATOR);
+					const bool showTurnTick =
+						currentMenu == MenuSetTurnTickAudioFeedback ||
+						(currentMenu == MenuSounds &&
+							soundMenuRow == SOUND_TURN_TICK);
+					const uint8_t enabled = showGainIndicator
+						? (g_gain_indicator_audio_feedback_enabled ? 1U : 0U)
+						: (showTurnTick
+							? (g_turn_tick_audio_feedback_enabled ? 1U : 0U)
+							: (g_pushbutton_audio_feedback_enabled ? 1U : 0U));
+					uint8_t* holdEnabled = showGainIndicator
+						? &hold_gain_indicator_audio_feedback
+						: (showTurnTick
+							? &hold_turn_tick_audio_feedback
+							: &hold_pushbutton_audio_feedback);
+					if (hold_soundMenuRow != soundMenuRow ||
+						*holdEnabled != enabled)
+					{
+						hold_soundMenuRow = soundMenuRow;
+						*holdEnabled = enabled;
+						g_text_buff.putString(showGainIndicator
+							? "00Gain Indic"
+							: (showTurnTick ? "00Turn Tick " : "00Beep      "));
+						g_text_buff.putString("10          ");
+						const char selection = currentMenu == MenuSounds ? ' ' : '>';
+						snprintf(g_tempStr, 13, "20%c%-3s      ", selection,
+							enabled ? "ON" : "OFF");
+						g_text_buff.putString(g_tempStr);
+					}
+				}
+				break;
+
+				case MenuSettings:
+				case MenuSetAudioFilter:
+				case MenuSetCwOffset:
+				{
+					const bool showAudioFilter = currentMenu == MenuSetAudioFilter ||
+						(currentMenu == MenuSettings &&
+							settingsMenuRow == SETTING_AUDIO_FILTER);
+					const AudioFilterMode mode = g_audio_filter_mode;
+					const uint8_t offsetSetting = g_cw_offset_setting;
+					if (hold_settingsMenuRow != settingsMenuRow ||
+						hold_audio_filter_mode != mode ||
+						hold_cw_offset_setting != offsetSetting)
+					{
+						hold_settingsMenuRow = settingsMenuRow;
+						hold_audio_filter_mode = mode;
+						hold_cw_offset_setting = offsetSetting;
+						g_text_buff.putString(showAudioFilter
+							? "00Audio Filt" : "00CW Offset ");
+						g_text_buff.putString("10          ");
+
+						const char selection = currentMenu == MenuSettings ? ' ' : '>';
+						if (showAudioFilter)
+						{
+							const uint16_t bandwidth = audioFilterBandwidthHz(mode);
+							const uint16_t centerHz = cwOffsetHz(offsetSetting);
+							if (bandwidth)
+							{
+								snprintf(g_tempStr, 13, "20%c%3u Hz", selection,
+									(unsigned int)bandwidth);
+								g_text_buff.putString(g_tempStr);
+								if (centerHz)
+								{
+									snprintf(g_tempStr, 13, "30%u-%uHz",
+										(unsigned int)(centerHz - bandwidth / 2U),
+										(unsigned int)(centerHz + bandwidth / 2U));
+									g_text_buff.putString(g_tempStr);
+								}
+								else
+								{
+									g_text_buff.putString("30ZERO BYP  ");
+								}
+							}
+							else
+							{
+								snprintf(g_tempStr, 13, "20%cOFF     ", selection);
+								g_text_buff.putString(g_tempStr);
+								g_text_buff.putString("30BYPASS    ");
+							}
+						}
+						else
+						{
+							snprintf(g_tempStr, 13, "20%c%4u Hz", selection,
+								(unsigned int)cwOffsetHz(offsetSetting));
+							g_text_buff.putString(g_tempStr);
+							g_text_buff.putString(offsetSetting == CW_OFFSET_ZERO_SETTING
+								? "30ZERO BEAT " : "30HIGH-SIDE ");
+						}
+					}
+				}
+				break;
 				
 				case MenuSetBatThresh:
 				case MenuSetmAh:
 				case MenuBattery:
 				{
 					uint16_t result = 0;
-					static float filtered_float = 0.;
-		
-						ADC0_startConversion();
-						if(!ADC0_waitForConversion())
-						{
-							break;
-						}
-						result = ADC0.RES;
-						
-						if(filtered_float < 1.)
-						{
-							filtered_float = (float)result;
-						}
-						else
-						{
-							filtered_float = filtered_float * 10. + (float)result;
-						}
-		
-					filtered_float /= 11.;
-
-					snprintf(g_tempStr, 13, "00Bat: %sV", batteryVoltsString(true, &filtered_float));
-					g_text_buff.putString(g_tempStr);
-					
-					if(currentMenu == MenuBattery)
+					if(g_battery_sample_countdown)
 					{
-						;
-						snprintf(g_tempStr, 13, "20pcnt: %s  ", batteryPercentString(filtered_float, null));
-						g_text_buff.putString(g_tempStr);
-						snprintf(g_tempStr, 13, "30min: %s  ", batteryTimeLeftString(&filtered_float));
+						break;
 					}
-					else if(currentMenu == MenuSetmAh)
+					g_battery_sample_countdown = BATTERY_SAMPLE_PERIOD_TICKS;
+
+					ADC0_startConversion();
+					if(!ADC0_waitForConversion())
 					{
-						snprintf(g_tempStr, 13, "20> %d mAh  ",  ((uint8_t)g_battery_capacity + 1)*50);						
+						break;
+					}
+					result = ADC0.RES;
+
+					if(!battery_filter_initialized)
+					{
+						filtered_battery_adc_counts = (float)result;
+						battery_filter_initialized = true;
 					}
 					else
 					{
-						snprintf(g_tempStr, 13, "20thre> %d%%  ", g_battery_warning_threshold);
+						/* About a one-second smoothing window at the 4 Hz sample rate. */
+						filtered_battery_adc_counts =
+							(3.0f * filtered_battery_adc_counts + (float)result) / 4.0f;
+					}
+
+					snprintf(g_tempStr, 13, "00Bat: %sV",
+						batteryVoltsString(true, &filtered_battery_adc_counts));
+					if(strcmp(g_tempStr, hold_battery_row0) != 0)
+					{
+						strcpy(hold_battery_row0, g_tempStr);
+						g_text_buff.putString(g_tempStr);
 					}
 					
-					g_text_buff.putString(g_tempStr);
+					if(currentMenu == MenuBattery)
+					{
+						snprintf(g_tempStr, 13, "20pcnt: %s  ",
+							batteryPercentString(filtered_battery_adc_counts, null));
+						if(strcmp(g_tempStr, hold_battery_row2) != 0)
+						{
+							strcpy(hold_battery_row2, g_tempStr);
+							g_text_buff.putString(g_tempStr);
+						}
+						snprintf(g_tempStr, 13, "30min: %s  ",
+							batteryTimeLeftString(&filtered_battery_adc_counts));
+					}
+					else if(currentMenu == MenuSetmAh)
+					{
+						snprintf(g_tempStr, 13, "20>%5u mAh",
+							(unsigned int)(((uint8_t)g_battery_capacity + 1U) * 50U));
+					}
+					else
+					{
+						snprintf(g_tempStr, 13, "20thre>%3u%% ",
+							(unsigned int)g_battery_warning_threshold);
+					}
+					
+					if(strcmp(g_tempStr, currentMenu == MenuBattery
+						? hold_battery_row3 : hold_battery_row2) != 0)
+					{
+						char* holdRow = currentMenu == MenuBattery
+							? hold_battery_row3 : hold_battery_row2;
+						strcpy(holdRow, g_tempStr);
+						g_text_buff.putString(g_tempStr);
+					}
 				}
 				break;
 				
@@ -1429,6 +1837,7 @@ int main(void)
 			
 			if(!hold_headphone_state)
 			{
+				rollbackMenuEditsIfActive();
 				if(setMenu(MenuGetCurrent) != MenuNoHeadphones)
 				{
 					setMenu(MenuNoHeadphones);
@@ -1453,6 +1862,7 @@ int main(void)
 			{
 				if(setMenu(MenuGetCurrent) != MenuInactivityPoweroff)
 				{
+					rollbackMenuEditsIfActive();
 					setMenu(MenuInactivityPoweroff);
 				}
 				else if(!g_text_buff.size())
@@ -1500,6 +1910,7 @@ int main(void)
 				}
 				else
 				{
+					commitMenuEditsIfActive();
 					setMenu(MenuOperational);
 				}
 			}
@@ -1536,11 +1947,12 @@ int main(void)
 						}
 						else if(g_frequency_mode == MODE_MEMORY)
 						{
-							g_rx_frequency = g_channel_frequency[g_active_memory];
-							si5351_set_quad_frequency(g_rx_frequency);					
+							(void)tuneReceiverTo(
+								g_channel_frequency[g_active_memory]);
 						}
 					}
 				
+					commitMenuEditsIfActive();
 					setMenu(MenuBackOne);
 				}
 				else
@@ -1576,11 +1988,12 @@ int main(void)
 						}
 						else if(g_frequency_mode == MODE_MEMORY)
 						{
-							g_rx_frequency = g_channel_frequency[g_active_memory];
-							si5351_set_quad_frequency(g_rx_frequency);					
+							(void)tuneReceiverTo(
+								g_channel_frequency[g_active_memory]);
 						}
 					}
 				
+					commitMenuEditsIfActive();
 					setMenu(MenuOperational);
 				}
 				else
@@ -1629,11 +2042,12 @@ int main(void)
 						}
 						else if(g_frequency_mode == MODE_MEMORY)
 						{
-							g_rx_frequency = g_channel_frequency[g_active_memory];
-							si5351_set_quad_frequency(g_rx_frequency);					
+							(void)tuneReceiverTo(
+								g_channel_frequency[g_active_memory]);
 						}
 					}
 				
+					commitMenuEditsIfActive();
 					setMenu(MenuBackOne);
 				}
 				else
@@ -1669,11 +2083,12 @@ int main(void)
 						}
 						else if(g_frequency_mode == MODE_MEMORY)
 						{
-							g_rx_frequency = g_channel_frequency[g_active_memory];
-							si5351_set_quad_frequency(g_rx_frequency);					
+							(void)tuneReceiverTo(
+								g_channel_frequency[g_active_memory]);
 						}
 					}
 				
+					commitMenuEditsIfActive();
 					setMenu(MenuOperational);
 				}
 				else
@@ -1696,9 +2111,10 @@ int main(void)
 				{
 					if((g_frequency_mode == MODE_VFO) && advanceActiveMemory(UP))
 					{
-						g_frequency_mode = MODE_MEMORY;
-						g_rx_frequency = g_channel_frequency[g_active_memory];
-						si5351_set_quad_frequency(g_rx_frequency);					
+						if (tuneReceiverTo(g_channel_frequency[g_active_memory]))
+						{
+							g_frequency_mode = MODE_MEMORY;
+						}
 					}
 					else
 					{
@@ -1730,10 +2146,80 @@ int main(void)
 								ADC0.MUXPOS = ADCBatteryVoltage;
 								setMenu(MenuBattery);
 							}
+							else if(menuRow == SOUNDS)
+							{
+								setMenu(MenuSounds);
+							}
 							else if(menuRow == ABOUT)
 							{
 								setMenu(MenuAbout);
 							}
+							else if(menuRow == SETTINGS)
+							{
+								setMenu(MenuSettings);
+							}
+						}
+						break;
+
+						case MenuSounds:
+						{
+							if (soundMenuRow == SOUND_GAIN_INDICATOR)
+							{
+								g_gain_indicator_audio_feedback_edit_original =
+									g_gain_indicator_audio_feedback_enabled;
+								g_gain_indicator_audio_feedback_edit_active = true;
+								setMenu(MenuSetGainIndicatorAudioFeedback);
+							}
+							else if (soundMenuRow == SOUND_TURN_TICK)
+							{
+								g_turn_tick_audio_feedback_edit_original =
+									g_turn_tick_audio_feedback_enabled;
+								g_turn_tick_audio_feedback_edit_active = true;
+								setMenu(MenuSetTurnTickAudioFeedback);
+							}
+							else
+							{
+								g_pushbutton_audio_feedback_edit_original =
+									g_pushbutton_audio_feedback_enabled;
+								g_pushbutton_audio_feedback_edit_active = true;
+								setMenu(MenuSetPushbuttonAudioFeedback);
+							}
+						}
+						break;
+
+						case MenuSetPushbuttonAudioFeedback:
+						case MenuSetTurnTickAudioFeedback:
+						case MenuSetGainIndicatorAudioFeedback:
+						{
+							/* Encoder and sense-button navigation are deliberate menu
+							 * exits, so both retain the value already being previewed. */
+							commitMenuEditsIfActive();
+							setMenu(MenuBackOne);
+						}
+						break;
+
+						case MenuSettings:
+						{
+							if (settingsMenuRow == SETTING_CW_OFFSET)
+							{
+								g_cw_offset_edit_original = g_cw_offset_setting;
+								g_cw_offset_edit_active = true;
+								setMenu(MenuSetCwOffset);
+							}
+							else
+							{
+								g_audio_filter_edit_original = g_audio_filter_mode;
+								g_audio_filter_edit_active = true;
+								setMenu(MenuSetAudioFilter);
+							}
+						}
+						break;
+
+						case MenuSetAudioFilter:
+						case MenuSetCwOffset:
+						{
+							commitMenuEditsIfActive();
+							setMenu(MenuBackOne);
 						}
 						break;
 					
@@ -1837,14 +2323,15 @@ int main(void)
 									uint32_t step_hz = g_encoderswitch_pressed ? 1000 : 100;
 									if(receiverFrequencyStep(g_rx_frequency, 1, step_hz, &requested_frequency))
 									{
-										g_rx_frequency = requested_frequency;
+									(void)tuneReceiverTo(requested_frequency);
 									}
 								}
 								else
 								{
 									if(advanceActiveMemory(UP))
 									{
-										g_rx_frequency = g_channel_frequency[g_active_memory];
+									(void)tuneReceiverTo(
+										g_channel_frequency[g_active_memory]);
 									}
 									else
 									{
@@ -1853,16 +2340,14 @@ int main(void)
 									}
 								}
 
-								si5351_set_quad_frequency(g_rx_frequency);
-							
-								g_tick++;
+								scheduleTurnTickAudioFeedback();
 							}
 							else if(g_leftsense_pressed)
 							{
 								if(g_audio_gain < 10) 
 								{
 									g_audio_gain++;
-									g_tick++;
+									scheduleTurnTickAudioFeedback();
 								}
 							}
 							else
@@ -1870,11 +2355,11 @@ int main(void)
 								if(pwm)
 								{
 									setPWM(--pwm);
-									g_tick++;
 								}
+								scheduleRfGainAudioFeedback(
+									MAX_PWM_SETTING - getPWM());
 							}
 						
-							g_rx_frequency = si5351_get_frequency(SI5351_CLK0);			
 							g_rf_gain_setting = getPWM();
 						}
 						break;
@@ -1887,12 +2372,12 @@ int main(void)
 						
 							Frequency_Hz f = g_channel_frequency[g_active_memory];
 							
-							if((f < RX_MAXIMUM_80M_FREQUENCY) && (f > RX_MINIMUM_80M_FREQUENCY))
+							if((f <= RX_MAXIMUM_80M_FREQUENCY) &&
+								(f >= RX_MINIMUM_80M_FREQUENCY))
 							{
-								g_rx_frequency = g_channel_frequency[g_active_memory];
+								(void)tuneReceiverTo(
+									g_channel_frequency[g_active_memory]);
 							}
-						
-							si5351_set_quad_frequency(g_rx_frequency);							
 						}
 						break;
 					
@@ -1945,6 +2430,66 @@ int main(void)
 							g_battery_warning_threshold = t;
 						}
 						break;
+
+						case MenuSetAudioFilter:
+						{
+							g_audio_filter_mode = nextAudioFilterMode(
+								g_audio_filter_mode, true);
+						}
+						break;
+
+						case MenuSetCwOffset:
+						{
+							const uint8_t nextSetting = nextCwOffsetSetting(
+								g_cw_offset_setting, true);
+							if (nextSetting != g_cw_offset_setting)
+							{
+								(void)applyCwOffsetSetting(nextSetting);
+							}
+						}
+						break;
+
+						case MenuSettings:
+						{
+							settingsMenuRow = (SettingsMenu_t)(
+								(uint8_t)settingsMenuRow + 1);
+							if (settingsMenuRow == NUMBER_OF_SETTINGS_MENUS)
+							{
+								settingsMenuRow = SETTING_AUDIO_FILTER;
+							}
+						}
+						break;
+
+						case MenuSounds:
+						{
+							soundMenuRow = (SoundsMenu_t)((uint8_t)soundMenuRow + 1);
+							if (soundMenuRow == NUMBER_OF_SOUND_MENUS)
+							{
+								soundMenuRow = SOUND_BEEP;
+							}
+						}
+						break;
+
+						case MenuSetPushbuttonAudioFeedback:
+						{
+							g_pushbutton_audio_feedback_enabled =
+								!g_pushbutton_audio_feedback_enabled;
+						}
+						break;
+
+						case MenuSetTurnTickAudioFeedback:
+						{
+							g_turn_tick_audio_feedback_enabled =
+								!g_turn_tick_audio_feedback_enabled;
+						}
+						break;
+
+						case MenuSetGainIndicatorAudioFeedback:
+						{
+							g_gain_indicator_audio_feedback_enabled =
+								!g_gain_indicator_audio_feedback_enabled;
+						}
+						break;
 					
 						case MenuMain:
 						{
@@ -1976,14 +2521,15 @@ int main(void)
 									uint32_t step_hz = g_encoderswitch_pressed ? 1000 : 100;
 									if(receiverFrequencyStep(g_rx_frequency, -1, step_hz, &requested_frequency))
 									{
-										g_rx_frequency = requested_frequency;
+									(void)tuneReceiverTo(requested_frequency);
 									}
 								}
 								else
 								{
 									if(advanceActiveMemory(!UP))
 									{
-										g_rx_frequency = g_channel_frequency[g_active_memory];
+									(void)tuneReceiverTo(
+										g_channel_frequency[g_active_memory]);
 									}
 									else
 									{
@@ -1992,16 +2538,14 @@ int main(void)
 									}
 								}
 
-								si5351_set_quad_frequency(g_rx_frequency);
-							
-								g_tick++;
+								scheduleTurnTickAudioFeedback();
 							}
 							else if(g_leftsense_pressed)
 							{
 								if(g_audio_gain > 1) 
 								{
 									g_audio_gain--;
-									g_tick++;
+									scheduleTurnTickAudioFeedback();
 								}
 							}
 							else
@@ -2009,11 +2553,11 @@ int main(void)
 								if(pwm < MAX_PWM_SETTING) 
 								{
 									setPWM(++pwm);
-									g_tick++;
 								}
+								scheduleRfGainAudioFeedback(
+									MAX_PWM_SETTING - getPWM());
 							}
 						
-							g_rx_frequency = si5351_get_frequency(SI5351_CLK0);			
 							g_rf_gain_setting = getPWM();
 						}
 						break;
@@ -2032,12 +2576,12 @@ int main(void)
 							Frequency_Hz f = g_channel_frequency[g_active_memory];
 							refresh_display = true;
 													
-							if((f < RX_MAXIMUM_80M_FREQUENCY) && (f > RX_MINIMUM_80M_FREQUENCY))
+							if((f <= RX_MAXIMUM_80M_FREQUENCY) &&
+								(f >= RX_MINIMUM_80M_FREQUENCY))
 							{
-								g_rx_frequency = g_channel_frequency[g_active_memory];
+								(void)tuneReceiverTo(
+									g_channel_frequency[g_active_memory]);
 							}
-						
-							si5351_set_quad_frequency(g_rx_frequency);							
 						}
 						break;				
 					
@@ -2098,6 +2642,72 @@ int main(void)
 							g_battery_warning_threshold = t;
 						}
 						break;
+
+						case MenuSetAudioFilter:
+						{
+							g_audio_filter_mode = nextAudioFilterMode(
+								g_audio_filter_mode, false);
+						}
+						break;
+
+						case MenuSetCwOffset:
+						{
+							const uint8_t nextSetting = nextCwOffsetSetting(
+								g_cw_offset_setting, false);
+							if (nextSetting != g_cw_offset_setting)
+							{
+								(void)applyCwOffsetSetting(nextSetting);
+							}
+						}
+						break;
+
+						case MenuSettings:
+						{
+							if (settingsMenuRow == SETTING_AUDIO_FILTER)
+							{
+								settingsMenuRow = SETTING_CW_OFFSET;
+							}
+							else
+							{
+								settingsMenuRow = (SettingsMenu_t)(
+									(uint8_t)settingsMenuRow - 1);
+							}
+						}
+						break;
+
+						case MenuSounds:
+						{
+							if (soundMenuRow == SOUND_BEEP)
+							{
+								soundMenuRow = SOUND_GAIN_INDICATOR;
+							}
+							else
+							{
+								soundMenuRow = (SoundsMenu_t)((uint8_t)soundMenuRow - 1);
+							}
+						}
+						break;
+
+						case MenuSetPushbuttonAudioFeedback:
+						{
+							g_pushbutton_audio_feedback_enabled =
+								!g_pushbutton_audio_feedback_enabled;
+						}
+						break;
+
+						case MenuSetTurnTickAudioFeedback:
+						{
+							g_turn_tick_audio_feedback_enabled =
+								!g_turn_tick_audio_feedback_enabled;
+						}
+						break;
+
+						case MenuSetGainIndicatorAudioFeedback:
+						{
+							g_gain_indicator_audio_feedback_enabled =
+								!g_gain_indicator_audio_feedback_enabled;
+						}
+						break;
 					
 						case MenuMain:
 						{
@@ -2125,10 +2735,11 @@ int main(void)
 		}
 		
 //======================================================		
-		if(g_goertzel.SamplesReady() && !atomicReadU16(&g_rssi_countdown))
+		if(g_cw_offset_setting != CW_OFFSET_ZERO_SETTING &&
+			g_goertzel.SamplesReady() && !atomicReadU16(&g_rssi_countdown))
 		{
 			static uint8_t init = NOMINAL_BUFF_SIZE;
-			float level, levelA, levelB, levelC; //, minLevel, maxLevel;
+			float level;
 			static float highSigDetectThreshold = 0.;
 			static float low_water = 999999.;
 			static float nominal = 0., high_water = 0.;
@@ -2136,20 +2747,34 @@ int main(void)
 			static uint16_t consecutiveDetect=0, consecutiveNoise=0;
 			static uint8_t holdPWM = 255;
 			bool sigDetected = false;
+
+			if (g_signal_analysis_reset_requested)
+			{
+				/* Levels from different detector centers are not comparable. */
+				g_nominal_buff.reset();
+				g_high_water_buff.reset();
+				g_rssi_buff.reset();
+				init = NOMINAL_BUFF_SIZE;
+				highSigDetectThreshold = 0.0f;
+				low_water = 999999.0f;
+				nominal = 0.0f;
+				high_water = 0.0f;
+				consecutiveDetect = 0;
+				consecutiveNoise = 0;
+				holdPWM = 255;
+				g_signal_analysis_reset_requested = false;
+			}
 								
 			atomicWriteU16(&g_rssi_countdown, 5);
 
 			int clipCount = 0;
 
-			g_goertzel.SetTargetFrequency(pitch_frequencies[0]);    /* Initialize the object with the sampling frequency, # of samples and target freq */
-			levelA = g_goertzel.Magnitude2(&clipCount);     /* Check samples for presence of the target frequency */
-			g_goertzel.SetTargetFrequency(pitch_frequencies[1]);    /* Initialize the object with the sampling frequency, # of samples and target freq */
-			levelB = g_goertzel.Magnitude2(&clipCount);     /* Check samples for presence of the target frequency */
-			g_goertzel.SetTargetFrequency(pitch_frequencies[2]);    /* Initialize the object with the sampling frequency, # of samples and target freq */
-			levelC = g_goertzel.Magnitude2(&clipCount);     /* Check samples for presence of the target frequency */
+			float levels[MAX_GOERTZEL_TARGETS] = {};
+			g_goertzel.Magnitudes2(levels, MAX_GOERTZEL_TARGETS,
+				&clipCount);
 			g_goertzel.ReleaseSamples();
 
-			level = (levelA + levelB + levelC);
+			level = levels[0] + levels[1] + levels[2];
 
 			if(1)
 			{		
@@ -2327,16 +2952,7 @@ char* batteryTimeLeftString(float* adcCounts)
 		bat = (float)g_lastConversionResult[g_adcChannel2Slot[ADCBatteryVoltage]];
 	}
 	
-	if(bat <= 878)
-	{
-		bat = 0.;
-	}
-	else
-	{
-		bat = (bat - 878.) / 2.85;
-	}
-	
-	if(bat > 100.) bat = 100.;
+	bat = batteryChargePercentFromVoltage(batteryVoltageFromAdcCounts(bat));
 	
 	bat = 60. * bat * (((uint8_t)g_battery_capacity + 1)*50) / 5000.; /* Example: 50 mA average current */
 	
@@ -2354,20 +2970,11 @@ char* batteryPercentString(float adcCounts, float* result)
 	char* pstr = str;
 	float pct;
 	
-	if(adcCounts <= 878.)
-	{
-		pct = 0.;
-	}
-	else
-	{
-		pct = (adcCounts - 878.) / 2.85;
-	}
-	
-	if(pct > 100.) pct = 100.;
+	pct = batteryChargePercentFromVoltage(batteryVoltageFromAdcCounts(adcCounts));
 	
 	if(result) *result = pct;
 
-	dtostrf(pct, 2, 0, str);
+	dtostrf((float)batteryPercentForDisplay(pct), 2, 0, str);
 	str[3] = '\0';
 	pstr = trimwhitespace(str);
 				
@@ -2378,7 +2985,6 @@ char* batteryPercentString(float adcCounts, float* result)
 // Returns a pointer to a string of length 7.
 char* batteryVoltsString(bool volts, float* value)
 {
-	static float filtered = 78.0;
 	static char str[7] = "?";
 	char* pstr = str;
 	float bat;
@@ -2392,34 +2998,22 @@ char* batteryVoltsString(bool volts, float* value)
 		bat = (float)g_lastConversionResult[g_adcChannel2Slot[ADCBatteryVoltage]];
 	}
 	
-	bat *= 288.;
-	bat /= 4096.;
-	bat += 2.;
+	bat = batteryVoltageFromAdcCounts(bat);
 	
-	if(value)
+	if((bat >= 0.0f) && (bat <= 18.0f))
 	{
-		filtered = bat;
-	}
-	else
-	{
-		filtered = (bat + 9*filtered) / 10.;
-	}
-	
-	if((bat >= 0.) && (bat <= 180.))
-	{
+		const uint16_t tenths = batteryVoltageTenthsForDisplay(bat);
 		if(volts)
 		{
-			dtostrf(filtered/10., 5, 2, str);
-			str[6] = '\0';
-			pstr = trimwhitespace(str);
-			return pstr;
+			snprintf(str, sizeof(str), "%u.%u",
+				(unsigned int)(tenths / 10U), (unsigned int)(tenths % 10U));
 		}
 		else
 		{
-			dtostrf(filtered, 4, 0, str);		
-			str[5] = '\0';
-			return str;
+			snprintf(str, sizeof(str), "%u", (unsigned int)tenths);
 		}
+		pstr = trimwhitespace(str);
+		return pstr;
 	}
 				
 	return str;

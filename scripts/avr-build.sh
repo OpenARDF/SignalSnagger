@@ -38,8 +38,9 @@ if [[ ${#sources[@]} -eq 0 ]]; then
 	exit 1
 fi
 
-# Match the deployed 0.38 Microchip Studio compile configuration before making
-# any independently reviewed optimization change.
+# Keep debug symbols in test images, but optimize the real-time 48 kHz audio
+# path enough that hardware testing measures firmware behavior rather than
+# debug-build interrupt overhead.
 common_flags=(
 	-funsigned-char
 	-funsigned-bitfields
@@ -50,7 +51,7 @@ common_flags=(
 	-I"$firmware_root/utils/assembler"
 	-I"$firmware_root"
 	-I"$AVR_DFP_ROOT/include"
-	-O0
+	-O2
 	-g2
 	-ffunction-sections
 	-fdata-sections
