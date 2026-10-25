@@ -13,6 +13,7 @@
 #include "deferred_byte_write_queue.h"
 #include "memory_channels.h"
 #include "periodic_countdown.h"
+#include "power_on_clock.h"
 #include "receiver.h"
 #include "receiver_frequency.h"
 #include "receiver_test_stubs.h"
@@ -517,6 +518,92 @@ void testSenseSwitchesRetainOperationalCardioidBehavior()
 	CHECK(!neither.bothPressed);
 	CHECK(!neither.cardioidFrontEnabled);
 	CHECK(!neither.cardioidBackEnabled);
+}
+
+void testPowerOnClockReadingSaturatesTimeAndCyclesIndependently()
+{
+	PowerOnClockReading reading = powerOnClockReading(0);
+	CHECK(reading.minutes == 0);
+	CHECK(reading.seconds == 0);
+	CHECK(reading.cycle == 1);
+
+	reading = powerOnClockReading(299);
+	CHECK(reading.minutes == 4);
+	CHECK(reading.seconds == 59);
+	CHECK(reading.cycle == 1);
+
+	reading = powerOnClockReading(300);
+	CHECK(reading.minutes == 5);
+	CHECK(reading.seconds == 0);
+	CHECK(reading.cycle == 2);
+
+	reading = powerOnClockReading(60000);
+	CHECK(reading.minutes == 999);
+	CHECK(reading.seconds == 59);
+	CHECK(reading.cycle == 201);
+
+	reading = powerOnClockReading(POWER_ON_CLOCK_MAX_TRACKED_SECONDS);
+	CHECK(reading.minutes == 999);
+	CHECK(reading.seconds == 59);
+	CHECK(reading.cycle == 999);
+
+	reading = powerOnClockReading(UINT32_MAX);
+	CHECK(reading.minutes == 999);
+	CHECK(reading.seconds == 59);
+	CHECK(reading.cycle == 999);
+}
+
+void testPowerOnClockRowsUseRequestedPaddingAndAlignment()
+{
+	char timeRow[POWER_ON_CLOCK_TIME_ROW_SIZE] = {};
+	char cycleRow[POWER_ON_CLOCK_CYCLE_ROW_SIZE] = {};
+	formatPowerOnClockRows(0, timeRow, cycleRow);
+	CHECK(std::strcmp(timeRow, "000:00") == 0);
+	CHECK(std::strcmp(cycleRow, "Cycle: 1") == 0);
+
+	formatPowerOnClockRows(UINT32_MAX, timeRow, cycleRow);
+	CHECK(std::strcmp(timeRow, "999:59") == 0);
+	CHECK(std::strcmp(cycleRow, "Cycle: 999") == 0);
+}
+
+void testClockDisplayGestureRequiresFiveMatchingSensePresses()
+{
+	ClockDisplayGesture gesture;
+	for (uint8_t press = 1; press < 5; ++press)
+	{
+		CHECK(!gesture.RecordSensePress(CLOCK_SENSE_LEFT));
+	}
+	CHECK(gesture.RecordSensePress(CLOCK_SENSE_LEFT));
+
+	for (uint8_t press = 1; press < 5; ++press)
+	{
+		CHECK(!gesture.RecordSensePress(CLOCK_SENSE_RIGHT));
+	}
+	CHECK(gesture.RecordSensePress(CLOCK_SENSE_RIGHT));
+}
+
+void testClockDisplayGestureCancelsOnOtherActivity()
+{
+	ClockDisplayGesture gesture;
+	for (uint8_t press = 0; press < 4; ++press)
+	{
+		CHECK(!gesture.RecordSensePress(CLOCK_SENSE_LEFT));
+	}
+	CHECK(!gesture.RecordSensePress(CLOCK_SENSE_RIGHT));
+	for (uint8_t press = 0; press < 4; ++press)
+	{
+		CHECK(!gesture.RecordSensePress(CLOCK_SENSE_RIGHT));
+	}
+	CHECK(gesture.RecordSensePress(CLOCK_SENSE_RIGHT));
+
+	CHECK(!gesture.RecordSensePress(CLOCK_SENSE_LEFT));
+	CHECK(!gesture.RecordSensePress(CLOCK_SENSE_LEFT));
+	gesture.Cancel();
+	for (uint8_t press = 1; press < 5; ++press)
+	{
+		CHECK(!gesture.RecordSensePress(CLOCK_SENSE_LEFT));
+	}
+	CHECK(gesture.RecordSensePress(CLOCK_SENSE_LEFT));
 }
 
 void testSignalScoreRejectsInvalidLogarithmInputs()
@@ -1103,6 +1190,10 @@ int main()
 	testMemoryChannelSelectionRejectsInvalidOrEmptyInputs();
 	testSenseSwitchesSuppressCardioidOutputsWhileEditing();
 	testSenseSwitchesRetainOperationalCardioidBehavior();
+	testPowerOnClockReadingSaturatesTimeAndCyclesIndependently();
+	testPowerOnClockRowsUseRequestedPaddingAndAlignment();
+	testClockDisplayGestureRequiresFiveMatchingSensePresses();
+	testClockDisplayGestureCancelsOnOtherActivity();
 	testSignalScoreRejectsInvalidLogarithmInputs();
 	testSignalScoreIsBounded();
 	testDateTimeParserAcceptsSupportedFormats();

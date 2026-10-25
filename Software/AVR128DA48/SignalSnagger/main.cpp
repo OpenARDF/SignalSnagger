@@ -29,6 +29,7 @@
 #include "dac0.h"
 #include "memory_channels.h"
 #include "periodic_countdown.h"
+#include "power_on_clock.h"
 #include "receiver_frequency.h"
 #include "rf_gain_audio_cue.h"
 #include "sense_switches.h"
@@ -187,7 +188,8 @@ extern BatteryCapacity_t g_battery_capacity;
 extern BatteryWarnThreshold_t g_battery_warning_threshold;
 extern uint8_t g_active_memory;
 
-static time_t g_seconds_since_poweron = 0; /* Read and written only by RTC_CNT_vect. */
+/* The RTC owns increments; foreground reads this multi-byte uptime atomically. */
+static volatile uint32_t g_seconds_since_poweron = 0;
 volatile uint8_t g_display_active_countdown = false;
 
 extern uint16_t g_clock_calibration;
@@ -237,6 +239,10 @@ static volatile bool g_leftsense_pressed = false;
 static volatile bool g_rightsense_pressed = false;
 static volatile bool g_doublesense_pressed = false;
 static volatile bool g_encoderswitch_pressed = false;
+/* Gesture state is ISR-owned; foreground only exchanges the one-byte requests. */
+static ClockDisplayGesture g_clock_display_gesture;
+static volatile bool g_clock_display_toggle_requested = false;
+static volatile bool g_clock_display_gesture_cancel_requested = false;
 /* Foreground owns this flag; the switch ISR reads it to preserve the RF path while editing. */
 static volatile bool g_frequency_updates_enabled = false;
 /* A long accept press must remain RF-neutral until the physical button is released. */
@@ -388,7 +394,12 @@ ISR(RTC_CNT_vect)
     {
         system_tick();
 		if(g_powerdown_seconds) g_powerdown_seconds--;
-		g_seconds_since_poweron++;
+		/* Saturating the source counter guarantees the visible clock can never
+		 * wrap, even if the receiver remains powered for the lifetime of uint32_t. */
+		if(g_seconds_since_poweron < POWER_ON_CLOCK_MAX_TRACKED_SECONDS)
+		{
+			g_seconds_since_poweron++;
+		}
 		if(g_seconds_since_poweron == 2) g_rotary_enable = true;
 		if(g_display_active_countdown) g_display_active_countdown--;
 	}
@@ -525,6 +536,11 @@ ISR(TCB0_INT_vect)
 		
 		if(g_rssi_countdown) g_rssi_countdown--;
 		if(g_battery_sample_countdown) g_battery_sample_countdown--;
+		if(g_clock_display_gesture_cancel_requested)
+		{
+			g_clock_display_gesture.Cancel();
+			g_clock_display_gesture_cancel_requested = false;
+		}
 		
 		if(periodicCountdownTick(&switchScanTicksRemaining, 6))
 		{
@@ -618,6 +634,29 @@ ISR(TCB0_INT_vect)
 				{
 					rightsenseAction = SwitchUnchanged;
 				}
+
+				const bool encoderClosure =
+					(changed & (1 << ENCODER_SWITCH)) && g_encoderswitch_pressed;
+				const bool senseClosure = leftsenseAction == SwitchClosure ||
+					rightsenseAction == SwitchClosure;
+				if(encoderClosure || (senseSwitches.bothPressed && senseClosure))
+				{
+					g_clock_display_gesture.Cancel();
+				}
+				else if(leftsenseAction == SwitchClosure)
+				{
+					if(g_clock_display_gesture.RecordSensePress(CLOCK_SENSE_LEFT))
+					{
+						g_clock_display_toggle_requested = true;
+					}
+				}
+				else if(rightsenseAction == SwitchClosure)
+				{
+					if(g_clock_display_gesture.RecordSensePress(CLOCK_SENSE_RIGHT))
+					{
+						g_clock_display_toggle_requested = true;
+					}
+				}
 				
 				if(senseSwitches.bothPressed) /* Both sense switches are closed */
 				{
@@ -665,6 +704,7 @@ ISR(TCB0_INT_vect)
 				{
 					if(g_encoderswitch_pressed) 
 					{
+						g_clock_display_gesture.Cancel();
 						g_encoder_presses_count++;
 						encoderswitchAction = SwitchClosure;
 					}
@@ -962,6 +1002,7 @@ ISR(PORTF_PORT_vect)
 				case 0b1110:
 				case 0b1000:
 				{
+					g_clock_display_gesture.Cancel();
 					g_rotary_edges++;
 				}
 				break;
@@ -971,6 +1012,7 @@ ISR(PORTF_PORT_vect)
 				case 0b1101:
 				case 0b1011:
 				{
+					g_clock_display_gesture.Cancel();
 					g_rotary_edges--;
 				}
 				break;
@@ -1271,7 +1313,10 @@ int main(void)
 	float filtered_battery_adc_counts = 0.0f;
 	bool battery_filter_initialized = false;
 	uint16_t hold_goertzel_rssi = 0;
+	uint32_t hold_clock_seconds = UINT32_MAX;
 	bool hold_headphone_state = true;
+	bool clock_display_active = false;
+	bool hold_clock_display_active = false;
 	bool refresh_display = true;
 	uint8_t x;
 	EC ec;
@@ -1397,8 +1442,32 @@ int main(void)
 		if(!g_display_active_countdown)
 		{
 			MenuState_t currentMenu = setMenu(MenuGetCurrent);
+			if(currentMenu != MenuOperational)
+			{
+				g_clock_display_gesture_cancel_requested = true;
+				if(clock_display_active)
+				{
+					clock_display_active = false;
+					refresh_display = true;
+				}
+			}
+			if(atomicExchangeBool(&g_clock_display_toggle_requested, false))
+			{
+				if(currentMenu == MenuOperational)
+				{
+					clock_display_active = !clock_display_active;
+					/* Drop queued text from the prior mode before changing LCD geometry. */
+					g_text_buff.reset();
+					refresh_display = true;
+				}
+				else
+				{
+					g_clock_display_gesture_cancel_requested = true;
+				}
+			}
 			
-			if(refresh_display || (currentMenu != hold_menuState))
+			if(refresh_display || (currentMenu != hold_menuState) ||
+				(clock_display_active != hold_clock_display_active))
 			{
 				refresh_display = false;
 				const bool currentIsBatteryMenu =
@@ -1425,7 +1494,9 @@ int main(void)
 				}
 				
 				hold_menuState = currentMenu;
+				hold_clock_display_active = clock_display_active;
 				display.cls();
+				hold_clock_seconds = UINT32_MAX; /* force update */
 				hold_rx_frequency = 0; /* force update */
 				hold_rf_gain_setting = 0xff; /* force update */
 				hold_audio_gain = 0xff; /* force update */
@@ -1446,7 +1517,9 @@ int main(void)
 				if(currentMenu == MenuOperational)
 				{
 					EEPromMgr.saveAllEEPROM();					
-					display.display(LINES_4);						
+					/* In two-line mode, logical rows 0 and 1 each occupy a
+					 * double-height pair of physical LCD rows. */
+					display.display(clock_display_active ? LINES_2 : LINES_4);
 				}
 				else if(currentMenu == MenuNoHeadphones)
 				{
@@ -1454,8 +1527,25 @@ int main(void)
 				}
 			}
 			
-			switch(currentMenu)
+			if(currentMenu == MenuOperational && clock_display_active)
 			{
+				const uint32_t clockSeconds = atomicReadU32(&g_seconds_since_poweron);
+				if(clockSeconds != hold_clock_seconds)
+				{
+					hold_clock_seconds = clockSeconds;
+					char timeRow[POWER_ON_CLOCK_TIME_ROW_SIZE];
+					char cycleRow[POWER_ON_CLOCK_CYCLE_ROW_SIZE];
+					formatPowerOnClockRows(clockSeconds, timeRow, cycleRow);
+					snprintf(g_tempStr, 13, "00%s", timeRow);
+					g_text_buff.putString(g_tempStr);
+					snprintf(g_tempStr, 13, "10%s", cycleRow);
+					g_text_buff.putString(g_tempStr);
+				}
+			}
+			else
+			{
+				switch(currentMenu)
+				{
 				case MenuOperational:
 				{
 					char str[11];
@@ -1810,6 +1900,7 @@ int main(void)
 				{
 				}
 				break;
+				}
 			}
 		}
 			
@@ -1922,8 +2013,11 @@ int main(void)
 		
 			if(atomicExchangeBool(&g_long_doublesense_press, false))
 			{
+				g_clock_display_gesture_cancel_requested = true;
 				if(setMenu(MenuGetCurrent) == MenuOperational) 
 				{
+					clock_display_active = false;
+					refresh_display = true;
 					setMenu(MenuMain);
 				}
 				else
