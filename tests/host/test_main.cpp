@@ -603,6 +603,29 @@ void testMemoryChannelSelectionRejectsInvalidOrEmptyInputs()
 	CHECK(findNextActiveMemory(empty, 0, 0, true, invalid) == invalid);
 }
 
+void testModeToggleKeepsCurrentPopulatedMemory()
+{
+	const uint32_t frequencies[] = {0, 3570500, 0, 3590000};
+	const uint8_t invalid = 0xff;
+
+	CHECK(findCurrentOrNextActiveMemory(frequencies, 4, 1, invalid) == 1);
+	CHECK(findCurrentOrNextActiveMemory(frequencies, 4, 3, invalid) == 3);
+}
+
+void testModeToggleAdvancesOnlyFromEmptyOrInvalidMemory()
+{
+	const uint32_t frequencies[] = {0, 3570500, 0, 3590000};
+	const uint32_t empty[] = {0, 0, 0};
+	const uint8_t invalid = 0xff;
+
+	CHECK(findCurrentOrNextActiveMemory(frequencies, 4, 0, invalid) == 1);
+	CHECK(findCurrentOrNextActiveMemory(frequencies, 4, 2, invalid) == 3);
+	CHECK(findCurrentOrNextActiveMemory(frequencies, 4, invalid, invalid) == 1);
+	CHECK(findCurrentOrNextActiveMemory(empty, 3, 1, invalid) == invalid);
+	CHECK(findCurrentOrNextActiveMemory(0, 3, 1, invalid) == invalid);
+	CHECK(findCurrentOrNextActiveMemory(empty, 0, 1, invalid) == invalid);
+}
+
 void testSenseSwitchesSuppressCardioidOutputsWhileEditing()
 {
 	const SenseSwitchState left = resolveSenseSwitches(false, true, false);
@@ -1476,6 +1499,8 @@ int main()
 	testStatusWaitCompletesOrTimesOut();
 	testMemoryChannelSelectionWrapsAndSkipsEmptyChannels();
 	testMemoryChannelSelectionRejectsInvalidOrEmptyInputs();
+	testModeToggleKeepsCurrentPopulatedMemory();
+	testModeToggleAdvancesOnlyFromEmptyOrInvalidMemory();
 	testSenseSwitchesSuppressCardioidOutputsWhileEditing();
 	testSenseSwitchesRetainOperationalCardioidBehavior();
 	testPowerOnClockReadingSaturatesTimeAndCyclesIndependently();

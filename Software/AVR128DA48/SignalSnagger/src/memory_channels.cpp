@@ -39,3 +39,27 @@ uint8_t findNextActiveMemory(const uint32_t* frequencies,
 
 	return invalidChannel;
 }
+
+uint8_t findCurrentOrNextActiveMemory(const uint32_t* frequencies,
+	uint8_t channelCount,
+	uint8_t currentChannel,
+	uint8_t invalidChannel)
+{
+	if (!frequencies || !channelCount)
+	{
+		return invalidChannel;
+	}
+
+	if (currentChannel < channelCount && frequencies[currentChannel])
+	{
+		return currentChannel;
+	}
+
+	/* Starting immediately before channel zero makes an invalid saved index
+	 * fall back to the first populated channel in normal ascending order. */
+	const uint8_t searchStart = currentChannel < channelCount
+		? currentChannel
+		: channelCount - 1;
+	return findNextActiveMemory(frequencies, channelCount, searchStart, true,
+		invalidChannel);
+}

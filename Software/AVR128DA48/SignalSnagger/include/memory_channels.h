@@ -17,4 +17,13 @@ uint8_t findNextActiveMemory(const uint32_t* frequencies,
 	bool up,
 	uint8_t invalidChannel);
 
+/**
+ * Keep a populated current channel, or find the next populated channel.
+ * An invalid current channel starts the wrapped search at channel zero.
+ */
+uint8_t findCurrentOrNextActiveMemory(const uint32_t* frequencies,
+	uint8_t channelCount,
+	uint8_t currentChannel,
+	uint8_t invalidChannel);
+
 #endif /* MEMORY_CHANNELS_H_ */

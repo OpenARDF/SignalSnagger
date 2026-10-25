@@ -2322,11 +2322,20 @@ int main(void)
 					 * display; menu and clock screens must retain their current state. */
 					if((setMenu(MenuGetCurrent) == MenuOperational) && !clock_display_active)
 					{
-						if((g_frequency_mode == MODE_VFO) && advanceActiveMemory(UP))
+						if(g_frequency_mode == MODE_VFO)
 						{
-							if (tuneReceiverTo(g_channel_frequency[g_active_memory]))
+							const uint8_t selectedMemory = findCurrentOrNextActiveMemory(
+								g_channel_frequency,
+								NUMBER_OF_FREQUENCY_CHANNELS,
+								g_active_memory,
+								INVALID_CHANNEL);
+							if(selectedMemory != INVALID_CHANNEL)
 							{
-								g_frequency_mode = MODE_MEMORY;
+								g_active_memory = selectedMemory;
+								if (tuneReceiverTo(g_channel_frequency[g_active_memory]))
+								{
+									g_frequency_mode = MODE_MEMORY;
+								}
 							}
 						}
 						else
