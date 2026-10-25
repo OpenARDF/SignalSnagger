@@ -1,0 +1,37 @@
+{
+  "format": "signalsnagger-release-evidence-v1",
+  "version": "0.38.4",
+  "tag": "v0.38.4",
+  "tagCommit": "eae943d4e2696841e1840f44b024daec1c32c69d",
+  "releaseUrl": "https://github.com/OpenARDF/SignalSnagger/releases/tag/v0.38.4",
+  "publishedUtc": "2026-10-25T17:36:45Z",
+  "verifiedUtc": "2026-10-25T17:37:25Z",
+  "releaseNotes": {
+    "fileName": "release-notes/v0.38.4.md",
+    "sha256": "a6b562b311388ee343420c975ef733dc1ea99f670bb0163c1f6414404d33c13e",
+    "matchesGitHubBody": true
+  },
+  "assets": [
+    {
+      "fileName": "SignalSnagger-v0.38.4.hex",
+      "sizeBytes": 141952,
+      "sha256": "d235ee521a79e6862e17cd43164cc1b491161c74f39f5e99a08ad1cb0a0c7da4"
+    },
+    {
+      "fileName": "SignalSnagger-v0.38.4-Release-Files.zip",
+      "sizeBytes": 53078,
+      "sha256": "cf575095b419c7ffe2e0ebcb3467b6b3e38133791fc09984cecd5e704ea8e063"
+    }
+  ],
+  "verification": {
+    "annotatedTag": true,
+    "tagTargetMatchesPackageCommit": true,
+    "packageBuiltFromCleanTree": true,
+    "freshDownloadHasExactAssetSet": true,
+    "freshDownloadChecksumsMatch": true,
+    "zipContentsAndBytesMatch": true,
+    "embeddedVersionMatchesTag": true,
+    "exactReleaseImageProgrammedOnHardware": false,
+    "hardwareEvidence": "Inherited from the immediately preceding 0.38.4m candidate under the documented pre-1.0 version-only promotion rule. The operator confirmed that exact candidate was flashed into and tested on the attached receiver; the focused single-bin detector behavior was accepted. Only SW_REVISION changed for 0.38.4. Preserved programmer/readback and protected-memory comparison records for 0.38.4m are unavailable, and the exact unsuffixed image was not programmed. See release-notes/v0.38.4.md."
+  }
+}
