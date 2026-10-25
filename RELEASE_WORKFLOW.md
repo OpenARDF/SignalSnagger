@@ -9,10 +9,14 @@
 - `Development1-KiCad` separately collects schematics, PCB data, libraries, and
   receiver-simulation changes. It uses its own promotion pull request to `main`;
   pending KiCad work is not merged into `Development1`.
-- Synchronize both collectors from `main` after either promotion. Run `just
-  branch-route-check <collector>` before topic work and `just
-  collector-preflight <collector>` before opening a collector promotion pull
-  request.
+- Keep `main` linear by using squash or rebase pull requests. Collectors use
+  merge-commit pull requests so topic and `main` ancestry remain auditable.
+  Synchronize both collectors from `main` after either promotion: create a
+  focused topic from each remote collector, merge exact `origin/main` with
+  `--no-ff`, run `just collector-sync-check <collector>`, and merge the pull
+  request with a merge commit. Run `just branch-route-check <collector>` before
+  topic work and `just collector-preflight <collector>` before opening a
+  collector promotion pull request.
 - The legacy deployed version string `0.38` is retained while reproducing the
   baseline. New stable versions use `x.y.z`; test builds append letters, such as
   `0.38.1a`, `0.38.1b`, through `0.38.1z`, then `0.38.1aa`.
@@ -117,7 +121,8 @@ successful upload alone is not a completed release.
    is the explicit exception to the single pre-release promotion pull request.
    Leave the release tag fixed at the earlier release commit. Run `just
    release-published-verify X.Y.Z` again from synchronized `main`, then
-   synchronize both collectors and delete safely integrated topic branches.
+   synchronize both collectors with ancestry-preserving merge pull requests
+   and delete safely integrated topic branches.
 
 SignalSnagger publishes one AVR128DA48 firmware image. The ZIP contains that
 same firmware HEX plus release-info JSON, SHA-256 checksums, and a README. It
