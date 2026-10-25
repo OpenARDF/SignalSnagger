@@ -10,6 +10,16 @@ default:
 status:
     git status --short --branch
 
+# Verify that a topic or collector is based on the named integration branch.
+branch-route-check collector:
+    ./scripts/check-branch-workflow.sh "{{collector}}"
+
+# Verify collector routing, repository gates, and secrets before promotion.
+collector-preflight collector:
+    ./scripts/check-branch-workflow.sh "{{collector}}" --promotion
+    just check
+    just secrets
+
 # Verify host tools and the pinned AVR compiler/device pack.
 doctor:
     ./scripts/repository-doctor.sh

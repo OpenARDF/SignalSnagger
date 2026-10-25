@@ -42,6 +42,7 @@ expect_eol() {
 
 for policy_file in .editorconfig .gitattributes BUILD_ENVIRONMENT.md \
 	CODEX_WORKFLOW.md RELEASE_WORKFLOW.md \
+	scripts/check-branch-workflow.sh \
 	scripts/package-avr-release.py \
 	scripts/validate-avr-release-package.py \
 	scripts/check-avr-release-package-repeatability.py \
@@ -107,11 +108,26 @@ fi
 if ! rg -q '^release-evidence-regression:' "$repo_root/Justfile"; then
 	fail "Justfile is missing release-evidence negative regression tests"
 fi
+if ! rg -q '^branch-route-check collector:' "$repo_root/Justfile"; then
+	fail "Justfile is missing collector branch-route validation"
+fi
+if ! rg -q '^collector-preflight collector:' "$repo_root/Justfile"; then
+	fail "Justfile is missing the collector promotion preflight"
+fi
 if ! rg -q 'experimentally validated' "$repo_root/CODEX_WORKFLOW.md"; then
 	fail "CODEX_WORKFLOW.md must protect the experimentally validated Si5351 strategy"
 fi
-if ! rg -q '`main` contains the deployed 0\.38 release baseline' "$repo_root/CODEX_WORKFLOW.md"; then
-	fail "CODEX_WORKFLOW.md must identify the recovered integration baseline"
+if ! rg -q '`Development1` is the firmware and software integration branch' "$repo_root/CODEX_WORKFLOW.md"; then
+	fail "CODEX_WORKFLOW.md must identify the firmware/software collector"
+fi
+if ! rg -q '`Development1-KiCad` is the separate KiCad' "$repo_root/CODEX_WORKFLOW.md"; then
+	fail "CODEX_WORKFLOW.md must identify the separate KiCad collector"
+fi
+if ! rg -q '`Development1` collects firmware, software, tests' "$repo_root/RELEASE_WORKFLOW.md"; then
+	fail "RELEASE_WORKFLOW.md must route release work through Development1"
+fi
+if ! rg -q '`Development1-KiCad` separately collects schematics' "$repo_root/RELEASE_WORKFLOW.md"; then
+	fail "RELEASE_WORKFLOW.md must keep KiCad work in its own collector"
 fi
 if ! rg -q '^## Pre-1\.0 development releases$' "$repo_root/RELEASE_WORKFLOW.md"; then
 	fail "RELEASE_WORKFLOW.md must define the pre-1.0 development-release policy"
