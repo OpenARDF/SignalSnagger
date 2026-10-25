@@ -243,6 +243,12 @@
     <Compile Include="include\memory_channels.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="include\menu_entry_timeout.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="include\multi_press_sequence.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="include\sense_switches.h">
       <SubType>compile</SubType>
     </Compile>

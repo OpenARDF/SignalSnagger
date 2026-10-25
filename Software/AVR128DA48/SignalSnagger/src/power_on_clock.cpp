@@ -7,7 +7,6 @@ namespace
 	const uint32_t MAX_DISPLAYED_TIME_SECONDS = UINT32_C(999) * 60U + 59U;
 	const uint16_t MAX_DISPLAYED_CYCLE = UINT16_C(999);
 	const uint16_t SECONDS_PER_CYCLE = UINT16_C(300);
-	const uint8_t REQUIRED_SENSE_PRESSES = UINT8_C(5);
 }
 
 PowerOnClockReading powerOnClockReading(uint32_t elapsedSeconds)
@@ -42,38 +41,21 @@ void formatPowerOnClockRows(uint32_t elapsedSeconds,
 }
 
 ClockDisplayGesture::ClockDisplayGesture()
-	: button_(CLOCK_SENSE_LEFT), pressCount_(0)
+	: sequence_()
 {
 }
 
-bool ClockDisplayGesture::RecordSensePress(ClockSenseButton button)
+void ClockDisplayGesture::RecordSensePress(ClockSenseButton button)
 {
-	if (!pressCount_)
-	{
-		button_ = button;
-		pressCount_ = 1;
-		return false;
-	}
+	sequence_.RecordPress((uint8_t)button);
+}
 
-	/* A press of the other sense button cancels the old sequence and is not
-	 * reused as the first press of a new one. This makes cancellation explicit. */
-	if (button != button_)
-	{
-		Cancel();
-		return false;
-	}
-
-	pressCount_++;
-	if (pressCount_ == REQUIRED_SENSE_PRESSES)
-	{
-		Cancel();
-		return true;
-	}
-
-	return false;
+bool ClockDisplayGesture::Tick()
+{
+	return sequence_.Tick();
 }
 
 void ClockDisplayGesture::Cancel()
 {
-	pressCount_ = 0;
+	sequence_.Cancel();
 }
