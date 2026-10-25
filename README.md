@@ -46,6 +46,12 @@ Si5351 quadrature strategy is experimentally established and must not be
 changed without focused regression tests and representative hardware
 measurements.
 
+Firmware and software topics integrate through `Development1`; KiCad and
+receiver-simulation topics integrate separately through `Development1-KiCad`.
+Each collector is promoted to `main` with its own cumulative pull request. Use
+`just branch-route-check <collector>` before topic work and `just
+collector-preflight <collector>` before promotion.
+
 Every GitHub release follows the mandatory ordered process in
 [RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md), including a reviewed release commit,
 clean deterministic packaging, an immutable annotated tag, exact two-asset

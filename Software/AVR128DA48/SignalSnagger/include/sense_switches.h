@@ -14,6 +14,14 @@ struct SenseSwitchState
 	bool cardioidBackEnabled;
 };
 
+enum ReceiverLedColor
+{
+	RECEIVER_LED_OFF,
+	RECEIVER_LED_RED,
+	RECEIVER_LED_GREEN,
+	NUMBER_OF_RECEIVER_LED_COLORS
+};
+
 /**
  * Interpret the active-low switch pins and choose the cardioid outputs.
  * Button presses remain visible to the UI when cardioid selection is disabled.
@@ -21,5 +29,13 @@ struct SenseSwitchState
 SenseSwitchState resolveSenseSwitches(bool leftPinHigh,
 	bool rightPinHigh,
 	bool cardioidSelectionAllowed);
+
+/**
+ * Give an enabled cardioid direction temporary priority over detector color.
+ * Ambiguous or inactive direction state preserves the detector indication.
+ */
+ReceiverLedColor resolveReceiverLedColor(bool cardioidFrontEnabled,
+	bool cardioidBackEnabled,
+	ReceiverLedColor detectorColor);
 
 #endif /* SENSE_SWITCHES_H_ */

@@ -3,12 +3,30 @@
 ## Branch discipline
 
 - Announce the current branch before editing.
-- `main` contains the deployed 0.38 release baseline and is the active
-  integration branch for this recovery and hardening effort.
+- `main` is the deployed, release-ready branch. Development work reaches it
+  only through a reviewed collector promotion pull request.
+- `Development1` is the firmware and software integration branch. Create
+  focused firmware, test, documentation, and general workflow topic branches
+  from a clean, synchronized `Development1`, and return them there after their
+  applicable gates pass.
+- `Development1-KiCad` is the separate KiCad and receiver-simulation
+  integration branch. Create schematic, PCB, footprint, symbol, and SPICE-model
+  topics from that branch and never merge pending KiCad work into
+  `Development1` merely to simplify promotion.
 - Start implementation on a focused `codex/<topic>` branch from a clean,
-  synchronized `main` unless the user explicitly requests otherwise.
+  synchronized collector branch unless the user explicitly requests otherwise.
+- Use `just branch-route-check Development1` or `just branch-route-check
+  Development1-KiCad` before topic work. Before promotion, use `just
+  collector-preflight <collector>` on the collector itself; the KiCad collector
+  preflight also runs the repository's `spice-check` gate.
 - Leave changes uncommitted and unpushed unless the user explicitly authorizes
-  those actions. Use a reviewed pull request for integration.
+  those actions. Use reviewed pull requests for normal topic integration.
+- Collect all approved firmware/software topics in `Development1`, then use one
+  cumulative `Development1` pull request to promote that set to `main`. Collect
+  KiCad/simulation topics in `Development1-KiCad` and promote them through a
+  separate pull request. Do not combine the two pending change sets.
+- After either collector is promoted, synchronize both collectors with the new
+  `main` before starting another topic so their common baseline stays current.
 - Keep unrelated KiCad changes outside firmware commits. Use `just
   stage-preview` before `just stage-non-kicad` or `just commit-push`.
 

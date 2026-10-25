@@ -4,13 +4,15 @@
 #include <stdint.h>
 
 /* Timing is expressed in 12 kHz output frames so cue generation stays integer,
- * deterministic, and cheap enough to advance from the audio ISR. At 18 WPM a
- * Morse dot and intra-character gap are 800 frames; a dash is three dots. */
-#define RF_GAIN_CUE_DOT_FRAMES UINT16_C(800)
-#define RF_GAIN_CUE_DASH_FRAMES UINT16_C(2400)
-#define RF_GAIN_CUE_GAP_FRAMES UINT16_C(800)
+ * deterministic, and cheap enough to advance from the audio ISR. At 25 WPM a
+ * Morse dot and intra-character gap are 576 frames; a dash is three dots. */
+#define RF_GAIN_CUE_DOT_FRAMES UINT16_C(576)
+#define RF_GAIN_CUE_DASH_FRAMES UINT16_C(1728)
+#define RF_GAIN_CUE_GAP_FRAMES UINT16_C(576)
 #define RF_GAIN_CUE_LONG_FRAMES UINT16_C(3600)
 #define RF_GAIN_CUE_SETTLE_FRAMES UINT16_C(3600)
+#define RF_GAIN_CUE_TONE_HZ UINT16_C(250)
+#define RF_GAIN_CUE_TONE_PERIOD_FRAMES UINT8_C(48)
 #define RF_GAIN_CUE_MAX_DISPLAYED_GAIN UINT8_C(10)
 #define RF_GAIN_CUE_NO_REQUEST UINT8_C(0xff)
 
