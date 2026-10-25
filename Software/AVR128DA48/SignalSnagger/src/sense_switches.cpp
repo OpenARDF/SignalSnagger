@@ -14,3 +14,15 @@ SenseSwitchState resolveSenseSwitches(bool leftPinHigh,
 	state.cardioidBackEnabled = cardioidSelectionAllowed && state.rightPressed;
 	return state;
 }
+
+ReceiverLedColor resolveReceiverLedColor(bool cardioidFrontEnabled,
+	bool cardioidBackEnabled,
+	ReceiverLedColor detectorColor)
+{
+	if (cardioidFrontEnabled != cardioidBackEnabled)
+	{
+		return cardioidFrontEnabled ? RECEIVER_LED_RED : RECEIVER_LED_GREEN;
+	}
+
+	return detectorColor;
+}

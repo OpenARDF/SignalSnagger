@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "multi_press_sequence.h"
+
 #define POWER_ON_CLOCK_TIME_ROW_SIZE 7
 #define POWER_ON_CLOCK_CYCLE_ROW_SIZE 11
 #define POWER_ON_CLOCK_MAX_TRACKED_SECONDS UINT32_C(299400)
@@ -33,15 +35,17 @@ class ClockDisplayGesture
 public:
 	ClockDisplayGesture();
 
-	/** Record one sense-button closure and return true on the fifth matching press. */
-	bool RecordSensePress(ClockSenseButton button);
+	/** Record one sense-button closure for resolution after the quiet period. */
+	void RecordSensePress(ClockSenseButton button);
+
+	/** Advance the timeout and return true only for an exact five-press burst. */
+	bool Tick();
 
 	/** Cancel a partial sequence after any unrelated button or encoder activity. */
 	void Cancel();
 
 private:
-	ClockSenseButton button_;
-	uint8_t pressCount_;
+	MultiPressSequence<5> sequence_;
 };
 
 #endif /* SIGNALSNAGGER_POWER_ON_CLOCK_H_ */

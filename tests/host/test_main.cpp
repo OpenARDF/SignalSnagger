@@ -12,6 +12,8 @@
 #include "datetime_utils.h"
 #include "deferred_byte_write_queue.h"
 #include "memory_channels.h"
+#include "menu_entry_timeout.h"
+#include "multi_press_sequence.h"
 #include "periodic_countdown.h"
 #include "power_on_clock.h"
 #include "receiver.h"
@@ -224,6 +226,51 @@ void testPeriodicCountdownRejectsInvalidArguments()
 	ticksRemaining = 0;
 	CHECK(periodicCountdownTick(&ticksRemaining, 6));
 	CHECK(ticksRemaining == 6);
+}
+
+void testMenuEntryTimeoutExpiresOnceAfterFiveSeconds()
+{
+	volatile MenuEntryTimeoutState timeout = {};
+	startMenuEntryTimeout(&timeout);
+	for (uint16_t tick = 1; tick < MENU_ENTRY_TIMEOUT_TICKS; ++tick)
+	{
+		tickMenuEntryTimeout(&timeout);
+		CHECK(!takeMenuEntryTimeoutExpired(&timeout));
+	}
+
+	tickMenuEntryTimeout(&timeout);
+	CHECK(takeMenuEntryTimeoutExpired(&timeout));
+	CHECK(!takeMenuEntryTimeoutExpired(&timeout));
+}
+
+void testMenuEntryTimeoutCancelsPermanentlyAfterActivity()
+{
+	volatile MenuEntryTimeoutState timeout = {};
+	startMenuEntryTimeout(&timeout);
+	for (uint16_t tick = 1; tick < MENU_ENTRY_TIMEOUT_TICKS; ++tick)
+	{
+		tickMenuEntryTimeout(&timeout);
+	}
+	/* Activity on the last possible scan still wins over expiration. */
+	cancelMenuEntryTimeout(&timeout);
+	for (uint16_t tick = 0; tick < MENU_ENTRY_TIMEOUT_TICKS * 2U; ++tick)
+	{
+		tickMenuEntryTimeout(&timeout);
+	}
+	CHECK(!takeMenuEntryTimeoutExpired(&timeout));
+}
+
+void testMenuEntryTimeoutCanRestartForNextEntry()
+{
+	volatile MenuEntryTimeoutState timeout = {};
+	startMenuEntryTimeout(&timeout);
+	cancelMenuEntryTimeout(&timeout);
+	startMenuEntryTimeout(&timeout);
+	for (uint16_t tick = 0; tick < MENU_ENTRY_TIMEOUT_TICKS; ++tick)
+	{
+		tickMenuEntryTimeout(&timeout);
+	}
+	CHECK(takeMenuEntryTimeoutExpired(&timeout));
 }
 
 void testDeferredByteWritesPreserveOrderAndCoalesceAddresses()
@@ -556,6 +603,29 @@ void testMemoryChannelSelectionRejectsInvalidOrEmptyInputs()
 	CHECK(findNextActiveMemory(empty, 0, 0, true, invalid) == invalid);
 }
 
+void testModeToggleKeepsCurrentPopulatedMemory()
+{
+	const uint32_t frequencies[] = {0, 3570500, 0, 3590000};
+	const uint8_t invalid = 0xff;
+
+	CHECK(findCurrentOrNextActiveMemory(frequencies, 4, 1, invalid) == 1);
+	CHECK(findCurrentOrNextActiveMemory(frequencies, 4, 3, invalid) == 3);
+}
+
+void testModeToggleAdvancesOnlyFromEmptyOrInvalidMemory()
+{
+	const uint32_t frequencies[] = {0, 3570500, 0, 3590000};
+	const uint32_t empty[] = {0, 0, 0};
+	const uint8_t invalid = 0xff;
+
+	CHECK(findCurrentOrNextActiveMemory(frequencies, 4, 0, invalid) == 1);
+	CHECK(findCurrentOrNextActiveMemory(frequencies, 4, 2, invalid) == 3);
+	CHECK(findCurrentOrNextActiveMemory(frequencies, 4, invalid, invalid) == 1);
+	CHECK(findCurrentOrNextActiveMemory(empty, 3, 1, invalid) == invalid);
+	CHECK(findCurrentOrNextActiveMemory(0, 3, 1, invalid) == invalid);
+	CHECK(findCurrentOrNextActiveMemory(empty, 0, 1, invalid) == invalid);
+}
+
 void testSenseSwitchesSuppressCardioidOutputsWhileEditing()
 {
 	const SenseSwitchState left = resolveSenseSwitches(false, true, false);
@@ -598,6 +668,37 @@ void testSenseSwitchesRetainOperationalCardioidBehavior()
 	CHECK(!neither.bothPressed);
 	CHECK(!neither.cardioidFrontEnabled);
 	CHECK(!neither.cardioidBackEnabled);
+}
+
+void testCardioidDirectionOverridesDetectorLedColor()
+{
+	CHECK(resolveReceiverLedColor(true, false, RECEIVER_LED_GREEN) ==
+		RECEIVER_LED_RED);
+	CHECK(resolveReceiverLedColor(false, true, RECEIVER_LED_RED) ==
+		RECEIVER_LED_GREEN);
+}
+
+void testInactiveOrAmbiguousDirectionPreservesDetectorLedColor()
+{
+	CHECK(resolveReceiverLedColor(false, false, RECEIVER_LED_RED) ==
+		RECEIVER_LED_RED);
+	CHECK(resolveReceiverLedColor(false, false, RECEIVER_LED_GREEN) ==
+		RECEIVER_LED_GREEN);
+	CHECK(resolveReceiverLedColor(false, false, RECEIVER_LED_OFF) ==
+		RECEIVER_LED_OFF);
+	CHECK(resolveReceiverLedColor(true, true, RECEIVER_LED_GREEN) ==
+		RECEIVER_LED_GREEN);
+}
+
+void testSuppressedCardioidDoesNotOverrideDetectorLedColor()
+{
+	const SenseSwitchState left = resolveSenseSwitches(false, true, false);
+	const SenseSwitchState right = resolveSenseSwitches(true, false, false);
+
+	CHECK(resolveReceiverLedColor(left.cardioidFrontEnabled,
+		left.cardioidBackEnabled, RECEIVER_LED_GREEN) == RECEIVER_LED_GREEN);
+	CHECK(resolveReceiverLedColor(right.cardioidFrontEnabled,
+		right.cardioidBackEnabled, RECEIVER_LED_RED) == RECEIVER_LED_RED);
 }
 
 void testPowerOnClockReadingSaturatesTimeAndCyclesIndependently()
@@ -649,17 +750,25 @@ void testPowerOnClockRowsUseRequestedPaddingAndAlignment()
 void testClockDisplayGestureRequiresFiveMatchingSensePresses()
 {
 	ClockDisplayGesture gesture;
-	for (uint8_t press = 1; press < 5; ++press)
+	for (uint8_t press = 0; press < 5; ++press)
 	{
-		CHECK(!gesture.RecordSensePress(CLOCK_SENSE_LEFT));
+		gesture.RecordSensePress(CLOCK_SENSE_LEFT);
 	}
-	CHECK(gesture.RecordSensePress(CLOCK_SENSE_LEFT));
+	for (uint8_t tick = 1; tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS; ++tick)
+	{
+		CHECK(!gesture.Tick());
+	}
+	CHECK(gesture.Tick());
 
-	for (uint8_t press = 1; press < 5; ++press)
+	for (uint8_t press = 0; press < 5; ++press)
 	{
-		CHECK(!gesture.RecordSensePress(CLOCK_SENSE_RIGHT));
+		gesture.RecordSensePress(CLOCK_SENSE_RIGHT);
 	}
-	CHECK(gesture.RecordSensePress(CLOCK_SENSE_RIGHT));
+	for (uint8_t tick = 1; tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS; ++tick)
+	{
+		CHECK(!gesture.Tick());
+	}
+	CHECK(gesture.Tick());
 }
 
 void testClockDisplayGestureCancelsOnOtherActivity()
@@ -667,23 +776,136 @@ void testClockDisplayGestureCancelsOnOtherActivity()
 	ClockDisplayGesture gesture;
 	for (uint8_t press = 0; press < 4; ++press)
 	{
-		CHECK(!gesture.RecordSensePress(CLOCK_SENSE_LEFT));
+		gesture.RecordSensePress(CLOCK_SENSE_LEFT);
 	}
-	CHECK(!gesture.RecordSensePress(CLOCK_SENSE_RIGHT));
+	gesture.RecordSensePress(CLOCK_SENSE_RIGHT);
+	for (uint8_t tick = 0; tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS; ++tick)
+	{
+		CHECK(!gesture.Tick());
+	}
+
+	for (uint8_t press = 0; press < 5; ++press)
+	{
+		gesture.RecordSensePress(CLOCK_SENSE_RIGHT);
+	}
+	for (uint8_t tick = 1; tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS; ++tick)
+	{
+		CHECK(!gesture.Tick());
+	}
+	CHECK(gesture.Tick());
+
+	gesture.RecordSensePress(CLOCK_SENSE_LEFT);
+	gesture.RecordSensePress(CLOCK_SENSE_LEFT);
+	gesture.Cancel();
+	for (uint8_t tick = 0; tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS; ++tick)
+	{
+		CHECK(!gesture.Tick());
+	}
+}
+
+template <uint8_t RequiredPresses>
+void checkMultiPressSequenceCount()
+{
+	MultiPressSequence<RequiredPresses> sequence;
+	for (uint8_t press = 0; press < RequiredPresses; ++press)
+	{
+		sequence.RecordPress(7);
+		if (press + 1 < RequiredPresses)
+		{
+			for (uint8_t tick = 1;
+				tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS;
+				++tick)
+			{
+				CHECK(!sequence.Tick());
+			}
+		}
+	}
+	for (uint8_t tick = 1; tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS; ++tick)
+	{
+		CHECK(!sequence.Tick());
+	}
+	CHECK(sequence.Tick());
+}
+
+void testMultiPressSequenceSupportsCountsOneThroughNine()
+{
+	checkMultiPressSequenceCount<1>();
+	checkMultiPressSequenceCount<2>();
+	checkMultiPressSequenceCount<3>();
+	checkMultiPressSequenceCount<4>();
+	checkMultiPressSequenceCount<5>();
+	checkMultiPressSequenceCount<6>();
+	checkMultiPressSequenceCount<7>();
+	checkMultiPressSequenceCount<8>();
+	checkMultiPressSequenceCount<9>();
+}
+
+void testClockDisplayGestureRestartsTimeoutAfterEachMatchingPress()
+{
+	ClockDisplayGesture gesture;
+	for (uint8_t press = 0; press < 5; ++press)
+	{
+		gesture.RecordSensePress(CLOCK_SENSE_LEFT);
+		for (uint8_t tick = 1;
+			tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS;
+			++tick)
+		{
+			CHECK(!gesture.Tick());
+		}
+	}
+	CHECK(gesture.Tick());
+}
+
+void testClockDisplayGestureRejectsExpiredSequence()
+{
+	ClockDisplayGesture gesture;
 	for (uint8_t press = 0; press < 4; ++press)
 	{
-		CHECK(!gesture.RecordSensePress(CLOCK_SENSE_RIGHT));
+		gesture.RecordSensePress(CLOCK_SENSE_RIGHT);
 	}
-	CHECK(gesture.RecordSensePress(CLOCK_SENSE_RIGHT));
 
-	CHECK(!gesture.RecordSensePress(CLOCK_SENSE_LEFT));
-	CHECK(!gesture.RecordSensePress(CLOCK_SENSE_LEFT));
-	gesture.Cancel();
-	for (uint8_t press = 1; press < 5; ++press)
+	for (uint8_t tick = 0;
+		tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS;
+		++tick)
 	{
-		CHECK(!gesture.RecordSensePress(CLOCK_SENSE_LEFT));
+		CHECK(!gesture.Tick());
 	}
-	CHECK(gesture.RecordSensePress(CLOCK_SENSE_LEFT));
+
+	/* The late press starts a new sequence; it cannot complete the expired one. */
+	gesture.RecordSensePress(CLOCK_SENSE_RIGHT);
+	for (uint8_t press = 1; press < 4; ++press)
+	{
+		gesture.RecordSensePress(CLOCK_SENSE_RIGHT);
+	}
+	gesture.RecordSensePress(CLOCK_SENSE_RIGHT);
+	for (uint8_t tick = 1; tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS; ++tick)
+	{
+		CHECK(!gesture.Tick());
+	}
+	CHECK(gesture.Tick());
+}
+
+void testClockDisplayGestureIgnoresUndefinedCounts()
+{
+	for (uint8_t pressCount = 1; pressCount <= 11; ++pressCount)
+	{
+		if (pressCount == 5)
+		{
+			continue;
+		}
+
+		ClockDisplayGesture gesture;
+		for (uint8_t press = 0; press < pressCount; ++press)
+		{
+			gesture.RecordSensePress(CLOCK_SENSE_LEFT);
+		}
+		for (uint8_t tick = 0;
+			tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS;
+			++tick)
+		{
+			CHECK(!gesture.Tick());
+		}
+	}
 }
 
 void testSignalScoreRejectsInvalidLogarithmInputs()
@@ -1286,6 +1508,9 @@ int main()
 	testCircularUintAverageUsesOnlyInitializedEntries();
 	testPeriodicCountdownDoesNotDriftAtByteWrap();
 	testPeriodicCountdownRejectsInvalidArguments();
+	testMenuEntryTimeoutExpiresOnceAfterFiveSeconds();
+	testMenuEntryTimeoutCancelsPermanentlyAfterActivity();
+	testMenuEntryTimeoutCanRestartForNextEntry();
 	testDeferredByteWritesPreserveOrderAndCoalesceAddresses();
 	testDeferredByteWritesRejectOverflowButStillCoalesce();
 	testReceiverFrequencyBoundsAreInclusive();
@@ -1305,12 +1530,21 @@ int main()
 	testStatusWaitCompletesOrTimesOut();
 	testMemoryChannelSelectionWrapsAndSkipsEmptyChannels();
 	testMemoryChannelSelectionRejectsInvalidOrEmptyInputs();
+	testModeToggleKeepsCurrentPopulatedMemory();
+	testModeToggleAdvancesOnlyFromEmptyOrInvalidMemory();
 	testSenseSwitchesSuppressCardioidOutputsWhileEditing();
 	testSenseSwitchesRetainOperationalCardioidBehavior();
+	testCardioidDirectionOverridesDetectorLedColor();
+	testInactiveOrAmbiguousDirectionPreservesDetectorLedColor();
+	testSuppressedCardioidDoesNotOverrideDetectorLedColor();
 	testPowerOnClockReadingSaturatesTimeAndCyclesIndependently();
 	testPowerOnClockRowsUseRequestedPaddingAndAlignment();
 	testClockDisplayGestureRequiresFiveMatchingSensePresses();
 	testClockDisplayGestureCancelsOnOtherActivity();
+	testMultiPressSequenceSupportsCountsOneThroughNine();
+	testClockDisplayGestureRestartsTimeoutAfterEachMatchingPress();
+	testClockDisplayGestureRejectsExpiredSequence();
+	testClockDisplayGestureIgnoresUndefinedCounts();
 	testSignalScoreRejectsInvalidLogarithmInputs();
 	testSignalScoreIsBounded();
 	testSignalDetectorSmoothingSeedsAndAverages();

@@ -28,6 +28,7 @@
 #include "display.h"
 #include "dac0.h"
 #include "memory_channels.h"
+#include "menu_entry_timeout.h"
 #include "periodic_countdown.h"
 #include "power_on_clock.h"
 #include "receiver_frequency.h"
@@ -241,10 +242,15 @@ static volatile bool g_leftsense_pressed = false;
 static volatile bool g_rightsense_pressed = false;
 static volatile bool g_doublesense_pressed = false;
 static volatile bool g_encoderswitch_pressed = false;
+/* The switch ISR publishes the RF paths actually enabled so the foreground
+ * LED policy never reports a direction that frequency editing suppresses. */
+static volatile bool g_cardioid_front_enabled = false;
+static volatile bool g_cardioid_back_enabled = false;
 /* Gesture state is ISR-owned; foreground only exchanges the one-byte requests. */
 static ClockDisplayGesture g_clock_display_gesture;
 static volatile bool g_clock_display_toggle_requested = false;
 static volatile bool g_clock_display_gesture_cancel_requested = false;
+static volatile MenuEntryTimeoutState g_menu_entry_timeout = {};
 /* Foreground owns this flag; the switch ISR reads it to preserve the RF path while editing. */
 static volatile bool g_frequency_updates_enabled = false;
 /* A long accept press must remain RF-neutral until the physical button is released. */
@@ -369,6 +375,27 @@ static void scheduleRfGainAudioFeedback(uint8_t displayedGain)
 		/* The request is one byte and is consumed only by the audio ISR. A newer
 		 * detent safely replaces an older request before it is consumed. */
 		g_requested_rf_gain_cue = displayedGain;
+	}
+}
+
+static void applyReceiverLedColor(ReceiverLedColor color)
+{
+	switch (color)
+	{
+		case RECEIVER_LED_RED:
+			LEDS.blink(LEDS_RED_ON_CONSTANT, true);
+			LEDS.blink(LEDS_GREEN_OFF);
+			break;
+
+		case RECEIVER_LED_GREEN:
+			LEDS.blink(LEDS_GREEN_ON_CONSTANT, true);
+			LEDS.blink(LEDS_RED_OFF);
+			break;
+
+		case RECEIVER_LED_OFF:
+		default:
+			LEDS.blink(LEDS_OFF, true);
+			break;
 	}
 }
 
@@ -551,6 +578,7 @@ ISR(TCB0_INT_vect)
 		
 		if(periodicCountdownTick(&switchScanTicksRemaining, 6))
 		{
+			tickMenuEntryTimeout(&g_menu_entry_timeout);
 			uint8_t switch_bits = ((1 << SENSE_SWITCH_LEFT) | (1 << SENSE_SWITCH_RIGHT) | (1 << ENCODER_SWITCH) | (1 << HEADPHONE_DETECT));
 
 			holdSwitch = portAdebouncedVals() & switch_bits;
@@ -593,6 +621,8 @@ ISR(TCB0_INT_vect)
 			const SenseSwitchState senseSwitches = resolveSenseSwitches(leftSense,
 				rightSense,
 				!g_frequency_updates_enabled && !g_suppress_cardioid_until_side_release);
+			g_cardioid_front_enabled = senseSwitches.cardioidFrontEnabled;
+			g_cardioid_back_enabled = senseSwitches.cardioidBackEnabled;
 			PORTA_set_pin_level(CARDIOID_FRONT, senseSwitches.cardioidFrontEnabled ? HIGH : LOW);
 			PORTA_set_pin_level(CARDIOID_BACK, senseSwitches.cardioidBackEnabled ? HIGH : LOW);
 			
@@ -652,17 +682,11 @@ ISR(TCB0_INT_vect)
 				}
 				else if(leftsenseAction == SwitchClosure)
 				{
-					if(g_clock_display_gesture.RecordSensePress(CLOCK_SENSE_LEFT))
-					{
-						g_clock_display_toggle_requested = true;
-					}
+					g_clock_display_gesture.RecordSensePress(CLOCK_SENSE_LEFT);
 				}
 				else if(rightsenseAction == SwitchClosure)
 				{
-					if(g_clock_display_gesture.RecordSensePress(CLOCK_SENSE_RIGHT))
-					{
-						g_clock_display_toggle_requested = true;
-					}
+					g_clock_display_gesture.RecordSensePress(CLOCK_SENSE_RIGHT);
 				}
 				
 				if(senseSwitches.bothPressed) /* Both sense switches are closed */
@@ -711,6 +735,9 @@ ISR(TCB0_INT_vect)
 				{
 					if(g_encoderswitch_pressed) 
 					{
+						/* Any debounced encoder-button closure makes this an intentional
+						 * menu session, permanently disarming the entry timeout. */
+						cancelMenuEntryTimeout(&g_menu_entry_timeout);
 						g_clock_display_gesture.Cancel();
 						g_encoder_presses_count++;
 						encoderswitchAction = SwitchClosure;
@@ -791,6 +818,13 @@ ISR(TCB0_INT_vect)
 						}
 					}
 				}
+			}
+
+			/* Resolve after processing this scan so any other button activation
+			 * cancels the pending burst before it can dispatch. */
+			if(g_clock_display_gesture.Tick())
+			{
+				g_clock_display_toggle_requested = true;
 			}
 			
 			if(doublesense_closures_count_period)
@@ -928,6 +962,9 @@ ISR(TCB0_INT_vect)
 				
 				if(val > 3)
 				{
+					/* A completed detent is menu activity even when the encoder switch
+					 * is also held. Invalid/noisy partial edges do not cancel timeout. */
+					cancelMenuEntryTimeout(&g_menu_entry_timeout);
 					if(g_encoderswitch_pressed)
 					{
 						encoderLongPressEnabled = false; /* prevent press activation while turning */
@@ -1360,9 +1397,12 @@ int main(void)
 	bool hold_headphone_state = true;
 	bool clock_display_active = false;
 	bool hold_clock_display_active = false;
+	bool clock_display_before_menu_entry = false;
 	bool refresh_display = true;
 	uint8_t x;
 	EC ec;
+	ReceiverLedColor detectorLedColor = RECEIVER_LED_OFF;
+	ReceiverLedColor holdReceiverLedColor = NUMBER_OF_RECEIVER_LED_COLORS;
 	bool inhibit_long_encoder_press = false;
 	
 	float temp_float = 0.;
@@ -1480,11 +1520,27 @@ int main(void)
 
 	while (1) 
 	{
+		bool refreshReceiverLed = false;
 		EEPromMgr.serviceQueuedWrites();
 
 		if(!g_display_active_countdown)
 		{
 			MenuState_t currentMenu = setMenu(MenuGetCurrent);
+			if(currentMenu != MenuMain)
+			{
+				cancelMenuEntryTimeout(&g_menu_entry_timeout);
+			}
+			else if(takeMenuEntryTimeoutExpired(&g_menu_entry_timeout))
+			{
+				/* No encoder activity occurred after entry. Discard queued menu text
+				 * and restore the exact operational display mode from before entry. */
+				rollbackMenuEditsIfActive();
+				g_text_buff.reset();
+				clock_display_active = clock_display_before_menu_entry;
+				setMenu(MenuOperational);
+				currentMenu = MenuOperational;
+				refresh_display = true;
+			}
 			if(currentMenu != MenuOperational)
 			{
 				g_clock_display_gesture_cancel_requested = true;
@@ -2077,12 +2133,19 @@ int main(void)
 				g_clock_display_gesture_cancel_requested = true;
 				if(setMenu(MenuGetCurrent) == MenuOperational) 
 				{
+					clock_display_before_menu_entry = clock_display_active;
 					clock_display_active = false;
 					refresh_display = true;
 					setMenu(MenuMain);
+					startMenuEntryTimeout(&g_menu_entry_timeout);
+					if(g_encoderswitch_pressed)
+					{
+						cancelMenuEntryTimeout(&g_menu_entry_timeout);
+					}
 				}
 				else
 				{
+					cancelMenuEntryTimeout(&g_menu_entry_timeout);
 					commitMenuEditsIfActive();
 					setMenu(MenuOperational);
 				}
@@ -2185,11 +2248,7 @@ int main(void)
 			uint16_t rightsense_presses = atomicExchangeU16(&g_handle_counted_rightsense_presses, 0);
 			if(rightsense_presses)
 			{
-				if(rightsense_presses == 1)
-				{
-					LEDS.blink(LEDS_OFF, true);
-				}
-				else if (rightsense_presses == 2)
+				if (rightsense_presses == 2)
 				{
 					if(g_encoderswitch_pressed)
 					{
@@ -2280,21 +2339,38 @@ int main(void)
 			uint16_t encoder_presses = atomicExchangeU16(&g_handle_counted_encoder_presses, 0);
 			if(encoder_presses)
 			{
+				/* Also cancel here in case the closure was queued just before menu
+				 * entry and its counted action arrived just afterward. */
+				cancelMenuEntryTimeout(&g_menu_entry_timeout);
 				if(encoder_presses == 1)
 				{
-					if((g_frequency_mode == MODE_VFO) && advanceActiveMemory(UP))
+					/* Receiver-mode selection belongs only to the normal operational
+					 * display; menu and clock screens must retain their current state. */
+					if((setMenu(MenuGetCurrent) == MenuOperational) && !clock_display_active)
 					{
-						if (tuneReceiverTo(g_channel_frequency[g_active_memory]))
+						if(g_frequency_mode == MODE_VFO)
 						{
-							g_frequency_mode = MODE_MEMORY;
+							const uint8_t selectedMemory = findCurrentOrNextActiveMemory(
+								g_channel_frequency,
+								NUMBER_OF_FREQUENCY_CHANNELS,
+								g_active_memory,
+								INVALID_CHANNEL);
+							if(selectedMemory != INVALID_CHANNEL)
+							{
+								g_active_memory = selectedMemory;
+								if (tuneReceiverTo(g_channel_frequency[g_active_memory]))
+								{
+									g_frequency_mode = MODE_MEMORY;
+								}
+							}
 						}
-					}
-					else
-					{
-						g_frequency_mode = MODE_VFO;
-					}
+						else
+						{
+							g_frequency_mode = MODE_VFO;
+						}
 				
-					refresh_display = true;
+						refresh_display = true;
+					}
 				}
 				else if (encoder_presses == 2)
 				{
@@ -2467,6 +2543,7 @@ int main(void)
 		
 			if(atomicExchangeBool(&g_long_encoder_press, false))
 			{
+				cancelMenuEntryTimeout(&g_menu_entry_timeout);
 				if(!inhibit_long_encoder_press)
 				{
 				}
@@ -2480,6 +2557,9 @@ int main(void)
 			int rotary_step = atomicConsumeIntStep(&g_rotary_count);
 			if(rotary_step)
 			{
+				/* Recheck in the foreground so a detent queued just before menu
+				 * entry still disarms the newly started timeout. */
+				cancelMenuEntryTimeout(&g_menu_entry_timeout);
 				uint8_t pwm = g_rf_gain_setting;
 			
 				atomicWriteU16(&g_powerdown_seconds, INACTIVITY_POWER_DOWN_DELAY_SECONDS);
@@ -3024,8 +3104,8 @@ int main(void)
 						{
 							if(signal_to_noise > 13)
 							{
-								LEDS.blink(LEDS_GREEN_ON_CONSTANT, true);
-								LEDS.blink(LEDS_RED_OFF);
+								detectorLedColor = RECEIVER_LED_GREEN;
+								refreshReceiverLed = true;
 							}
 							
 							consecutiveNoise = 0;	
@@ -3052,8 +3132,8 @@ int main(void)
 
 						if(consecutiveNoise > 2)
 						{
-							LEDS.blink(LEDS_RED_ON_CONSTANT, true);
-							LEDS.blink(LEDS_GREEN_OFF, true);
+							detectorLedColor = RECEIVER_LED_RED;
+							refreshReceiverLed = true;
 						}
 					}									
 				}
@@ -3065,6 +3145,18 @@ int main(void)
 					nominal = g_nominal_buff.olympic();
 				}
 			}
+		}
+
+		/* Direction indication is derived from the RF outputs actually enabled.
+		 * Releasing the sense button restores the latest detector color. */
+		const ReceiverLedColor receiverLedColor = resolveReceiverLedColor(
+			g_cardioid_front_enabled,
+			g_cardioid_back_enabled,
+			detectorLedColor);
+		if(refreshReceiverLed || receiverLedColor != holdReceiverLedColor)
+		{
+			applyReceiverLedColor(receiverLedColor);
+			holdReceiverLedColor = receiverLedColor;
 		}
 		
 		
