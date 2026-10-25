@@ -242,6 +242,10 @@ static volatile bool g_leftsense_pressed = false;
 static volatile bool g_rightsense_pressed = false;
 static volatile bool g_doublesense_pressed = false;
 static volatile bool g_encoderswitch_pressed = false;
+/* The switch ISR publishes the RF paths actually enabled so the foreground
+ * LED policy never reports a direction that frequency editing suppresses. */
+static volatile bool g_cardioid_front_enabled = false;
+static volatile bool g_cardioid_back_enabled = false;
 /* Gesture state is ISR-owned; foreground only exchanges the one-byte requests. */
 static ClockDisplayGesture g_clock_display_gesture;
 static volatile bool g_clock_display_toggle_requested = false;
@@ -371,6 +375,27 @@ static void scheduleRfGainAudioFeedback(uint8_t displayedGain)
 		/* The request is one byte and is consumed only by the audio ISR. A newer
 		 * detent safely replaces an older request before it is consumed. */
 		g_requested_rf_gain_cue = displayedGain;
+	}
+}
+
+static void applyReceiverLedColor(ReceiverLedColor color)
+{
+	switch (color)
+	{
+		case RECEIVER_LED_RED:
+			LEDS.blink(LEDS_RED_ON_CONSTANT, true);
+			LEDS.blink(LEDS_GREEN_OFF);
+			break;
+
+		case RECEIVER_LED_GREEN:
+			LEDS.blink(LEDS_GREEN_ON_CONSTANT, true);
+			LEDS.blink(LEDS_RED_OFF);
+			break;
+
+		case RECEIVER_LED_OFF:
+		default:
+			LEDS.blink(LEDS_OFF, true);
+			break;
 	}
 }
 
@@ -596,6 +621,8 @@ ISR(TCB0_INT_vect)
 			const SenseSwitchState senseSwitches = resolveSenseSwitches(leftSense,
 				rightSense,
 				!g_frequency_updates_enabled && !g_suppress_cardioid_until_side_release);
+			g_cardioid_front_enabled = senseSwitches.cardioidFrontEnabled;
+			g_cardioid_back_enabled = senseSwitches.cardioidBackEnabled;
 			PORTA_set_pin_level(CARDIOID_FRONT, senseSwitches.cardioidFrontEnabled ? HIGH : LOW);
 			PORTA_set_pin_level(CARDIOID_BACK, senseSwitches.cardioidBackEnabled ? HIGH : LOW);
 			
@@ -1374,6 +1401,8 @@ int main(void)
 	bool refresh_display = true;
 	uint8_t x;
 	EC ec;
+	ReceiverLedColor detectorLedColor = RECEIVER_LED_OFF;
+	ReceiverLedColor holdReceiverLedColor = NUMBER_OF_RECEIVER_LED_COLORS;
 	bool inhibit_long_encoder_press = false;
 	
 	float temp_float = 0.;
@@ -1491,6 +1520,7 @@ int main(void)
 
 	while (1) 
 	{
+		bool refreshReceiverLed = false;
 		EEPromMgr.serviceQueuedWrites();
 
 		if(!g_display_active_countdown)
@@ -2218,11 +2248,7 @@ int main(void)
 			uint16_t rightsense_presses = atomicExchangeU16(&g_handle_counted_rightsense_presses, 0);
 			if(rightsense_presses)
 			{
-				if(rightsense_presses == 1)
-				{
-					LEDS.blink(LEDS_OFF, true);
-				}
-				else if (rightsense_presses == 2)
+				if (rightsense_presses == 2)
 				{
 					if(g_encoderswitch_pressed)
 					{
@@ -3078,8 +3104,8 @@ int main(void)
 						{
 							if(signal_to_noise > 13)
 							{
-								LEDS.blink(LEDS_GREEN_ON_CONSTANT, true);
-								LEDS.blink(LEDS_RED_OFF);
+								detectorLedColor = RECEIVER_LED_GREEN;
+								refreshReceiverLed = true;
 							}
 							
 							consecutiveNoise = 0;	
@@ -3106,8 +3132,8 @@ int main(void)
 
 						if(consecutiveNoise > 2)
 						{
-							LEDS.blink(LEDS_RED_ON_CONSTANT, true);
-							LEDS.blink(LEDS_GREEN_OFF, true);
+							detectorLedColor = RECEIVER_LED_RED;
+							refreshReceiverLed = true;
 						}
 					}									
 				}
@@ -3119,6 +3145,18 @@ int main(void)
 					nominal = g_nominal_buff.olympic();
 				}
 			}
+		}
+
+		/* Direction indication is derived from the RF outputs actually enabled.
+		 * Releasing the sense button restores the latest detector color. */
+		const ReceiverLedColor receiverLedColor = resolveReceiverLedColor(
+			g_cardioid_front_enabled,
+			g_cardioid_back_enabled,
+			detectorLedColor);
+		if(refreshReceiverLed || receiverLedColor != holdReceiverLedColor)
+		{
+			applyReceiverLedColor(receiverLedColor);
+			holdReceiverLedColor = receiverLedColor;
 		}
 		
 		

@@ -670,6 +670,37 @@ void testSenseSwitchesRetainOperationalCardioidBehavior()
 	CHECK(!neither.cardioidBackEnabled);
 }
 
+void testCardioidDirectionOverridesDetectorLedColor()
+{
+	CHECK(resolveReceiverLedColor(true, false, RECEIVER_LED_GREEN) ==
+		RECEIVER_LED_RED);
+	CHECK(resolveReceiverLedColor(false, true, RECEIVER_LED_RED) ==
+		RECEIVER_LED_GREEN);
+}
+
+void testInactiveOrAmbiguousDirectionPreservesDetectorLedColor()
+{
+	CHECK(resolveReceiverLedColor(false, false, RECEIVER_LED_RED) ==
+		RECEIVER_LED_RED);
+	CHECK(resolveReceiverLedColor(false, false, RECEIVER_LED_GREEN) ==
+		RECEIVER_LED_GREEN);
+	CHECK(resolveReceiverLedColor(false, false, RECEIVER_LED_OFF) ==
+		RECEIVER_LED_OFF);
+	CHECK(resolveReceiverLedColor(true, true, RECEIVER_LED_GREEN) ==
+		RECEIVER_LED_GREEN);
+}
+
+void testSuppressedCardioidDoesNotOverrideDetectorLedColor()
+{
+	const SenseSwitchState left = resolveSenseSwitches(false, true, false);
+	const SenseSwitchState right = resolveSenseSwitches(true, false, false);
+
+	CHECK(resolveReceiverLedColor(left.cardioidFrontEnabled,
+		left.cardioidBackEnabled, RECEIVER_LED_GREEN) == RECEIVER_LED_GREEN);
+	CHECK(resolveReceiverLedColor(right.cardioidFrontEnabled,
+		right.cardioidBackEnabled, RECEIVER_LED_RED) == RECEIVER_LED_RED);
+}
+
 void testPowerOnClockReadingSaturatesTimeAndCyclesIndependently()
 {
 	PowerOnClockReading reading = powerOnClockReading(0);
@@ -1503,6 +1534,9 @@ int main()
 	testModeToggleAdvancesOnlyFromEmptyOrInvalidMemory();
 	testSenseSwitchesSuppressCardioidOutputsWhileEditing();
 	testSenseSwitchesRetainOperationalCardioidBehavior();
+	testCardioidDirectionOverridesDetectorLedColor();
+	testInactiveOrAmbiguousDirectionPreservesDetectorLedColor();
+	testSuppressedCardioidDoesNotOverrideDetectorLedColor();
 	testPowerOnClockReadingSaturatesTimeAndCyclesIndependently();
 	testPowerOnClockRowsUseRequestedPaddingAndAlignment();
 	testClockDisplayGestureRequiresFiveMatchingSensePresses();
