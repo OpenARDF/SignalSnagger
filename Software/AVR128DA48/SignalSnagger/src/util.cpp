@@ -68,7 +68,8 @@ bool frequencyString(char* result, uint32_t freq)
 //		uint32_t k = (freq % 1000000) / 1000;
 		uint32_t c = (freq % 1000);
 //		sprintf(result, "%lu.%03lu.%03lu", freq/1000000, k, c);
-		sprintf(result, "%lu.%1lu", freq/1000, c/100);
+		/* Two fractional kHz digits keep a 10 Hz tuning step visible. */
+		sprintf(result, "%lu.%02lu", freq/1000, c/10);
 		
 		failure = false;
 	}

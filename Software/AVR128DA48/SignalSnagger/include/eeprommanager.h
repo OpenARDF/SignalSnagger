@@ -115,6 +115,7 @@ struct EE_prom
 	uint8_t turn_tick_audio_feedback;
 	uint8_t gain_indicator_audio_feedback;
 	uint8_t cw_offset_setting;
+	uint8_t tuning_step_setting;
 
 };
 
@@ -195,7 +196,8 @@ typedef enum
 	Pushbutton_Audio_Feedback = Audio_Filter_Mode + sizeof(uint8_t),
 	Turn_Tick_Audio_Feedback = Pushbutton_Audio_Feedback + sizeof(uint8_t),
 	Gain_Indicator_Audio_Feedback = Turn_Tick_Audio_Feedback + sizeof(uint8_t),
-	Cw_Offset_Setting = Gain_Indicator_Audio_Feedback + sizeof(uint8_t)
+	Cw_Offset_Setting = Gain_Indicator_Audio_Feedback + sizeof(uint8_t),
+	Tuning_Step_Setting = Cw_Offset_Setting + sizeof(uint8_t)
 } EE_var_t;
 
 

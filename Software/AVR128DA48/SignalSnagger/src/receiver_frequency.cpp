@@ -1,5 +1,32 @@
 #include "receiver_frequency.h"
 
+TuningStepSetting tuningStepSettingFromStored(uint8_t storedSetting)
+{
+	return storedSetting == TUNING_STEP_10_HZ ? TUNING_STEP_10_HZ
+		: TUNING_STEP_DEFAULT_SETTING;
+}
+
+TuningStepSetting nextTuningStepSetting(TuningStepSetting setting, bool up)
+{
+	setting = tuningStepSettingFromStored((uint8_t)setting);
+	if (up)
+	{
+		return TUNING_STEP_100_HZ;
+	}
+	return TUNING_STEP_10_HZ;
+}
+
+uint16_t tuningStepHz(TuningStepSetting setting)
+{
+	return tuningStepSettingFromStored((uint8_t)setting) == TUNING_STEP_10_HZ
+		? UINT16_C(10) : UINT16_C(100);
+}
+
+uint16_t tuningCoarseStepHz(TuningStepSetting setting)
+{
+	return (uint16_t)(tuningStepHz(setting) * UINT16_C(10));
+}
+
 bool cwOffsetSettingIsValid(uint8_t setting)
 {
 	return setting == CW_OFFSET_ZERO_SETTING ||

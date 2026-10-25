@@ -12,12 +12,16 @@
 #include "datetime_utils.h"
 #include "deferred_byte_write_queue.h"
 #include "memory_channels.h"
+#include "menu_entry_timeout.h"
+#include "multi_press_sequence.h"
 #include "periodic_countdown.h"
+#include "power_on_clock.h"
 #include "receiver.h"
 #include "receiver_frequency.h"
 #include "receiver_test_stubs.h"
 #include "rf_gain_audio_cue.h"
 #include "sense_switches.h"
+#include "si5351_fraction.h"
 #include "signal_score.h"
 #include "sound_settings.h"
 #include "status_wait.h"
@@ -224,6 +228,51 @@ void testPeriodicCountdownRejectsInvalidArguments()
 	CHECK(ticksRemaining == 6);
 }
 
+void testMenuEntryTimeoutExpiresOnceAfterFiveSeconds()
+{
+	volatile MenuEntryTimeoutState timeout = {};
+	startMenuEntryTimeout(&timeout);
+	for (uint16_t tick = 1; tick < MENU_ENTRY_TIMEOUT_TICKS; ++tick)
+	{
+		tickMenuEntryTimeout(&timeout);
+		CHECK(!takeMenuEntryTimeoutExpired(&timeout));
+	}
+
+	tickMenuEntryTimeout(&timeout);
+	CHECK(takeMenuEntryTimeoutExpired(&timeout));
+	CHECK(!takeMenuEntryTimeoutExpired(&timeout));
+}
+
+void testMenuEntryTimeoutCancelsPermanentlyAfterActivity()
+{
+	volatile MenuEntryTimeoutState timeout = {};
+	startMenuEntryTimeout(&timeout);
+	for (uint16_t tick = 1; tick < MENU_ENTRY_TIMEOUT_TICKS; ++tick)
+	{
+		tickMenuEntryTimeout(&timeout);
+	}
+	/* Activity on the last possible scan still wins over expiration. */
+	cancelMenuEntryTimeout(&timeout);
+	for (uint16_t tick = 0; tick < MENU_ENTRY_TIMEOUT_TICKS * 2U; ++tick)
+	{
+		tickMenuEntryTimeout(&timeout);
+	}
+	CHECK(!takeMenuEntryTimeoutExpired(&timeout));
+}
+
+void testMenuEntryTimeoutCanRestartForNextEntry()
+{
+	volatile MenuEntryTimeoutState timeout = {};
+	startMenuEntryTimeout(&timeout);
+	cancelMenuEntryTimeout(&timeout);
+	startMenuEntryTimeout(&timeout);
+	for (uint16_t tick = 0; tick < MENU_ENTRY_TIMEOUT_TICKS; ++tick)
+	{
+		tickMenuEntryTimeout(&timeout);
+	}
+	CHECK(takeMenuEntryTimeoutExpired(&timeout));
+}
+
 void testDeferredByteWritesPreserveOrderAndCoalesceAddresses()
 {
 	DeferredByteWriteQueue<3> queue;
@@ -290,9 +339,68 @@ void testReceiverFrequencyStepProducesValidatedResult()
 	CHECK(result == 3571500);
 	CHECK(receiverFrequencyStep(result, -1, 100, &result));
 	CHECK(result == 3571400);
+	CHECK(receiverFrequencyStep(result, 1, 10, &result));
+	CHECK(result == 3571410);
 	CHECK(!receiverFrequencyStep(result, 1, 0, &result));
 	CHECK(!receiverFrequencyStep(result, 2, 100, &result));
 	CHECK(!receiverFrequencyStep(result, 1, 100, 0));
+}
+
+void testSi5351FractionPreservesExactLegacyGrid()
+{
+	const uint32_t referenceHz = UINT32_C(25000000);
+	const uint32_t maximumDenominator = UINT32_C(1048575);
+	for (uint32_t carrierHz = RECEIVER_FREQUENCY_MIN_HZ;
+		carrierHz <= RECEIVER_FREQUENCY_MAX_HZ; carrierHz += 100U)
+	{
+		const uint32_t outputHz = carrierHz + AUDIO_CW_DEFAULT_OFFSET_HZ;
+		const uint32_t multipliedHz = 126U * outputHz;
+		Si5351Fraction fraction = {};
+		CHECK(si5351CalculateFraction(multipliedHz, referenceHz,
+			maximumDenominator, &fraction));
+		CHECK(fraction.denominator <= maximumDenominator);
+		const uint64_t reconstructed =
+			(uint64_t)referenceHz * fraction.integer * fraction.denominator +
+			(uint64_t)referenceHz * fraction.numerator;
+		CHECK(reconstructed == (uint64_t)multipliedHz * fraction.denominator);
+	}
+}
+
+void testSi5351FractionBoundsEveryTenHertzTuningPoint()
+{
+	const uint32_t referenceHz = UINT32_C(25000000);
+	const uint32_t maximumDenominator = UINT32_C(1048575);
+	for (uint32_t carrierHz = RECEIVER_FREQUENCY_MIN_HZ;
+		carrierHz <= RECEIVER_FREQUENCY_MAX_HZ; carrierHz += 10U)
+	{
+		for (uint8_t offsetSetting = CW_OFFSET_ZERO_SETTING;
+			offsetSetting <= CW_OFFSET_MAX_SETTING; ++offsetSetting)
+		{
+			if (offsetSetting != CW_OFFSET_ZERO_SETTING &&
+				offsetSetting < CW_OFFSET_MIN_SETTING)
+			{
+				continue;
+			}
+			const uint32_t outputHz = carrierHz + cwOffsetHz(offsetSetting);
+			const uint32_t multipliedHz = 126U * outputHz;
+			Si5351Fraction fraction = {};
+			CHECK(si5351CalculateFraction(multipliedHz, referenceHz,
+				maximumDenominator, &fraction));
+			CHECK(fraction.denominator >= 1U);
+			CHECK(fraction.denominator <= maximumDenominator);
+			CHECK(fraction.numerator < fraction.denominator);
+
+			const double actualOutputHz = (double)referenceHz *
+				((double)fraction.integer + (double)fraction.numerator /
+					(double)fraction.denominator) / 126.0;
+			CHECK(std::fabs(actualOutputHz - (double)outputHz) < 0.1);
+		}
+	}
+
+	Si5351Fraction fraction = {};
+	CHECK(!si5351CalculateFraction(1, 0, maximumDenominator, &fraction));
+	CHECK(!si5351CalculateFraction(1, referenceHz, 0, &fraction));
+	CHECK(!si5351CalculateFraction(1, referenceHz, maximumDenominator, 0));
 }
 
 void testCwOffsetSettingsNormalizeAndClampWithoutWrapping()
@@ -314,6 +422,26 @@ void testCwOffsetSettingsNormalizeAndClampWithoutWrapping()
 		CW_OFFSET_MAX_SETTING);
 	CHECK(nextCwOffsetSetting(CW_OFFSET_MAX_SETTING, false) ==
 		CW_OFFSET_MAX_SETTING - 1);
+}
+
+void testTuningStepSettingsNormalizeAndKeepDecadeCoarseStep()
+{
+	CHECK(tuningStepSettingFromStored(0xff) == TUNING_STEP_100_HZ);
+	CHECK(tuningStepSettingFromStored(0) == TUNING_STEP_100_HZ);
+	CHECK(tuningStepSettingFromStored(TUNING_STEP_10_HZ) ==
+		TUNING_STEP_10_HZ);
+	CHECK(tuningStepHz(TUNING_STEP_10_HZ) == 10);
+	CHECK(tuningCoarseStepHz(TUNING_STEP_10_HZ) == 100);
+	CHECK(tuningStepHz(TUNING_STEP_100_HZ) == 100);
+	CHECK(tuningCoarseStepHz(TUNING_STEP_100_HZ) == 1000);
+	CHECK(nextTuningStepSetting(TUNING_STEP_10_HZ, true) ==
+		TUNING_STEP_100_HZ);
+	CHECK(nextTuningStepSetting(TUNING_STEP_100_HZ, true) ==
+		TUNING_STEP_100_HZ);
+	CHECK(nextTuningStepSetting(TUNING_STEP_100_HZ, false) ==
+		TUNING_STEP_10_HZ);
+	CHECK(nextTuningStepSetting(TUNING_STEP_10_HZ, false) ==
+		TUNING_STEP_10_HZ);
 }
 
 void testCarrierFrequencyMapsToHighSideOscillator()
@@ -475,6 +603,29 @@ void testMemoryChannelSelectionRejectsInvalidOrEmptyInputs()
 	CHECK(findNextActiveMemory(empty, 0, 0, true, invalid) == invalid);
 }
 
+void testModeToggleKeepsCurrentPopulatedMemory()
+{
+	const uint32_t frequencies[] = {0, 3570500, 0, 3590000};
+	const uint8_t invalid = 0xff;
+
+	CHECK(findCurrentOrNextActiveMemory(frequencies, 4, 1, invalid) == 1);
+	CHECK(findCurrentOrNextActiveMemory(frequencies, 4, 3, invalid) == 3);
+}
+
+void testModeToggleAdvancesOnlyFromEmptyOrInvalidMemory()
+{
+	const uint32_t frequencies[] = {0, 3570500, 0, 3590000};
+	const uint32_t empty[] = {0, 0, 0};
+	const uint8_t invalid = 0xff;
+
+	CHECK(findCurrentOrNextActiveMemory(frequencies, 4, 0, invalid) == 1);
+	CHECK(findCurrentOrNextActiveMemory(frequencies, 4, 2, invalid) == 3);
+	CHECK(findCurrentOrNextActiveMemory(frequencies, 4, invalid, invalid) == 1);
+	CHECK(findCurrentOrNextActiveMemory(empty, 3, 1, invalid) == invalid);
+	CHECK(findCurrentOrNextActiveMemory(0, 3, 1, invalid) == invalid);
+	CHECK(findCurrentOrNextActiveMemory(empty, 0, 1, invalid) == invalid);
+}
+
 void testSenseSwitchesSuppressCardioidOutputsWhileEditing()
 {
 	const SenseSwitchState left = resolveSenseSwitches(false, true, false);
@@ -519,6 +670,244 @@ void testSenseSwitchesRetainOperationalCardioidBehavior()
 	CHECK(!neither.cardioidBackEnabled);
 }
 
+void testCardioidDirectionOverridesDetectorLedColor()
+{
+	CHECK(resolveReceiverLedColor(true, false, RECEIVER_LED_GREEN) ==
+		RECEIVER_LED_RED);
+	CHECK(resolveReceiverLedColor(false, true, RECEIVER_LED_RED) ==
+		RECEIVER_LED_GREEN);
+}
+
+void testInactiveOrAmbiguousDirectionPreservesDetectorLedColor()
+{
+	CHECK(resolveReceiverLedColor(false, false, RECEIVER_LED_RED) ==
+		RECEIVER_LED_RED);
+	CHECK(resolveReceiverLedColor(false, false, RECEIVER_LED_GREEN) ==
+		RECEIVER_LED_GREEN);
+	CHECK(resolveReceiverLedColor(false, false, RECEIVER_LED_OFF) ==
+		RECEIVER_LED_OFF);
+	CHECK(resolveReceiverLedColor(true, true, RECEIVER_LED_GREEN) ==
+		RECEIVER_LED_GREEN);
+}
+
+void testSuppressedCardioidDoesNotOverrideDetectorLedColor()
+{
+	const SenseSwitchState left = resolveSenseSwitches(false, true, false);
+	const SenseSwitchState right = resolveSenseSwitches(true, false, false);
+
+	CHECK(resolveReceiverLedColor(left.cardioidFrontEnabled,
+		left.cardioidBackEnabled, RECEIVER_LED_GREEN) == RECEIVER_LED_GREEN);
+	CHECK(resolveReceiverLedColor(right.cardioidFrontEnabled,
+		right.cardioidBackEnabled, RECEIVER_LED_RED) == RECEIVER_LED_RED);
+}
+
+void testPowerOnClockReadingSaturatesTimeAndCyclesIndependently()
+{
+	PowerOnClockReading reading = powerOnClockReading(0);
+	CHECK(reading.minutes == 0);
+	CHECK(reading.seconds == 0);
+	CHECK(reading.cycle == 1);
+
+	reading = powerOnClockReading(299);
+	CHECK(reading.minutes == 4);
+	CHECK(reading.seconds == 59);
+	CHECK(reading.cycle == 1);
+
+	reading = powerOnClockReading(300);
+	CHECK(reading.minutes == 5);
+	CHECK(reading.seconds == 0);
+	CHECK(reading.cycle == 2);
+
+	reading = powerOnClockReading(60000);
+	CHECK(reading.minutes == 999);
+	CHECK(reading.seconds == 59);
+	CHECK(reading.cycle == 201);
+
+	reading = powerOnClockReading(POWER_ON_CLOCK_MAX_TRACKED_SECONDS);
+	CHECK(reading.minutes == 999);
+	CHECK(reading.seconds == 59);
+	CHECK(reading.cycle == 999);
+
+	reading = powerOnClockReading(UINT32_MAX);
+	CHECK(reading.minutes == 999);
+	CHECK(reading.seconds == 59);
+	CHECK(reading.cycle == 999);
+}
+
+void testPowerOnClockRowsUseRequestedPaddingAndAlignment()
+{
+	char timeRow[POWER_ON_CLOCK_TIME_ROW_SIZE] = {};
+	char cycleRow[POWER_ON_CLOCK_CYCLE_ROW_SIZE] = {};
+	formatPowerOnClockRows(0, timeRow, cycleRow);
+	CHECK(std::strcmp(timeRow, "000:00") == 0);
+	CHECK(std::strcmp(cycleRow, "Cycle: 1") == 0);
+
+	formatPowerOnClockRows(UINT32_MAX, timeRow, cycleRow);
+	CHECK(std::strcmp(timeRow, "999:59") == 0);
+	CHECK(std::strcmp(cycleRow, "Cycle: 999") == 0);
+}
+
+void testClockDisplayGestureRequiresFiveMatchingSensePresses()
+{
+	ClockDisplayGesture gesture;
+	for (uint8_t press = 0; press < 5; ++press)
+	{
+		gesture.RecordSensePress(CLOCK_SENSE_LEFT);
+	}
+	for (uint8_t tick = 1; tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS; ++tick)
+	{
+		CHECK(!gesture.Tick());
+	}
+	CHECK(gesture.Tick());
+
+	for (uint8_t press = 0; press < 5; ++press)
+	{
+		gesture.RecordSensePress(CLOCK_SENSE_RIGHT);
+	}
+	for (uint8_t tick = 1; tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS; ++tick)
+	{
+		CHECK(!gesture.Tick());
+	}
+	CHECK(gesture.Tick());
+}
+
+void testClockDisplayGestureCancelsOnOtherActivity()
+{
+	ClockDisplayGesture gesture;
+	for (uint8_t press = 0; press < 4; ++press)
+	{
+		gesture.RecordSensePress(CLOCK_SENSE_LEFT);
+	}
+	gesture.RecordSensePress(CLOCK_SENSE_RIGHT);
+	for (uint8_t tick = 0; tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS; ++tick)
+	{
+		CHECK(!gesture.Tick());
+	}
+
+	for (uint8_t press = 0; press < 5; ++press)
+	{
+		gesture.RecordSensePress(CLOCK_SENSE_RIGHT);
+	}
+	for (uint8_t tick = 1; tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS; ++tick)
+	{
+		CHECK(!gesture.Tick());
+	}
+	CHECK(gesture.Tick());
+
+	gesture.RecordSensePress(CLOCK_SENSE_LEFT);
+	gesture.RecordSensePress(CLOCK_SENSE_LEFT);
+	gesture.Cancel();
+	for (uint8_t tick = 0; tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS; ++tick)
+	{
+		CHECK(!gesture.Tick());
+	}
+}
+
+template <uint8_t RequiredPresses>
+void checkMultiPressSequenceCount()
+{
+	MultiPressSequence<RequiredPresses> sequence;
+	for (uint8_t press = 0; press < RequiredPresses; ++press)
+	{
+		sequence.RecordPress(7);
+		if (press + 1 < RequiredPresses)
+		{
+			for (uint8_t tick = 1;
+				tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS;
+				++tick)
+			{
+				CHECK(!sequence.Tick());
+			}
+		}
+	}
+	for (uint8_t tick = 1; tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS; ++tick)
+	{
+		CHECK(!sequence.Tick());
+	}
+	CHECK(sequence.Tick());
+}
+
+void testMultiPressSequenceSupportsCountsOneThroughNine()
+{
+	checkMultiPressSequenceCount<1>();
+	checkMultiPressSequenceCount<2>();
+	checkMultiPressSequenceCount<3>();
+	checkMultiPressSequenceCount<4>();
+	checkMultiPressSequenceCount<5>();
+	checkMultiPressSequenceCount<6>();
+	checkMultiPressSequenceCount<7>();
+	checkMultiPressSequenceCount<8>();
+	checkMultiPressSequenceCount<9>();
+}
+
+void testClockDisplayGestureRestartsTimeoutAfterEachMatchingPress()
+{
+	ClockDisplayGesture gesture;
+	for (uint8_t press = 0; press < 5; ++press)
+	{
+		gesture.RecordSensePress(CLOCK_SENSE_LEFT);
+		for (uint8_t tick = 1;
+			tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS;
+			++tick)
+		{
+			CHECK(!gesture.Tick());
+		}
+	}
+	CHECK(gesture.Tick());
+}
+
+void testClockDisplayGestureRejectsExpiredSequence()
+{
+	ClockDisplayGesture gesture;
+	for (uint8_t press = 0; press < 4; ++press)
+	{
+		gesture.RecordSensePress(CLOCK_SENSE_RIGHT);
+	}
+
+	for (uint8_t tick = 0;
+		tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS;
+		++tick)
+	{
+		CHECK(!gesture.Tick());
+	}
+
+	/* The late press starts a new sequence; it cannot complete the expired one. */
+	gesture.RecordSensePress(CLOCK_SENSE_RIGHT);
+	for (uint8_t press = 1; press < 4; ++press)
+	{
+		gesture.RecordSensePress(CLOCK_SENSE_RIGHT);
+	}
+	gesture.RecordSensePress(CLOCK_SENSE_RIGHT);
+	for (uint8_t tick = 1; tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS; ++tick)
+	{
+		CHECK(!gesture.Tick());
+	}
+	CHECK(gesture.Tick());
+}
+
+void testClockDisplayGestureIgnoresUndefinedCounts()
+{
+	for (uint8_t pressCount = 1; pressCount <= 11; ++pressCount)
+	{
+		if (pressCount == 5)
+		{
+			continue;
+		}
+
+		ClockDisplayGesture gesture;
+		for (uint8_t press = 0; press < pressCount; ++press)
+		{
+			gesture.RecordSensePress(CLOCK_SENSE_LEFT);
+		}
+		for (uint8_t tick = 0;
+			tick < MULTI_PRESS_SEQUENCE_TIMEOUT_TICKS;
+			++tick)
+		{
+			CHECK(!gesture.Tick());
+		}
+	}
+}
+
 void testSignalScoreRejectsInvalidLogarithmInputs()
 {
 	CHECK(receiverSignalScore(0.0f, 0.0f) == 0);
@@ -532,6 +921,38 @@ void testSignalScoreIsBounded()
 	CHECK(receiverSignalScore(200.0f, 80.0f) == 30);
 	const uint16_t largeScore = receiverSignalScore(1.0e38f, 0.0f);
 	CHECK(largeScore > 3600 && largeScore < 3700);
+}
+
+void testSignalDetectorSmoothingSeedsAndAverages()
+{
+	SignalDetectorStability stability;
+	CHECK(stability.Smooth(10.0f) == 10.0f);
+	CHECK(stability.Smooth(30.0f) == 20.0f);
+	CHECK(stability.Smooth(20.0f) == 20.0f);
+
+	stability.Reset();
+	CHECK(stability.Smooth(40.0f) == 40.0f);
+}
+
+void testSignalDetectorHysteresisStabilizesRelease()
+{
+	SignalDetectorStability stability;
+	const float nominal = 100.0f;
+	const float acquire = 200.0f;
+	const float release = 170.0f;
+
+	CHECK(!stability.Update(acquire, nominal, acquire));
+	CHECK(stability.Update(acquire + 1.0f, nominal, acquire));
+	CHECK(stability.Update(release, nominal, acquire));
+	CHECK(!stability.Update(release - 1.0f, nominal, acquire));
+}
+
+void testSignalDetectorHysteresisRejectsInvalidThreshold()
+{
+	SignalDetectorStability stability;
+	CHECK(stability.Update(201.0f, 100.0f, 200.0f));
+	CHECK(!stability.Update(201.0f, 100.0f, 100.0f));
+	CHECK(!stability.Update(201.0f, 100.0f, 99.0f));
 }
 
 void testDateTimeParserAcceptsSupportedFormats()
@@ -650,32 +1071,34 @@ void testGoertzelUsesReleasedSaturationThreshold()
 	CHECK(highCount == MINN);
 }
 
-void testGoertzelAnalyzesSelectedCwOffsetBinsInOnePass()
+void testGoertzelAnalyzesSelectedCwOffsetCenter()
 {
 	const double pi = 3.14159265358979323846;
 	for (uint8_t setting = CW_OFFSET_MIN_SETTING;
 		setting <= CW_OFFSET_MAX_SETTING; ++setting)
 	{
-		Goertzel detector(AUDIO_GOERTZEL_SAMPLE_COUNT,
-			AUDIO_DSP_SAMPLE_RATE_HZ);
 		const uint16_t centerHz = cwOffsetHz(setting);
-		const float targets[MAX_GOERTZEL_TARGETS] = {
-			(float)(centerHz - AUDIO_CW_DETECTOR_SPACING_HZ),
-			(float)centerHz,
-			(float)(centerHz + AUDIO_CW_DETECTOR_SPACING_HZ)
+		const uint16_t toneFrequencies[] = {
+			(uint16_t)(centerHz - AUDIO_CW_DETECTOR_SPACING_HZ),
+			centerHz,
+			(uint16_t)(centerHz + AUDIO_CW_DETECTOR_SPACING_HZ)
 		};
-		detector.SetTargetFrequencies(targets, MAX_GOERTZEL_TARGETS);
-
-		for (uint16_t index = 0; index < AUDIO_GOERTZEL_SAMPLE_COUNT; ++index)
+		float magnitudes[3] = {};
+		for (uint8_t tone = 0; tone < 3; ++tone)
 		{
-			const int sample = ADCCENTER + (int)(500.0 * std::sin(
-				2.0 * pi * centerHz * index / AUDIO_DSP_SAMPLE_RATE_HZ));
-			detector.DataPoint(sample);
+			Goertzel detector(AUDIO_GOERTZEL_SAMPLE_COUNT,
+				AUDIO_DSP_SAMPLE_RATE_HZ);
+			detector.SetTargetFrequency((float)centerHz);
+			for (uint16_t index = 0; index < AUDIO_GOERTZEL_SAMPLE_COUNT;
+				++index)
+			{
+				const int sample = ADCCENTER + (int)(500.0 * std::sin(
+					2.0 * pi * toneFrequencies[tone] * index /
+					AUDIO_DSP_SAMPLE_RATE_HZ));
+				detector.DataPoint(sample);
+			}
+			magnitudes[tone] = detector.Magnitude2(0);
 		}
-
-		float magnitudes[MAX_GOERTZEL_TARGETS] = {};
-		CHECK(detector.Magnitudes2(magnitudes, MAX_GOERTZEL_TARGETS, 0) ==
-			MAX_GOERTZEL_TARGETS);
 		CHECK(magnitudes[1] > 100.0f * magnitudes[0]);
 		CHECK(magnitudes[1] > 100.0f * magnitudes[2]);
 	}
@@ -905,10 +1328,17 @@ void testRfGainAudioCueMatchesApprovedMorseTiming()
 		{RF_GAIN_CUE_LONG_FRAMES, RF_GAIN_CUE_LONG_FRAMES, 0, 0, 0}
 	};
 
-	CHECK(RF_GAIN_CUE_DOT_FRAMES == 800);
-	CHECK(RF_GAIN_CUE_DASH_FRAMES == 2400);
-	CHECK(RF_GAIN_CUE_GAP_FRAMES == 800);
+	CHECK(RF_GAIN_CUE_DOT_FRAMES == 576);
+	CHECK(RF_GAIN_CUE_DASH_FRAMES == 1728);
+	CHECK(RF_GAIN_CUE_GAP_FRAMES == 576);
 	CHECK(RF_GAIN_CUE_LONG_FRAMES == 3600);
+	CHECK(RF_GAIN_CUE_TONE_HZ == 250);
+	CHECK(RF_GAIN_CUE_TONE_PERIOD_FRAMES == 48);
+	CHECK(AUDIO_DSP_SAMPLE_RATE_HZ ==
+		RF_GAIN_CUE_TONE_HZ * RF_GAIN_CUE_TONE_PERIOD_FRAMES);
+	CHECK(RF_GAIN_CUE_DOT_FRAMES % RF_GAIN_CUE_TONE_PERIOD_FRAMES == 0);
+	CHECK(RF_GAIN_CUE_DASH_FRAMES % RF_GAIN_CUE_TONE_PERIOD_FRAMES == 0);
+	CHECK(RF_GAIN_CUE_LONG_FRAMES % RF_GAIN_CUE_TONE_PERIOD_FRAMES == 0);
 	for (uint8_t gain = 0; gain <= RF_GAIN_CUE_MAX_DISPLAYED_GAIN; ++gain)
 	{
 		const CapturedRfGainCue captured = captureRfGainCue(gain);
@@ -1078,12 +1508,18 @@ int main()
 	testCircularUintAverageUsesOnlyInitializedEntries();
 	testPeriodicCountdownDoesNotDriftAtByteWrap();
 	testPeriodicCountdownRejectsInvalidArguments();
+	testMenuEntryTimeoutExpiresOnceAfterFiveSeconds();
+	testMenuEntryTimeoutCancelsPermanentlyAfterActivity();
+	testMenuEntryTimeoutCanRestartForNextEntry();
 	testDeferredByteWritesPreserveOrderAndCoalesceAddresses();
 	testDeferredByteWritesRejectOverflowButStillCoalesce();
 	testReceiverFrequencyBoundsAreInclusive();
 	testReceiverFrequencyStepRejectsOutOfBandResult();
 	testReceiverFrequencyStepProducesValidatedResult();
+	testSi5351FractionPreservesExactLegacyGrid();
+	testSi5351FractionBoundsEveryTenHertzTuningPoint();
 	testCwOffsetSettingsNormalizeAndClampWithoutWrapping();
+	testTuningStepSettingsNormalizeAndKeepDecadeCoarseStep();
 	testCarrierFrequencyMapsToHighSideOscillator();
 	testReceiverAppliesInclusiveBandEdges();
 	testReceiverRejectsInvalidFrequencyAndPropagatesHardwareFailure();
@@ -1094,17 +1530,33 @@ int main()
 	testStatusWaitCompletesOrTimesOut();
 	testMemoryChannelSelectionWrapsAndSkipsEmptyChannels();
 	testMemoryChannelSelectionRejectsInvalidOrEmptyInputs();
+	testModeToggleKeepsCurrentPopulatedMemory();
+	testModeToggleAdvancesOnlyFromEmptyOrInvalidMemory();
 	testSenseSwitchesSuppressCardioidOutputsWhileEditing();
 	testSenseSwitchesRetainOperationalCardioidBehavior();
+	testCardioidDirectionOverridesDetectorLedColor();
+	testInactiveOrAmbiguousDirectionPreservesDetectorLedColor();
+	testSuppressedCardioidDoesNotOverrideDetectorLedColor();
+	testPowerOnClockReadingSaturatesTimeAndCyclesIndependently();
+	testPowerOnClockRowsUseRequestedPaddingAndAlignment();
+	testClockDisplayGestureRequiresFiveMatchingSensePresses();
+	testClockDisplayGestureCancelsOnOtherActivity();
+	testMultiPressSequenceSupportsCountsOneThroughNine();
+	testClockDisplayGestureRestartsTimeoutAfterEachMatchingPress();
+	testClockDisplayGestureRejectsExpiredSequence();
+	testClockDisplayGestureIgnoresUndefinedCounts();
 	testSignalScoreRejectsInvalidLogarithmInputs();
 	testSignalScoreIsBounded();
+	testSignalDetectorSmoothingSeedsAndAverages();
+	testSignalDetectorHysteresisStabilizesRelease();
+	testSignalDetectorHysteresisRejectsInvalidThreshold();
 	testDateTimeParserAcceptsSupportedFormats();
 	testDateTimeParserRejectsMalformedDatesWithoutMutation();
 	testDateTimeEpochConversion();
 	testGoertzelRetuneKeepsReadyBlockUntilRelease();
 	testGoertzelReadyBlockIsNotOverwritten();
 	testGoertzelUsesReleasedSaturationThreshold();
-	testGoertzelAnalyzesSelectedCwOffsetBinsInOnePass();
+	testGoertzelAnalyzesSelectedCwOffsetCenter();
 	testAudioPathUsesSignedSaturatingGainAndDacScaling();
 	testAudioPathDecimatesAtAnExactFourToOneRatio();
 	testAudioPathBandpassRejectsOutOfBandSignals();
