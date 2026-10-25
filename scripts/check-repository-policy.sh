@@ -43,6 +43,7 @@ expect_eol() {
 for policy_file in .editorconfig .gitattributes BUILD_ENVIRONMENT.md \
 	CODEX_WORKFLOW.md RELEASE_WORKFLOW.md \
 	scripts/check-branch-workflow.sh \
+	scripts/test-branch-workflow.sh \
 	scripts/package-avr-release.py \
 	scripts/validate-avr-release-package.py \
 	scripts/check-avr-release-package-repeatability.py \
@@ -114,6 +115,12 @@ fi
 if ! rg -q '^collector-preflight collector:' "$repo_root/Justfile"; then
 	fail "Justfile is missing the collector promotion preflight"
 fi
+if ! rg -q '^collector-sync-check collector:' "$repo_root/Justfile"; then
+	fail "Justfile is missing ancestry-preserving collector synchronization"
+fi
+if ! rg -q '^branch-workflow-regression:' "$repo_root/Justfile"; then
+	fail "Justfile is missing branch-workflow regression coverage"
+fi
 if ! rg -q 'Development1-KiCad.*just spice-check' "$repo_root/Justfile"; then
 	fail "KiCad collector preflight must run the SPICE model gate"
 fi
@@ -125,6 +132,9 @@ if ! rg -q '`Development1` is the firmware and software integration branch' "$re
 fi
 if ! rg -q '`Development1-KiCad` is the separate KiCad' "$repo_root/CODEX_WORKFLOW.md"; then
 	fail "CODEX_WORKFLOW.md must identify the separate KiCad collector"
+fi
+if ! rg -q 'Collectors accept merge commits only' "$repo_root/CODEX_WORKFLOW.md"; then
+	fail "CODEX_WORKFLOW.md must preserve ancestry through collector merge commits"
 fi
 if ! rg -q '`Development1` collects firmware, software, tests' "$repo_root/RELEASE_WORKFLOW.md"; then
 	fail "RELEASE_WORKFLOW.md must route release work through Development1"

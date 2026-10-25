@@ -25,8 +25,16 @@
   cumulative `Development1` pull request to promote that set to `main`. Collect
   KiCad/simulation topics in `Development1-KiCad` and promote them through a
   separate pull request. Do not combine the two pending change sets.
-- After either collector is promoted, synchronize both collectors with the new
-  `main` before starting another topic so their common baseline stays current.
+- `main` accepts squash or rebase pull requests and keeps a linear release
+  history. Collectors accept merge commits only: their integration history must
+  preserve topic ancestry and the exact `main` baseline instead of reproducing
+  equivalent file content under unrelated commits.
+- After either collector is promoted, fetch `origin`, create a focused sync
+  topic from each exact remote collector tip, and merge exact `origin/main`
+  into it with `--no-ff`. Run `just collector-sync-check <collector>`, then
+  merge the sync pull request with a merge commit. Do not rebase, squash, reset,
+  or force-push collectors. Finish both synchronizations before starting
+  another topic so their common baseline stays current.
 - Keep unrelated KiCad changes outside firmware commits. Use `just
   stage-preview` before `just stage-non-kicad` or `just commit-push`.
 
