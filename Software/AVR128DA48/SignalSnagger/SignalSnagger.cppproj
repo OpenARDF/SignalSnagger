@@ -249,6 +249,9 @@
     <Compile Include="include\periodic_countdown.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="include\power_on_clock.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="include\shared_state.h">
       <SubType>compile</SubType>
     </Compile>
@@ -421,6 +424,9 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\periodic_countdown.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\power_on_clock.cpp">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\receiver_frequency.cpp">

@@ -26,6 +26,7 @@ trap 'rm -f "$test_binary"' EXIT
 	"$firmware_root/src/datetime_utils.cpp" \
 	"$firmware_root/src/memory_channels.cpp" \
 	"$firmware_root/src/periodic_countdown.cpp" \
+	"$firmware_root/src/power_on_clock.cpp" \
 	"$firmware_root/src/receiver.cpp" \
 	"$firmware_root/src/receiver_frequency.cpp" \
 	"$firmware_root/src/rf_gain_audio_cue.cpp" \
