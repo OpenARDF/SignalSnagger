@@ -298,6 +298,7 @@ static volatile uint16_t g_audio_dropped_frames = 0;
 #define MAX_SINE_PERIOD_STEPS   (201)
 #define SINE_AMPLITUDE          (256)
 
+static void fillSineWave(int16_t* samples, uint8_t sinePeriodSteps);
 static void sineWaveInit(int sine_period_steps);
 static void startAudioFlow(void);
 static void commitMenuEditsIfActive(void);
@@ -310,6 +311,16 @@ static bool applyCwOffsetSetting(uint8_t setting);
 
 /* Buffer to store the sine wave samples */
 int16_t sineWave[MAX_SINE_PERIOD_STEPS];
+/* Gain cues use a low, fixed pitch so they remain distinct from received CW.
+ * A 48-frame period divides every approved tone duration without edge clicks. */
+static int16_t g_rf_gain_cue_sine_wave[RF_GAIN_CUE_TONE_PERIOD_FRAMES];
+static_assert(AUDIO_DSP_SAMPLE_RATE_HZ ==
+	RF_GAIN_CUE_TONE_HZ * RF_GAIN_CUE_TONE_PERIOD_FRAMES,
+	"gain cue tone constants must match the DSP sample rate");
+static_assert(RF_GAIN_CUE_DOT_FRAMES % RF_GAIN_CUE_TONE_PERIOD_FRAMES == 0 &&
+	RF_GAIN_CUE_DASH_FRAMES % RF_GAIN_CUE_TONE_PERIOD_FRAMES == 0 &&
+	RF_GAIN_CUE_LONG_FRAMES % RF_GAIN_CUE_TONE_PERIOD_FRAMES == 0,
+	"gain cue elements must contain complete tone cycles");
 static volatile uint8_t g_sine_period_steps = 25;
 static volatile uint16_t g_beep = 0;
 static volatile uint8_t g_tick = 0;
@@ -423,6 +434,7 @@ ISR(ADC0_RESRDY_vect)
 ISR(TCA1_CMP0_vect)
 {
 	static uint8_t sineIndex = 0;
+	static uint8_t gainCueSineIndex = 0;
 	ADC0_audioFrameHandled();
 	if (!g_audio_frame_ready)
 	{
@@ -458,17 +470,19 @@ ISR(TCA1_CMP0_vect)
 	else
 	{
 		bool gainCueToneStarted = false;
-		if (g_rf_gain_audio_cue.NextFrame(&gainCueToneStarted) &&
-			g_sine_period_steps)
+		if (g_rf_gain_audio_cue.NextFrame(&gainCueToneStarted))
 		{
-			/* Every demonstrated element spans an integer number of 480 Hz cycles;
-			 * restarting at phase zero keeps each edge free of waveform steps. */
+			/* Every element spans complete 250 Hz cycles. Restarting at phase zero
+			 * keeps each independently gated element free of waveform steps. */
 			if (gainCueToneStarted)
 			{
-				sineIndex = 0;
+				gainCueSineIndex = 0;
 			}
-			injectedSample = sineWave[sineIndex++];
-			if(sineIndex >= g_sine_period_steps) sineIndex = 0;
+			injectedSample = g_rf_gain_cue_sine_wave[gainCueSineIndex++];
+			if(gainCueSineIndex >= RF_GAIN_CUE_TONE_PERIOD_FRAMES)
+			{
+				gainCueSineIndex = 0;
+			}
 		}
 		else if (g_tick)
 		{
@@ -973,10 +987,17 @@ ISR(PORTF_PORT_vect)
 }
 
 
+static void fillSineWave(int16_t* samples, uint8_t sinePeriodSteps)
+{
+	for(uint8_t i = 0; i < sinePeriodSteps; i++)
+	{
+		samples[i] = (int16_t)(SINE_AMPLITUDE *
+			sin(2 * M_PI * i / sinePeriodSteps));
+	}
+}
+
 static void sineWaveInit(int sine_period_steps)
 {
-    uint8_t i;
-	
 	if((sine_period_steps > 10) && (sine_period_steps <= MAX_SINE_PERIOD_STEPS))
 	{
 		bool hold_at = g_audio_test;
@@ -984,11 +1005,7 @@ static void sineWaveInit(int sine_period_steps)
 		g_audio_test = false;
 		g_sine_period_steps = 0;
 	
-		for(i = 0; i < sine_period_steps; i++)
-		{
-			sineWave[i] = (int16_t)(SINE_AMPLITUDE *
-				sin(2 * M_PI * i / sine_period_steps));
-		}
+		fillSineWave(sineWave, (uint8_t)sine_period_steps);
 	
 		g_sine_period_steps = sine_period_steps;
 		g_audio_test = hold_at;
@@ -1226,6 +1243,7 @@ static void rollbackMenuEditsIfActive(void)
 int main(void)
 {
 	sineWaveInit(25);
+	fillSineWave(g_rf_gain_cue_sine_wave, RF_GAIN_CUE_TONE_PERIOD_FRAMES);
 	
 	MenuState_t hold_menuState = MenuOperational;
 	uint8_t hold_activeMemory = 0;
