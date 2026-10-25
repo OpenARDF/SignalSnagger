@@ -18,6 +18,7 @@ branch-route-check collector:
 collector-preflight collector:
     ./scripts/check-branch-workflow.sh "{{collector}}" --promotion
     just check
+    if [[ "{{collector}}" == "Development1-KiCad" ]]; then just spice-check; fi
     just secrets
 
 # Verify host tools and the pinned AVR compiler/device pack.

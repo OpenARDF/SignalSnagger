@@ -114,6 +114,9 @@ fi
 if ! rg -q '^collector-preflight collector:' "$repo_root/Justfile"; then
 	fail "Justfile is missing the collector promotion preflight"
 fi
+if ! rg -q 'Development1-KiCad.*just spice-check' "$repo_root/Justfile"; then
+	fail "KiCad collector preflight must run the SPICE model gate"
+fi
 if ! rg -q 'experimentally validated' "$repo_root/CODEX_WORKFLOW.md"; then
 	fail "CODEX_WORKFLOW.md must protect the experimentally validated Si5351 strategy"
 fi
