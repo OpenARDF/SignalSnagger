@@ -31,6 +31,7 @@ trap 'rm -f "$test_binary"' EXIT
 	"$firmware_root/src/receiver_frequency.cpp" \
 	"$firmware_root/src/rf_gain_audio_cue.cpp" \
 	"$firmware_root/src/sense_switches.cpp" \
+	"$firmware_root/src/si5351_fraction.cpp" \
 	"$firmware_root/src/signal_score.cpp" \
 	"$firmware_root/src/status_wait.cpp" \
 	"$firmware_root/src/text_utils.cpp" \

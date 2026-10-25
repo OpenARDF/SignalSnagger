@@ -19,6 +19,7 @@
 #include "receiver_test_stubs.h"
 #include "rf_gain_audio_cue.h"
 #include "sense_switches.h"
+#include "si5351_fraction.h"
 #include "signal_score.h"
 #include "sound_settings.h"
 #include "status_wait.h"
@@ -291,9 +292,68 @@ void testReceiverFrequencyStepProducesValidatedResult()
 	CHECK(result == 3571500);
 	CHECK(receiverFrequencyStep(result, -1, 100, &result));
 	CHECK(result == 3571400);
+	CHECK(receiverFrequencyStep(result, 1, 10, &result));
+	CHECK(result == 3571410);
 	CHECK(!receiverFrequencyStep(result, 1, 0, &result));
 	CHECK(!receiverFrequencyStep(result, 2, 100, &result));
 	CHECK(!receiverFrequencyStep(result, 1, 100, 0));
+}
+
+void testSi5351FractionPreservesExactLegacyGrid()
+{
+	const uint32_t referenceHz = UINT32_C(25000000);
+	const uint32_t maximumDenominator = UINT32_C(1048575);
+	for (uint32_t carrierHz = RECEIVER_FREQUENCY_MIN_HZ;
+		carrierHz <= RECEIVER_FREQUENCY_MAX_HZ; carrierHz += 100U)
+	{
+		const uint32_t outputHz = carrierHz + AUDIO_CW_DEFAULT_OFFSET_HZ;
+		const uint32_t multipliedHz = 126U * outputHz;
+		Si5351Fraction fraction = {};
+		CHECK(si5351CalculateFraction(multipliedHz, referenceHz,
+			maximumDenominator, &fraction));
+		CHECK(fraction.denominator <= maximumDenominator);
+		const uint64_t reconstructed =
+			(uint64_t)referenceHz * fraction.integer * fraction.denominator +
+			(uint64_t)referenceHz * fraction.numerator;
+		CHECK(reconstructed == (uint64_t)multipliedHz * fraction.denominator);
+	}
+}
+
+void testSi5351FractionBoundsEveryTenHertzTuningPoint()
+{
+	const uint32_t referenceHz = UINT32_C(25000000);
+	const uint32_t maximumDenominator = UINT32_C(1048575);
+	for (uint32_t carrierHz = RECEIVER_FREQUENCY_MIN_HZ;
+		carrierHz <= RECEIVER_FREQUENCY_MAX_HZ; carrierHz += 10U)
+	{
+		for (uint8_t offsetSetting = CW_OFFSET_ZERO_SETTING;
+			offsetSetting <= CW_OFFSET_MAX_SETTING; ++offsetSetting)
+		{
+			if (offsetSetting != CW_OFFSET_ZERO_SETTING &&
+				offsetSetting < CW_OFFSET_MIN_SETTING)
+			{
+				continue;
+			}
+			const uint32_t outputHz = carrierHz + cwOffsetHz(offsetSetting);
+			const uint32_t multipliedHz = 126U * outputHz;
+			Si5351Fraction fraction = {};
+			CHECK(si5351CalculateFraction(multipliedHz, referenceHz,
+				maximumDenominator, &fraction));
+			CHECK(fraction.denominator >= 1U);
+			CHECK(fraction.denominator <= maximumDenominator);
+			CHECK(fraction.numerator < fraction.denominator);
+
+			const double actualOutputHz = (double)referenceHz *
+				((double)fraction.integer + (double)fraction.numerator /
+					(double)fraction.denominator) / 126.0;
+			CHECK(std::fabs(actualOutputHz - (double)outputHz) < 0.1);
+		}
+	}
+
+	Si5351Fraction fraction = {};
+	CHECK(!si5351CalculateFraction(1, 0, maximumDenominator, &fraction));
+	CHECK(!si5351CalculateFraction(1, referenceHz, 0, &fraction));
+	CHECK(!si5351CalculateFraction(1, referenceHz, maximumDenominator, 0));
 }
 
 void testCwOffsetSettingsNormalizeAndClampWithoutWrapping()
@@ -315,6 +375,26 @@ void testCwOffsetSettingsNormalizeAndClampWithoutWrapping()
 		CW_OFFSET_MAX_SETTING);
 	CHECK(nextCwOffsetSetting(CW_OFFSET_MAX_SETTING, false) ==
 		CW_OFFSET_MAX_SETTING - 1);
+}
+
+void testTuningStepSettingsNormalizeAndKeepDecadeCoarseStep()
+{
+	CHECK(tuningStepSettingFromStored(0xff) == TUNING_STEP_100_HZ);
+	CHECK(tuningStepSettingFromStored(0) == TUNING_STEP_100_HZ);
+	CHECK(tuningStepSettingFromStored(TUNING_STEP_10_HZ) ==
+		TUNING_STEP_10_HZ);
+	CHECK(tuningStepHz(TUNING_STEP_10_HZ) == 10);
+	CHECK(tuningCoarseStepHz(TUNING_STEP_10_HZ) == 100);
+	CHECK(tuningStepHz(TUNING_STEP_100_HZ) == 100);
+	CHECK(tuningCoarseStepHz(TUNING_STEP_100_HZ) == 1000);
+	CHECK(nextTuningStepSetting(TUNING_STEP_10_HZ, true) ==
+		TUNING_STEP_100_HZ);
+	CHECK(nextTuningStepSetting(TUNING_STEP_100_HZ, true) ==
+		TUNING_STEP_100_HZ);
+	CHECK(nextTuningStepSetting(TUNING_STEP_100_HZ, false) ==
+		TUNING_STEP_10_HZ);
+	CHECK(nextTuningStepSetting(TUNING_STEP_10_HZ, false) ==
+		TUNING_STEP_10_HZ);
 }
 
 void testCarrierFrequencyMapsToHighSideOscillator()
@@ -621,6 +701,38 @@ void testSignalScoreIsBounded()
 	CHECK(largeScore > 3600 && largeScore < 3700);
 }
 
+void testSignalDetectorSmoothingSeedsAndAverages()
+{
+	SignalDetectorStability stability;
+	CHECK(stability.Smooth(10.0f) == 10.0f);
+	CHECK(stability.Smooth(30.0f) == 20.0f);
+	CHECK(stability.Smooth(20.0f) == 20.0f);
+
+	stability.Reset();
+	CHECK(stability.Smooth(40.0f) == 40.0f);
+}
+
+void testSignalDetectorHysteresisStabilizesRelease()
+{
+	SignalDetectorStability stability;
+	const float nominal = 100.0f;
+	const float acquire = 200.0f;
+	const float release = 170.0f;
+
+	CHECK(!stability.Update(acquire, nominal, acquire));
+	CHECK(stability.Update(acquire + 1.0f, nominal, acquire));
+	CHECK(stability.Update(release, nominal, acquire));
+	CHECK(!stability.Update(release - 1.0f, nominal, acquire));
+}
+
+void testSignalDetectorHysteresisRejectsInvalidThreshold()
+{
+	SignalDetectorStability stability;
+	CHECK(stability.Update(201.0f, 100.0f, 200.0f));
+	CHECK(!stability.Update(201.0f, 100.0f, 100.0f));
+	CHECK(!stability.Update(201.0f, 100.0f, 99.0f));
+}
+
 void testDateTimeParserAcceptsSupportedFormats()
 {
 	struct tm parsed = {};
@@ -737,32 +849,34 @@ void testGoertzelUsesReleasedSaturationThreshold()
 	CHECK(highCount == MINN);
 }
 
-void testGoertzelAnalyzesSelectedCwOffsetBinsInOnePass()
+void testGoertzelAnalyzesSelectedCwOffsetCenter()
 {
 	const double pi = 3.14159265358979323846;
 	for (uint8_t setting = CW_OFFSET_MIN_SETTING;
 		setting <= CW_OFFSET_MAX_SETTING; ++setting)
 	{
-		Goertzel detector(AUDIO_GOERTZEL_SAMPLE_COUNT,
-			AUDIO_DSP_SAMPLE_RATE_HZ);
 		const uint16_t centerHz = cwOffsetHz(setting);
-		const float targets[MAX_GOERTZEL_TARGETS] = {
-			(float)(centerHz - AUDIO_CW_DETECTOR_SPACING_HZ),
-			(float)centerHz,
-			(float)(centerHz + AUDIO_CW_DETECTOR_SPACING_HZ)
+		const uint16_t toneFrequencies[] = {
+			(uint16_t)(centerHz - AUDIO_CW_DETECTOR_SPACING_HZ),
+			centerHz,
+			(uint16_t)(centerHz + AUDIO_CW_DETECTOR_SPACING_HZ)
 		};
-		detector.SetTargetFrequencies(targets, MAX_GOERTZEL_TARGETS);
-
-		for (uint16_t index = 0; index < AUDIO_GOERTZEL_SAMPLE_COUNT; ++index)
+		float magnitudes[3] = {};
+		for (uint8_t tone = 0; tone < 3; ++tone)
 		{
-			const int sample = ADCCENTER + (int)(500.0 * std::sin(
-				2.0 * pi * centerHz * index / AUDIO_DSP_SAMPLE_RATE_HZ));
-			detector.DataPoint(sample);
+			Goertzel detector(AUDIO_GOERTZEL_SAMPLE_COUNT,
+				AUDIO_DSP_SAMPLE_RATE_HZ);
+			detector.SetTargetFrequency((float)centerHz);
+			for (uint16_t index = 0; index < AUDIO_GOERTZEL_SAMPLE_COUNT;
+				++index)
+			{
+				const int sample = ADCCENTER + (int)(500.0 * std::sin(
+					2.0 * pi * toneFrequencies[tone] * index /
+					AUDIO_DSP_SAMPLE_RATE_HZ));
+				detector.DataPoint(sample);
+			}
+			magnitudes[tone] = detector.Magnitude2(0);
 		}
-
-		float magnitudes[MAX_GOERTZEL_TARGETS] = {};
-		CHECK(detector.Magnitudes2(magnitudes, MAX_GOERTZEL_TARGETS, 0) ==
-			MAX_GOERTZEL_TARGETS);
 		CHECK(magnitudes[1] > 100.0f * magnitudes[0]);
 		CHECK(magnitudes[1] > 100.0f * magnitudes[2]);
 	}
@@ -1177,7 +1291,10 @@ int main()
 	testReceiverFrequencyBoundsAreInclusive();
 	testReceiverFrequencyStepRejectsOutOfBandResult();
 	testReceiverFrequencyStepProducesValidatedResult();
+	testSi5351FractionPreservesExactLegacyGrid();
+	testSi5351FractionBoundsEveryTenHertzTuningPoint();
 	testCwOffsetSettingsNormalizeAndClampWithoutWrapping();
+	testTuningStepSettingsNormalizeAndKeepDecadeCoarseStep();
 	testCarrierFrequencyMapsToHighSideOscillator();
 	testReceiverAppliesInclusiveBandEdges();
 	testReceiverRejectsInvalidFrequencyAndPropagatesHardwareFailure();
@@ -1196,13 +1313,16 @@ int main()
 	testClockDisplayGestureCancelsOnOtherActivity();
 	testSignalScoreRejectsInvalidLogarithmInputs();
 	testSignalScoreIsBounded();
+	testSignalDetectorSmoothingSeedsAndAverages();
+	testSignalDetectorHysteresisStabilizesRelease();
+	testSignalDetectorHysteresisRejectsInvalidThreshold();
 	testDateTimeParserAcceptsSupportedFormats();
 	testDateTimeParserRejectsMalformedDatesWithoutMutation();
 	testDateTimeEpochConversion();
 	testGoertzelRetuneKeepsReadyBlockUntilRelease();
 	testGoertzelReadyBlockIsNotOverwritten();
 	testGoertzelUsesReleasedSaturationThreshold();
-	testGoertzelAnalyzesSelectedCwOffsetBinsInOnePass();
+	testGoertzelAnalyzesSelectedCwOffsetCenter();
 	testAudioPathUsesSignedSaturatingGainAndDacScaling();
 	testAudioPathDecimatesAtAnExactFourToOneRatio();
 	testAudioPathBandpassRejectsOutOfBandSignals();

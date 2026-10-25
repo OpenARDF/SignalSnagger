@@ -18,12 +18,29 @@
 #define CW_OFFSET_DEFAULT_SETTING UINT8_C(8)
 #define CW_OFFSET_SETTING_COUNT UINT8_C(7)
 
+enum TuningStepSetting : uint8_t
+{
+	/* Reserved values let an erased appended EEPROM byte retain the historical
+	 * 100 Hz tuning behavior after a firmware upgrade. */
+	TUNING_STEP_10_HZ = 0xaa,
+	TUNING_STEP_100_HZ = 0xab
+};
+
+#define TUNING_STEP_DEFAULT_SETTING TUNING_STEP_100_HZ
+
+extern volatile TuningStepSetting g_tuning_step_setting;
+
 bool cwOffsetSettingIsValid(uint8_t setting);
 uint8_t cwOffsetSettingFromStored(uint8_t storedSetting);
 uint16_t cwOffsetHz(uint8_t setting);
 
 /** Move among 0, 500, ..., 1000 Hz without wrapping at either endpoint. */
 uint8_t nextCwOffsetSetting(uint8_t setting, bool up);
+
+TuningStepSetting tuningStepSettingFromStored(uint8_t storedSetting);
+TuningStepSetting nextTuningStepSetting(TuningStepSetting setting, bool up);
+uint16_t tuningStepHz(TuningStepSetting setting);
+uint16_t tuningCoarseStepHz(TuningStepSetting setting);
 
 /**
  * Convert a displayed carrier frequency to the high-side oscillator frequency.

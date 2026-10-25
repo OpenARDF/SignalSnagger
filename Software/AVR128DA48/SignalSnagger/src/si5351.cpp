@@ -38,6 +38,7 @@
 
 #include "include/i2c.h"
 #include "include/si5351.h"
+#include "include/si5351_fraction.h"
 
 #define SI5351_EVEN_INTEGER_FEEDBACK					 126
 
@@ -362,11 +363,15 @@ EC si5351_shutdown(void)
 /******************************************************************************************/
 /******************************************************************************************/
 		
-		a = freq_VCO / g_xtal_freq;
-		b = freq_VCO % g_xtal_freq;
-		c = g_xtal_freq;	
-		
-		reduce_by_gcd(&b, &c);
+		Si5351Fraction pllFraction = {};
+		if (!si5351CalculateFraction(freq_VCO, g_xtal_freq,
+			SI5351_PLL_C_MAX, &pllFraction))
+		{
+			return ERROR_CODE_SW_LOGIC_ERROR;
+		}
+		a = pllFraction.integer;
+		b = pllFraction.numerator;
+		c = pllFraction.denominator;
 
 		bx128 = b << 7;
 		bx128overc = bx128 / c;
@@ -467,11 +472,15 @@ EC si5351_shutdown(void)
 
 		freq_VCO = SI5351_EVEN_INTEGER_FEEDBACK*freq;
 		
-		a = freq_VCO / g_xtal_freq;
-		b = freq_VCO % g_xtal_freq;
-		c = g_xtal_freq;	
-		
-		reduce_by_gcd(&b, &c);
+		Si5351Fraction pllFraction = {};
+		if (!si5351CalculateFraction(freq_VCO, g_xtal_freq,
+			SI5351_PLL_C_MAX, &pllFraction))
+		{
+			return ERROR_CODE_SW_LOGIC_ERROR;
+		}
+		a = pllFraction.integer;
+		b = pllFraction.numerator;
+		c = pllFraction.denominator;
 
 		uint32_t bx128 = b << 7;
 		uint32_t bx128overc = bx128 / c;
