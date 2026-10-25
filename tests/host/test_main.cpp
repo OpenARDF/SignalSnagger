@@ -18,6 +18,7 @@
 #include "receiver_test_stubs.h"
 #include "rf_gain_audio_cue.h"
 #include "sense_switches.h"
+#include "si5351_fraction.h"
 #include "signal_score.h"
 #include "sound_settings.h"
 #include "status_wait.h"
@@ -290,9 +291,68 @@ void testReceiverFrequencyStepProducesValidatedResult()
 	CHECK(result == 3571500);
 	CHECK(receiverFrequencyStep(result, -1, 100, &result));
 	CHECK(result == 3571400);
+	CHECK(receiverFrequencyStep(result, 1, 10, &result));
+	CHECK(result == 3571410);
 	CHECK(!receiverFrequencyStep(result, 1, 0, &result));
 	CHECK(!receiverFrequencyStep(result, 2, 100, &result));
 	CHECK(!receiverFrequencyStep(result, 1, 100, 0));
+}
+
+void testSi5351FractionPreservesExactLegacyGrid()
+{
+	const uint32_t referenceHz = UINT32_C(25000000);
+	const uint32_t maximumDenominator = UINT32_C(1048575);
+	for (uint32_t carrierHz = RECEIVER_FREQUENCY_MIN_HZ;
+		carrierHz <= RECEIVER_FREQUENCY_MAX_HZ; carrierHz += 100U)
+	{
+		const uint32_t outputHz = carrierHz + AUDIO_CW_DEFAULT_OFFSET_HZ;
+		const uint32_t multipliedHz = 126U * outputHz;
+		Si5351Fraction fraction = {};
+		CHECK(si5351CalculateFraction(multipliedHz, referenceHz,
+			maximumDenominator, &fraction));
+		CHECK(fraction.denominator <= maximumDenominator);
+		const uint64_t reconstructed =
+			(uint64_t)referenceHz * fraction.integer * fraction.denominator +
+			(uint64_t)referenceHz * fraction.numerator;
+		CHECK(reconstructed == (uint64_t)multipliedHz * fraction.denominator);
+	}
+}
+
+void testSi5351FractionBoundsEveryTenHertzTuningPoint()
+{
+	const uint32_t referenceHz = UINT32_C(25000000);
+	const uint32_t maximumDenominator = UINT32_C(1048575);
+	for (uint32_t carrierHz = RECEIVER_FREQUENCY_MIN_HZ;
+		carrierHz <= RECEIVER_FREQUENCY_MAX_HZ; carrierHz += 10U)
+	{
+		for (uint8_t offsetSetting = CW_OFFSET_ZERO_SETTING;
+			offsetSetting <= CW_OFFSET_MAX_SETTING; ++offsetSetting)
+		{
+			if (offsetSetting != CW_OFFSET_ZERO_SETTING &&
+				offsetSetting < CW_OFFSET_MIN_SETTING)
+			{
+				continue;
+			}
+			const uint32_t outputHz = carrierHz + cwOffsetHz(offsetSetting);
+			const uint32_t multipliedHz = 126U * outputHz;
+			Si5351Fraction fraction = {};
+			CHECK(si5351CalculateFraction(multipliedHz, referenceHz,
+				maximumDenominator, &fraction));
+			CHECK(fraction.denominator >= 1U);
+			CHECK(fraction.denominator <= maximumDenominator);
+			CHECK(fraction.numerator < fraction.denominator);
+
+			const double actualOutputHz = (double)referenceHz *
+				((double)fraction.integer + (double)fraction.numerator /
+					(double)fraction.denominator) / 126.0;
+			CHECK(std::fabs(actualOutputHz - (double)outputHz) < 0.1);
+		}
+	}
+
+	Si5351Fraction fraction = {};
+	CHECK(!si5351CalculateFraction(1, 0, maximumDenominator, &fraction));
+	CHECK(!si5351CalculateFraction(1, referenceHz, 0, &fraction));
+	CHECK(!si5351CalculateFraction(1, referenceHz, maximumDenominator, 0));
 }
 
 void testCwOffsetSettingsNormalizeAndClampWithoutWrapping()
@@ -314,6 +374,26 @@ void testCwOffsetSettingsNormalizeAndClampWithoutWrapping()
 		CW_OFFSET_MAX_SETTING);
 	CHECK(nextCwOffsetSetting(CW_OFFSET_MAX_SETTING, false) ==
 		CW_OFFSET_MAX_SETTING - 1);
+}
+
+void testTuningStepSettingsNormalizeAndKeepDecadeCoarseStep()
+{
+	CHECK(tuningStepSettingFromStored(0xff) == TUNING_STEP_100_HZ);
+	CHECK(tuningStepSettingFromStored(0) == TUNING_STEP_100_HZ);
+	CHECK(tuningStepSettingFromStored(TUNING_STEP_10_HZ) ==
+		TUNING_STEP_10_HZ);
+	CHECK(tuningStepHz(TUNING_STEP_10_HZ) == 10);
+	CHECK(tuningCoarseStepHz(TUNING_STEP_10_HZ) == 100);
+	CHECK(tuningStepHz(TUNING_STEP_100_HZ) == 100);
+	CHECK(tuningCoarseStepHz(TUNING_STEP_100_HZ) == 1000);
+	CHECK(nextTuningStepSetting(TUNING_STEP_10_HZ, true) ==
+		TUNING_STEP_100_HZ);
+	CHECK(nextTuningStepSetting(TUNING_STEP_100_HZ, true) ==
+		TUNING_STEP_100_HZ);
+	CHECK(nextTuningStepSetting(TUNING_STEP_100_HZ, false) ==
+		TUNING_STEP_10_HZ);
+	CHECK(nextTuningStepSetting(TUNING_STEP_10_HZ, false) ==
+		TUNING_STEP_10_HZ);
 }
 
 void testCarrierFrequencyMapsToHighSideOscillator()
@@ -1117,7 +1197,10 @@ int main()
 	testReceiverFrequencyBoundsAreInclusive();
 	testReceiverFrequencyStepRejectsOutOfBandResult();
 	testReceiverFrequencyStepProducesValidatedResult();
+	testSi5351FractionPreservesExactLegacyGrid();
+	testSi5351FractionBoundsEveryTenHertzTuningPoint();
 	testCwOffsetSettingsNormalizeAndClampWithoutWrapping();
+	testTuningStepSettingsNormalizeAndKeepDecadeCoarseStep();
 	testCarrierFrequencyMapsToHighSideOscillator();
 	testReceiverAppliesInclusiveBandEdges();
 	testReceiverRejectsInvalidFrequencyAndPropagatesHardwareFailure();

@@ -41,6 +41,7 @@ Frequency_Hz g_frequency_med = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 Frequency_Hz g_frequency_hi = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 Frequency_Hz g_frequency_beacon = EEPROM_TX_80M_FREQUENCY_DEFAULT;
 volatile uint8_t g_cw_offset_setting = CW_OFFSET_DEFAULT_SETTING;
+volatile TuningStepSetting g_tuning_step_setting = TUNING_STEP_DEFAULT_SETTING;
 
 Frequency_Hz g_channel_frequency[NUMBER_OF_FREQUENCY_CHANNELS];
 

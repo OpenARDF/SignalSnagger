@@ -87,9 +87,10 @@ ASSERT_EEPROM_OFFSET(turn_tick_audio_feedback, Turn_Tick_Audio_Feedback);
 ASSERT_EEPROM_OFFSET(gain_indicator_audio_feedback,
 	Gain_Indicator_Audio_Feedback);
 ASSERT_EEPROM_OFFSET(cw_offset_setting, Cw_Offset_Setting);
+ASSERT_EEPROM_OFFSET(tuning_step_setting, Tuning_Step_Setting);
 static_assert(sizeof(EE_prom) ==
-	Cw_Offset_Setting + sizeof(uint8_t),
-	"EEPROM layout size must end after cw_offset_setting");
+	Tuning_Step_Setting + sizeof(uint8_t),
+	"EEPROM layout size must end after tuning_step_setting");
 
 #undef ASSERT_EEPROM_OFFSET
 
@@ -217,7 +218,8 @@ const struct EE_prom EEMEM EepromManager::ee_vars
 	PUSHBUTTON_AUDIO_FEEDBACK_ENABLED, // uint8_t pushbutton_audio_feedback
 	TURN_TICK_AUDIO_FEEDBACK_ENABLED, // uint8_t turn_tick_audio_feedback
 	GAIN_INDICATOR_AUDIO_FEEDBACK_ENABLED, // uint8_t gain_indicator_audio_feedback
-	CW_OFFSET_DEFAULT_SETTING // uint8_t cw_offset_setting
+	CW_OFFSET_DEFAULT_SETTING, // uint8_t cw_offset_setting
+	(uint8_t)TUNING_STEP_DEFAULT_SETTING // uint8_t tuning_step_setting
 };
 
 bool g_isMaster = UNUSED_VAR;
@@ -906,6 +908,16 @@ void EepromManager::updateEEPROMVar(EE_var_t v, void* val)
 		}
 		break;
 
+		case Tuning_Step_Setting:
+		{
+			if (*(uint8_t*)val != eeprom_read_byte(
+				(uint8_t*)&(EepromManager::ee_vars.tuning_step_setting)))
+			{
+				avr_eeprom_write_byte(Tuning_Step_Setting, *(uint8_t*)val);
+			}
+		}
+		break;
+
 		default:
 		{
 
@@ -973,6 +985,8 @@ void EepromManager::saveAllEEPROM(void)
 		(void*)&gainIndicatorAudioFeedback);
 	uint8_t cwOffsetSetting = g_cw_offset_setting;
 	updateEEPROMVar(Cw_Offset_Setting, (void*)&cwOffsetSetting);
+	uint8_t tuningStepSetting = (uint8_t)g_tuning_step_setting;
+	updateEEPROMVar(Tuning_Step_Setting, (void*)&tuningStepSetting);
 }
 
 
@@ -1116,10 +1130,15 @@ bool EepromManager::readNonVols(void)
 		g_gain_indicator_audio_feedback_enabled =
 			gainIndicatorAudioFeedbackFromStored(eeprom_read_byte((uint8_t*)&(
 				EepromManager::ee_vars.gain_indicator_audio_feedback)));
-			/* The appended byte is erased on receivers upgraded from older firmware.
-			 * Normalize it to 800 Hz without disturbing any preceding settings. */
-			g_cw_offset_setting = cwOffsetSettingFromStored(eeprom_read_byte(
-				(uint8_t*)&(EepromManager::ee_vars.cw_offset_setting)));
+		/* The appended byte is erased on receivers upgraded from older firmware.
+		 * Normalize it to 800 Hz without disturbing any preceding settings. */
+		g_cw_offset_setting = cwOffsetSettingFromStored(eeprom_read_byte(
+			(uint8_t*)&(EepromManager::ee_vars.cw_offset_setting)));
+
+		/* Preserve the historical 100 Hz behavior when the newly appended byte
+		 * is erased on an upgraded receiver. */
+		g_tuning_step_setting = tuningStepSettingFromStored(eeprom_read_byte(
+			(uint8_t*)&(EepromManager::ee_vars.tuning_step_setting)));
 
 		failure = false;
 	}
@@ -1308,9 +1327,13 @@ bool EepromManager::readNonVols(void)
 				gainIndicatorAudioFeedbackToStored(
 					g_gain_indicator_audio_feedback_enabled));
 
-				g_cw_offset_setting = CW_OFFSET_DEFAULT_SETTING;
-				avr_eeprom_write_byte(Cw_Offset_Setting,
-					g_cw_offset_setting);
+			g_cw_offset_setting = CW_OFFSET_DEFAULT_SETTING;
+			avr_eeprom_write_byte(Cw_Offset_Setting,
+				g_cw_offset_setting);
+
+			g_tuning_step_setting = TUNING_STEP_DEFAULT_SETTING;
+			avr_eeprom_write_byte(Tuning_Step_Setting,
+				(uint8_t)g_tuning_step_setting);
 			
 			/* Done */
 

@@ -95,6 +95,7 @@ enum MenuState_t {
 	MenuSettings,
 	MenuSetAudioFilter,
 	MenuSetCwOffset,
+	MenuSetTuningStep,
 	MenuAbout,
 	MenuInactivityPoweroff,
 	MenuNoHeadphones,
@@ -132,6 +133,7 @@ enum SoundsMenu_t {
 enum SettingsMenu_t {
 	SETTING_AUDIO_FILTER,
 	SETTING_CW_OFFSET,
+	SETTING_TUNING_STEP,
 	NUMBER_OF_SETTINGS_MENUS,
 	INVALID_SETTINGS_MENU
 };
@@ -253,6 +255,9 @@ static bool g_audio_filter_edit_active = false;
  * oscillator, detector, and filter-center snapshot. */
 static uint8_t g_cw_offset_edit_original = CW_OFFSET_DEFAULT_SETTING;
 static bool g_cw_offset_edit_active = false;
+static TuningStepSetting g_tuning_step_edit_original =
+	TUNING_STEP_DEFAULT_SETTING;
+static bool g_tuning_step_edit_active = false;
 volatile bool g_pushbutton_audio_feedback_enabled =
 	PUSHBUTTON_AUDIO_FEEDBACK_DEFAULT;
 /* Foreground restores this snapshot when live feedback preview is cancelled. */
@@ -308,6 +313,7 @@ static bool tuneReceiverTo(Frequency_Hz carrierFrequency);
 static bool tuneActiveMemoryStep(int8_t direction, uint32_t stepHz);
 static void configureCwDetector(void);
 static bool applyCwOffsetSetting(uint8_t setting);
+static uint16_t selectedTuningStepHz(void);
 
 /* Buffer to store the sine wave samples */
 int16_t sineWave[MAX_SINE_PERIOD_STEPS];
@@ -1010,6 +1016,13 @@ static bool tuneReceiverTo(Frequency_Hz carrierFrequency)
 	return true;
 }
 
+static uint16_t selectedTuningStepHz(void)
+{
+	const TuningStepSetting setting = g_tuning_step_setting;
+	return g_encoderswitch_pressed ? tuningCoarseStepHz(setting)
+		: tuningStepHz(setting);
+}
+
 static bool tuneActiveMemoryStep(int8_t direction, uint32_t stepHz)
 {
 	if (!rxTuneMemoryStep(&g_rx_frequency,
@@ -1170,6 +1183,14 @@ static void commitMenuEditsIfActive(void)
 		g_cw_offset_edit_active = false;
 	}
 
+	if (g_tuning_step_edit_active)
+	{
+		g_tuning_step_edit_original = g_tuning_step_setting;
+		uint8_t storedSetting = (uint8_t)g_tuning_step_setting;
+		EEPromMgr.updateEEPROMVar(Tuning_Step_Setting, &storedSetting);
+		g_tuning_step_edit_active = false;
+	}
+
 	if (g_pushbutton_audio_feedback_edit_active)
 	{
 		g_pushbutton_audio_feedback_edit_original =
@@ -1216,6 +1237,12 @@ static void rollbackMenuEditsIfActive(void)
 		g_cw_offset_edit_active = false;
 	}
 
+	if (g_tuning_step_edit_active)
+	{
+		g_tuning_step_setting = g_tuning_step_edit_original;
+		g_tuning_step_edit_active = false;
+	}
+
 	if (g_pushbutton_audio_feedback_edit_active)
 	{
 		g_pushbutton_audio_feedback_enabled =
@@ -1259,6 +1286,7 @@ int main(void)
 	uint8_t hold_audio_gain = 0;
 	AudioFilterMode hold_audio_filter_mode = AUDIO_FILTER_MODE_INVALID;
 	uint8_t hold_cw_offset_setting = UINT8_MAX;
+	uint8_t hold_tuning_step_setting = UINT8_MAX;
 	uint8_t hold_pushbutton_audio_feedback = 0xff;
 	uint8_t hold_turn_tick_audio_feedback = 0xff;
 	uint8_t hold_gain_indicator_audio_feedback = 0xff;
@@ -1428,6 +1456,7 @@ int main(void)
 				hold_audio_gain = 0xff; /* force update */
 				hold_audio_filter_mode = AUDIO_FILTER_MODE_INVALID; /* force update */
 				hold_cw_offset_setting = UINT8_MAX; /* force update */
+				hold_tuning_step_setting = UINT8_MAX; /* force update */
 				hold_pushbutton_audio_feedback = 0xff; /* force update */
 				hold_turn_tick_audio_feedback = 0xff; /* force update */
 				hold_gain_indicator_audio_feedback = 0xff; /* force update */
@@ -1463,7 +1492,8 @@ int main(void)
 							hold_rx_frequency = g_rx_frequency;
 				
 							frequencyString(str, hold_rx_frequency);
-							sprintf(g_tempStr, "00VFO%s%s", g_frequency_updates_enabled ? ">":" ", str);
+							snprintf(g_tempStr, 13, "00V%s%s ",
+								g_frequency_updates_enabled ? ">":" ", str);
 							g_text_buff.putString(g_tempStr);
 						}
 					}
@@ -1481,7 +1511,8 @@ int main(void)
 							else
 							{
 								frequencyString(str, hold_rx_frequency);
-								snprintf(g_tempStr, 13, "00M%02d%s%s", hold_activeMemory + 1, g_frequency_updates_enabled ? ">":" ", str);
+								snprintf(g_tempStr, 13, "00%02d%s%s", hold_activeMemory + 1,
+									g_frequency_updates_enabled ? ">":" ", str);
 							}
 							
 							g_text_buff.putString(g_tempStr);
@@ -1573,21 +1604,29 @@ int main(void)
 				case MenuSettings:
 				case MenuSetAudioFilter:
 				case MenuSetCwOffset:
+				case MenuSetTuningStep:
 				{
 					const bool showAudioFilter = currentMenu == MenuSetAudioFilter ||
 						(currentMenu == MenuSettings &&
 							settingsMenuRow == SETTING_AUDIO_FILTER);
+					const bool showCwOffset = currentMenu == MenuSetCwOffset ||
+						(currentMenu == MenuSettings &&
+							settingsMenuRow == SETTING_CW_OFFSET);
 					const AudioFilterMode mode = g_audio_filter_mode;
 					const uint8_t offsetSetting = g_cw_offset_setting;
+					const TuningStepSetting tuningStepSetting =
+						g_tuning_step_setting;
 					if (hold_settingsMenuRow != settingsMenuRow ||
 						hold_audio_filter_mode != mode ||
-						hold_cw_offset_setting != offsetSetting)
+						hold_cw_offset_setting != offsetSetting ||
+						hold_tuning_step_setting != (uint8_t)tuningStepSetting)
 					{
 						hold_settingsMenuRow = settingsMenuRow;
 						hold_audio_filter_mode = mode;
 						hold_cw_offset_setting = offsetSetting;
-						g_text_buff.putString(showAudioFilter
-							? "00Audio Filt" : "00CW Offset ");
+						hold_tuning_step_setting = (uint8_t)tuningStepSetting;
+						g_text_buff.putString(showAudioFilter ? "00Audio Filt"
+							: (showCwOffset ? "00CW Offset " : "00Tune Step "));
 						g_text_buff.putString("10          ");
 
 						const char selection = currentMenu == MenuSettings ? ' ' : '>';
@@ -1597,12 +1636,12 @@ int main(void)
 							const uint16_t centerHz = cwOffsetHz(offsetSetting);
 							if (bandwidth)
 							{
-								snprintf(g_tempStr, 13, "20%c%3u Hz", selection,
+								snprintf(g_tempStr, 13, "20%c%3u Hz   ", selection,
 									(unsigned int)bandwidth);
 								g_text_buff.putString(g_tempStr);
 								if (centerHz)
 								{
-									snprintf(g_tempStr, 13, "30%u-%uHz",
+									snprintf(g_tempStr, 13, "30%u-%uHz ",
 										(unsigned int)(centerHz - bandwidth / 2U),
 										(unsigned int)(centerHz + bandwidth / 2U));
 									g_text_buff.putString(g_tempStr);
@@ -1614,18 +1653,25 @@ int main(void)
 							}
 							else
 							{
-								snprintf(g_tempStr, 13, "20%cOFF     ", selection);
+								snprintf(g_tempStr, 13, "20%cOFF      ", selection);
 								g_text_buff.putString(g_tempStr);
 								g_text_buff.putString("30BYPASS    ");
 							}
 						}
-						else
+						else if (showCwOffset)
 						{
-							snprintf(g_tempStr, 13, "20%c%4u Hz", selection,
+							snprintf(g_tempStr, 13, "20%c%4u Hz  ", selection,
 								(unsigned int)cwOffsetHz(offsetSetting));
 							g_text_buff.putString(g_tempStr);
 							g_text_buff.putString(offsetSetting == CW_OFFSET_ZERO_SETTING
 								? "30ZERO BEAT " : "30HIGH-SIDE ");
+						}
+						else
+						{
+							snprintf(g_tempStr, 13, "20%c%3u Hz   ", selection,
+								(unsigned int)tuningStepHz(tuningStepSetting));
+							g_text_buff.putString(g_tempStr);
+							g_text_buff.putString("30PUSH x10  ");
 						}
 					}
 				}
@@ -1737,7 +1783,7 @@ int main(void)
 							frequencyString(str, chanF);
 							if(currentMenu == MenuFreqMemories)
 							{
-								snprintf(g_tempStr, 13, "20  %s  ", str);
+								snprintf(g_tempStr, 13, "20 %s  ", str);
 								g_text_buff.putString(g_tempStr);
 								
 								if(g_channel_name[g_active_memory])
@@ -1753,7 +1799,7 @@ int main(void)
 							{
 								if(currentMenu == MenuSetMemFreq)
 								{
-									snprintf(g_tempStr, 13, "20> %s  ", str);
+									snprintf(g_tempStr, 13, "20>%s  ", str);
 								}
 								else
 								{
@@ -2221,6 +2267,12 @@ int main(void)
 								g_cw_offset_edit_active = true;
 								setMenu(MenuSetCwOffset);
 							}
+							else if (settingsMenuRow == SETTING_TUNING_STEP)
+							{
+								g_tuning_step_edit_original = g_tuning_step_setting;
+								g_tuning_step_edit_active = true;
+								setMenu(MenuSetTuningStep);
+							}
 							else
 							{
 								g_audio_filter_edit_original = g_audio_filter_mode;
@@ -2232,6 +2284,7 @@ int main(void)
 
 						case MenuSetAudioFilter:
 						case MenuSetCwOffset:
+						case MenuSetTuningStep:
 						{
 							commitMenuEditsIfActive();
 							setMenu(MenuBackOne);
@@ -2335,7 +2388,7 @@ int main(void)
 								if(g_frequency_mode == MODE_VFO)
 								{
 									Frequency_Hz requested_frequency = g_rx_frequency;
-									uint32_t step_hz = g_encoderswitch_pressed ? 1000 : 100;
+									uint32_t step_hz = selectedTuningStepHz();
 									if(receiverFrequencyStep(g_rx_frequency, 1, step_hz, &requested_frequency))
 									{
 									(void)tuneReceiverTo(requested_frequency);
@@ -2398,7 +2451,7 @@ int main(void)
 					
 						case MenuSetMemFreq:
 						{
-							uint32_t step_hz = g_encoderswitch_pressed ? 1000 : 100;
+							uint32_t step_hz = selectedTuningStepHz();
 							(void)tuneActiveMemoryStep(1, step_hz);
 						}
 						break;
@@ -2458,6 +2511,13 @@ int main(void)
 							{
 								(void)applyCwOffsetSetting(nextSetting);
 							}
+						}
+						break;
+
+						case MenuSetTuningStep:
+						{
+							g_tuning_step_setting = nextTuningStepSetting(
+								g_tuning_step_setting, true);
 						}
 						break;
 
@@ -2530,7 +2590,7 @@ int main(void)
 								if(g_frequency_mode == MODE_VFO)
 								{
 									Frequency_Hz requested_frequency = g_rx_frequency;
-									uint32_t step_hz = g_encoderswitch_pressed ? 1000 : 100;
+									uint32_t step_hz = selectedTuningStepHz();
 									if(receiverFrequencyStep(g_rx_frequency, -1, step_hz, &requested_frequency))
 									{
 									(void)tuneReceiverTo(requested_frequency);
@@ -2599,7 +2659,7 @@ int main(void)
 					
 						case MenuSetMemFreq:
 						{
-							uint32_t step_hz = g_encoderswitch_pressed ? 1000 : 100;
+							uint32_t step_hz = selectedTuningStepHz();
 							(void)tuneActiveMemoryStep(-1, step_hz);
 						}
 						break;
@@ -2670,11 +2730,18 @@ int main(void)
 						}
 						break;
 
+						case MenuSetTuningStep:
+						{
+							g_tuning_step_setting = nextTuningStepSetting(
+								g_tuning_step_setting, false);
+						}
+						break;
+
 						case MenuSettings:
 						{
 							if (settingsMenuRow == SETTING_AUDIO_FILTER)
 							{
-								settingsMenuRow = SETTING_CW_OFFSET;
+								settingsMenuRow = SETTING_TUNING_STEP;
 							}
 							else
 							{
