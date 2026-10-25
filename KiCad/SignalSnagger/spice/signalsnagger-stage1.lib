@@ -1,0 +1,187 @@
+* SignalSnagger Stage 1 receiver-path models for ngspice/KiCad.
+*
+* These models are nominal engineering models.  They intentionally distinguish
+* manufacturer-derived topology/limits from behavioral surrogates.  See
+* README.md in this directory for provenance, limits, and the Stage 2 plan.
+
+* Generic Gummel-Poon 2N2222A-class model used for SMMBT2222ALT1G.
+* Pins: collector base emitter
+.SUBCKT SS_SMMBT2222ALT1G C B E
+Q1 C B E SS_2N2222A
+.MODEL SS_2N2222A NPN (IS=14.34F XTI=3 EG=1.11 VAF=74.03 BF=255.9
++ NE=1.307 ISE=14.34F IKF=0.2847 XTB=1.5 BR=6.092 NC=2 RC=1
++ CJC=7.306P MJC=0.3416 VJC=0.75 FC=0.5 CJE=22.01P MJE=0.377
++ VJE=0.75 TR=46.91N TF=411.1P ITF=0.6 VTF=1.7 XTF=3 RB=10)
+.ENDS SS_SMMBT2222ALT1G
+
+* Vishay DG9422E nominal SPST analog-switch surrogate.
+* Pins: V+ COM V- GND NO IN
+.SUBCKT SS_DG9422E 1 2 3 4 5 6
+SMAIN 2 5 6 4 SS_DG9422_SW
+C2G 2 4 12P
+C5G 5 4 12P
+R2L 2 4 1G
+R5L 5 4 1G
+RIN 6 4 1MEG
+.MODEL SS_DG9422_SW SW (RON=3.2 ROFF=1G VT=1.5 VH=0.1)
+.ENDS SS_DG9422E
+
+* Linear potentiometer surrogates.  Pins: end 1, wiper, end 3.
+* W is the fraction of total resistance from pin 1 to the wiper.
+.SUBCKT SS_POT_10K 1 2 3 PARAMS: W=0.5
+R12 1 2 {MAX(10K*W,1M)}
+R23 2 3 {MAX(10K*(1-W),1M)}
+.ENDS SS_POT_10K
+
+.SUBCKT SS_POT_100K 1 2 3 PARAMS: W=0.5
+R12 1 2 {MAX(100K*W,1M)}
+R23 2 3 {MAX(100K*(1-W),1M)}
+.ENDS SS_POT_100K
+
+* Coilcraft PWB-4-CLC coupled-inductor approximation.
+* Pins: PA P_CT PB SB S_CT SA
+* Published totals: Lpri=25 uH, Lsec=98 uH, DCRpri=75 mOhm,
+* DCRsec=135 mOhm.  K is a nominal fit pending Stage 2 S-parameter fitting.
+.SUBCKT SS_PWB_4_CLC 1 2 3 4 5 6 PARAMS: KCOUP=0.998
+RPA 1 NPA 37.5M
+LPA NPA 2 6.25U
+LPB 2 NPB 6.25U
+RPB NPB 3 37.5M
+RSA 6 NSA 67.5M
+LSA NSA 5 24.5U
+LSB 5 NSB 24.5U
+RSB NSB 4 67.5M
+KPA_SA LPA LSA {KCOUP}
+KPA_SB LPA LSB {KCOUP}
+KPB_SA LPB LSA {KCOUP}
+KPB_SB LPB LSB {KCOUP}
+KPA_PB LPA LPB {KCOUP}
+KSA_SB LSA LSB {KCOUP}
+CPRI 1 3 2P
+CSEC 6 4 2P
+.ENDS SS_PWB_4_CLC
+
+* Diodes Incorporated PI5C3253 dual 4:1 mux/demux surrogate.
+* Package pins are preserved in numerical order.
+* Typical/max-relevant Stage 1 values: RON=5 ohm, CIO(off)=6 pF.
+.SUBCKT SS_PI5C3253 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+BC11 C11 8 V={((V(1,8)<0.8)&&(V(2,8)<0.8)&&(V(14,8)<0.8))?5:0}
+BC12 C12 8 V={((V(1,8)<0.8)&&(V(2,8)<0.8)&&(V(14,8)>2.0))?5:0}
+BC13 C13 8 V={((V(1,8)<0.8)&&(V(2,8)>2.0)&&(V(14,8)<0.8))?5:0}
+BC14 C14 8 V={((V(1,8)<0.8)&&(V(2,8)>2.0)&&(V(14,8)>2.0))?5:0}
+S11 7 6 C11 8 SS_PI5_SW
+S12 7 5 C12 8 SS_PI5_SW
+S13 7 4 C13 8 SS_PI5_SW
+S14 7 3 C14 8 SS_PI5_SW
+BC21 C21 8 V={((V(15,8)<0.8)&&(V(2,8)<0.8)&&(V(14,8)<0.8))?5:0}
+BC22 C22 8 V={((V(15,8)<0.8)&&(V(2,8)<0.8)&&(V(14,8)>2.0))?5:0}
+BC23 C23 8 V={((V(15,8)<0.8)&&(V(2,8)>2.0)&&(V(14,8)<0.8))?5:0}
+BC24 C24 8 V={((V(15,8)<0.8)&&(V(2,8)>2.0)&&(V(14,8)>2.0))?5:0}
+S21 9 10 C21 8 SS_PI5_SW
+S22 9 11 C22 8 SS_PI5_SW
+S23 9 12 C23 8 SS_PI5_SW
+S24 9 13 C24 8 SS_PI5_SW
+C3 3 8 6P
+C4 4 8 6P
+C5 5 8 6P
+C6 6 8 6P
+C7 7 8 6P
+C9 9 8 6P
+C10 10 8 6P
+C11P 11 8 6P
+C12P 12 8 6P
+C13P 13 8 6P
+R3L 3 8 1G
+R4L 4 8 1G
+R5L 5 8 1G
+R6L 6 8 1G
+R7L 7 8 1G
+R9L 9 8 1G
+R10L 10 8 1G
+R11L 11 8 1G
+R12L 12 8 1G
+R13L 13 8 1G
+.MODEL SS_PI5_SW SW (RON=5 ROFF=1G VT=2.5 VH=0.05)
+.ENDS SS_PI5C3253
+
+* TI REF4132B25 nominal 2.5 V reference surrogate.
+* Pins: NC GND EN VIN VOUT
+.SUBCKT SS_REF4132B25 1 2 3 4 5
+RNC 1 2 1G
+REN 3 2 1MEG
+BREF NREF 2 V={((V(3,2)>0.8)&&(V(4,2)>2.6))?2.5:0}
+ROUT NREF 5 0.2
+COUT 5 2 100N
+.ENDS SS_REF4132B25
+
+* Vishay MSS1P4-M3 Schottky detector/limiter model.
+* Pins: cathode anode
+.SUBCKT SS_MSS1P4_M3 K A
+D1 A K SS_MSS1P4_D
+.MODEL SS_MSS1P4_D D (IS=5U N=1.08 RS=0.18 CJO=110P M=0.45 VJ=0.35
++ BV=40 IBV=100U TT=8N)
+.ENDS SS_MSS1P4_M3
+
+* ST TS912 dual rail-to-rail op-amp behavioral surrogate.
+* Pins: OUT1 IN1- IN1+ V- IN2+ IN2- OUT2 V+
+.SUBCKT SS_TS912_DUAL 1 2 3 4 5 6 7 8
+XOA1 1 2 3 8 4 SS_TS912_CORE
+XOA2 7 6 5 8 4 SS_TS912_CORE
+.ENDS SS_TS912_DUAL
+
+.SUBCKT SS_TS912_CORE OUT INM INP VP VM
+RINP INP VM 1T
+RINM INM VM 1T
+EGAIN NERR VM VALUE={100000*(V(INP,VM)-V(INM,VM))}
+RPOLE NERR NDOM 100K
+CPOLE NDOM VM 159N
+BCLAMP NDRV VM V={(V(VP,VM)-0.01)/2+(V(VP,VM)-0.07)/2*TANH(V(NDOM,VM)/((V(VP,VM)-0.07)/2))}
+ROUT NDRV OUT 65
+COUT OUT VM 1P
+.ENDS SS_TS912_CORE
+
+* TI LM386-1 audio-power-amplifier behavioral surrogate.
+* Pins: GAIN IN- IN+ GND OUT VS BYPASS GAIN
+.SUBCKT SS_LM386_1 1 2 3 4 5 6 7 8
+RINP 3 4 50K
+RINM 2 4 50K
+EGAIN NERR 4 VALUE={20*(V(3,4)-V(2,4))}
+RPOLE NERR NDOM 10K
+CPOLE NDOM 4 2.65N
+BCLAMP NDRV 4 V={V(6,4)/2+(V(6,4)-0.4)/2*TANH(V(NDOM,4)/((V(6,4)-0.4)/2))}
+ROUT NDRV 5 5
+CBYP 7 4 15P
+RBYPP 7 4 100K
+RGAIN1 1 4 100K
+RGAIN8 8 4 100K
+.ENDS SS_LM386_1
+
+* Si5351 receiver-LO surrogate.  Outputs CLK0 and CLK1 are equal-frequency,
+* 50-percent-duty square waves in quadrature.  Other pins are high impedance.
+* Pins: VDD XA XB SCL SDA CLK2 VDDO GND CLK1 CLK0
+.SUBCKT SS_SI5351_QSD 1 2 3 4 5 6 7 8 9 10 PARAMS: F_LO=3.6MEG VHIGH=3.3
+VCLK0 10 8 PULSE(0 {VHIGH} 0 1N 1N {0.5/F_LO} {1/F_LO})
+VCLK1 9 8 PULSE(0 {VHIGH} {0.25/F_LO} 1N 1N {0.5/F_LO} {1/F_LO})
+RCLK2 6 8 1G
+RXA 2 8 1G
+RXB 3 8 1G
+RSCL 4 8 1G
+RSDA 5 8 1G
+.ENDS SS_SI5351_QSD
+
+* AVR128DA48 Stage 1 receiver passthrough.
+* Package pins are p1..p48.  PD2/pin22 is sampled at 44.1 kHz and the
+* quantized 10-bit held value is driven from DAC0/PD6/pin26.  PD3/pin23 is
+* reserved for the later I/Q DSP model.
+.SUBCKT SS_AVR128DA48_PASS_44K1 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10
++ p11 p12 p13 p14 p15 p16 p17 p18 p19 p20 p21 p22 p23 p24
++ p25 p26 p27 p28 p29 p30 p31 p32 p33 p34 p35 p36 p37 p38
++ p39 p40 p41 p42 p43 p44 p45 p46 p47 p48 PARAMS: FS=44.1K VFS=5
+VSH CLK p15 PULSE(0 5 0 1N 1N 100N {1/FS})
+SADC p22 HOLD CLK p15 SS_ADC_SAMPLE
+CHOLD HOLD p15 20P IC=2.5
+RLEAK HOLD p15 1G
+BQUANT QDAC p15 V={FLOOR(V(HOLD,p15)*1023/VFS+0.5)*VFS/1023}
+ROUT QDAC p26 50
+.MODEL SS_ADC_SAMPLE SW (RON=10 ROFF=1T VT=2.5 VH=0.1)
+.ENDS SS_AVR128DA48_PASS_44K1
