@@ -2318,19 +2318,24 @@ int main(void)
 				cancelMenuEntryTimeout(&g_menu_entry_timeout);
 				if(encoder_presses == 1)
 				{
-					if((g_frequency_mode == MODE_VFO) && advanceActiveMemory(UP))
+					/* Receiver-mode selection belongs only to the normal operational
+					 * display; menu and clock screens must retain their current state. */
+					if((setMenu(MenuGetCurrent) == MenuOperational) && !clock_display_active)
 					{
-						if (tuneReceiverTo(g_channel_frequency[g_active_memory]))
+						if((g_frequency_mode == MODE_VFO) && advanceActiveMemory(UP))
 						{
-							g_frequency_mode = MODE_MEMORY;
+							if (tuneReceiverTo(g_channel_frequency[g_active_memory]))
+							{
+								g_frequency_mode = MODE_MEMORY;
+							}
 						}
-					}
-					else
-					{
-						g_frequency_mode = MODE_VFO;
-					}
+						else
+						{
+							g_frequency_mode = MODE_VFO;
+						}
 				
-					refresh_display = true;
+						refresh_display = true;
+					}
 				}
 				else if (encoder_presses == 2)
 				{
