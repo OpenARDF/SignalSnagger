@@ -17,7 +17,8 @@
   synchronized collector branch unless the user explicitly requests otherwise.
 - Use `just branch-route-check Development1` or `just branch-route-check
   Development1-KiCad` before topic work. Before promotion, use `just
-  collector-preflight <collector>` on the collector itself.
+  collector-preflight <collector>` on the collector itself; the KiCad collector
+  preflight also runs the repository's `spice-check` gate.
 - Leave changes uncommitted and unpushed unless the user explicitly authorizes
   those actions. Use reviewed pull requests for normal topic integration.
 - Collect all approved firmware/software topics in `Development1`, then use one
