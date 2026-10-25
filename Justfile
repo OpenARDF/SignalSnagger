@@ -12,14 +12,25 @@ status:
 
 # Verify that a topic or collector is based on the named integration branch.
 branch-route-check collector:
+    git fetch --prune origin main "{{collector}}"
     ./scripts/check-branch-workflow.sh "{{collector}}"
+
+# Verify that a synchronization topic joins the exact remote collector and main tips.
+collector-sync-check collector:
+    git fetch --prune origin main "{{collector}}"
+    ./scripts/check-branch-workflow.sh "{{collector}}" --sync
 
 # Verify collector routing, repository gates, and secrets before promotion.
 collector-preflight collector:
+    git fetch --prune origin main "{{collector}}"
     ./scripts/check-branch-workflow.sh "{{collector}}" --promotion
     just check
     if [[ "{{collector}}" == "Development1-KiCad" ]]; then just spice-check; fi
     just secrets
+
+# Prove branch routing rejects stale collectors and malformed synchronization topics.
+branch-workflow-regression:
+    ./scripts/test-branch-workflow.sh
 
 # Verify host tools and the pinned AVR compiler/device pack.
 doctor:
@@ -82,7 +93,7 @@ secrets:
     gitleaks detect --source "{{repo_root}}" --no-banner --redact
 
 # Blocking local gate for repository and firmware changes.
-check: doctor docs-check policy-check release-evidence-check release-evidence-regression test avr-build
+check: doctor docs-check policy-check branch-workflow-regression release-evidence-check release-evidence-regression test avr-build
 
 # Complete deterministic release-candidate gate; hardware validation remains separate.
 release-preflight: check secrets avr-repeatability release-package-repeatability release-package-regression
