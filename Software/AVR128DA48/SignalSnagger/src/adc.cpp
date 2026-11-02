@@ -258,6 +258,18 @@ void ADC0_SYSTEM_shutdown(void)
 	g_adc_initialization = ADC_NOT_INITIALIZED;
 }
 
+void ADC0_emergencyStopAudio(void)
+{
+	/* Do not perform foreground cleanup here: this function runs at interrupt
+	 * level 1 specifically to release the CPU from a starvation condition. */
+	ADC0.INTCTRL = 0;
+	TCA1.SINGLE.INTCTRL = 0;
+	TCA1.SINGLE.CTRLA = 0;
+	ADC0.EVCTRL = 0;
+	EVSYS.USERADC0START = 0;
+	EVSYS.CHANNEL0 = 0;
+}
+
 // ISR(ADC0_RESRDY_vect)
 // {
 // 	/* Clear the interrupt flag by reading the result */
