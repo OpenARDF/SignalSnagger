@@ -162,6 +162,20 @@ uint16_t audioCenteredToDac(int16_t centeredSample)
 	return (uint16_t)((bounded / 4) + AUDIO_DAC_CENTER);
 }
 
+uint16_t audioDirectDacValue(uint16_t adcSample, uint8_t gain,
+	bool feedthrough, int16_t injectedSample)
+{
+	if (adcSample > 4095)
+	{
+		adcSample = 4095;
+	}
+	const int16_t centeredSample = feedthrough
+		? (int16_t)adcSample - AUDIO_ADC_CENTER
+		: 0;
+	return audioCenteredToDac(audioScaleAndSaturate(centeredSample, gain,
+		injectedSample));
+}
+
 AudioPathProcessor::AudioPathProcessor()
 {
 	Reset();

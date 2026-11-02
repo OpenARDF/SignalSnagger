@@ -20,6 +20,7 @@
 #include "receiver_frequency.h"
 #include "receiver_test_stubs.h"
 #include "rf_gain_audio_cue.h"
+#include "runtime_liveness.h"
 #include "sense_switches.h"
 #include "si5351_fraction.h"
 #include "signal_score.h"
@@ -45,7 +46,8 @@ static_assert(!std::is_copy_assignable<CircularUintBuff>::value,
 	"CircularUintBuff must not copy its owning buffer pointer");
 static_assert(ADCCENTER == 2048, "released firmware uses 12-bit ADC centering");
 static_assert(SATURATION == (9 * ADCCENTER / 5), "preserve released clipping threshold");
-static_assert(AUDIO_ADC_SAMPLE_RATE_HZ == 48000, "audio ADC rate must remain explicit");
+static_assert(AUDIO_ADC_SAMPLE_RATE_HZ == 48000,
+	"direct-audio path must preserve the explicit 48 kHz ADC rate");
 static_assert(AUDIO_DSP_SAMPLE_RATE_HZ == 12000, "audio DSP rate must track decimation");
 static_assert(AUDIO_CW_DEFAULT_OFFSET_HZ == 800,
 	"default CW listening offset must remain explicit");
@@ -1118,6 +1120,59 @@ void testAudioPathUsesSignedSaturatingGainAndDacScaling()
 	CHECK(audioCenteredToDac(2047) == 1023);
 }
 
+void testDirectAudioPreservesEveryCenteredSampleWithoutLegacyWrapping()
+{
+	CHECK(audioDirectDacValue(AUDIO_ADC_CENTER, AUDIO_NEUTRAL_GAIN,
+		true, 0) == AUDIO_DAC_CENTER);
+	CHECK(audioDirectDacValue(AUDIO_ADC_CENTER + 100, AUDIO_NEUTRAL_GAIN,
+		true, 0) == AUDIO_DAC_CENTER + 25);
+	CHECK(audioDirectDacValue(AUDIO_ADC_CENTER - 100, AUDIO_NEUTRAL_GAIN,
+		true, 0) == AUDIO_DAC_CENTER - 25);
+	CHECK(audioDirectDacValue(AUDIO_ADC_CENTER + 1,
+		AUDIO_NEUTRAL_GAIN + 2, true, 0) == AUDIO_DAC_CENTER + 1);
+	CHECK(audioDirectDacValue(AUDIO_ADC_CENTER - 1,
+		AUDIO_NEUTRAL_GAIN + 2, true, 0) == AUDIO_DAC_CENTER - 1);
+	CHECK(audioDirectDacValue(4096, AUDIO_NEUTRAL_GAIN, true, 0) == 1023);
+	CHECK(audioDirectDacValue(AUDIO_ADC_CENTER + 100, AUDIO_NEUTRAL_GAIN,
+		false, 40) == AUDIO_DAC_CENTER + 10);
+}
+
+void testAudioBacklogTripsOnlyAfterSustainedDrops()
+{
+	uint8_t consecutiveDrops = 0;
+	for (uint8_t index = 0; index < AUDIO_BACKLOG_TRIP_FRAMES - 1; ++index)
+	{
+		consecutiveDrops = audioBacklogAfterFrame(consecutiveDrops, true);
+		CHECK(!audioBacklogMustTrip(consecutiveDrops));
+	}
+	consecutiveDrops = audioBacklogAfterFrame(consecutiveDrops, true);
+	CHECK(audioBacklogMustTrip(consecutiveDrops));
+	CHECK(audioBacklogAfterFrame(consecutiveDrops, true) ==
+		AUDIO_BACKLOG_TRIP_FRAMES);
+	CHECK(audioBacklogAfterFrame(consecutiveDrops, false) == 0);
+}
+
+void testRuntimeWatchdogRequiresEveryExpectedService()
+{
+	RuntimeLivenessGate gate;
+	RuntimeLivenessSnapshot snapshot = {1, 1, 1};
+	CHECK(!gate.ShouldFeed(snapshot, true, false));
+
+	snapshot.switchService++;
+	snapshot.adcCapture++;
+	CHECK(!gate.ShouldFeed(snapshot, true, false));
+	snapshot.audioDsp++;
+	CHECK(gate.ShouldFeed(snapshot, true, false));
+	CHECK(!gate.ShouldFeed(snapshot, true, false));
+
+	snapshot.switchService++;
+	CHECK(gate.ShouldFeed(snapshot, false, false));
+	snapshot.switchService++;
+	snapshot.adcCapture++;
+	snapshot.audioDsp++;
+	CHECK(!gate.ShouldFeed(snapshot, true, true));
+}
+
 void testAudioPathDecimatesAtAnExactFourToOneRatio()
 {
 	AudioPathProcessor processor;
@@ -1558,6 +1613,9 @@ int main()
 	testGoertzelUsesReleasedSaturationThreshold();
 	testGoertzelAnalyzesSelectedCwOffsetCenter();
 	testAudioPathUsesSignedSaturatingGainAndDacScaling();
+	testDirectAudioPreservesEveryCenteredSampleWithoutLegacyWrapping();
+	testAudioBacklogTripsOnlyAfterSustainedDrops();
+	testRuntimeWatchdogRequiresEveryExpectedService();
 	testAudioPathDecimatesAtAnExactFourToOneRatio();
 	testAudioPathBandpassRejectsOutOfBandSignals();
 	testAudioFilterModesNormalizeClampAndReportBandwidth();

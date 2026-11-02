@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <avr/sleep.h>
+#include <avr/wdt.h>
 #include <atomic.h>
 #include <math.h>
 
@@ -33,6 +34,8 @@
 #include "power_on_clock.h"
 #include "receiver_frequency.h"
 #include "rf_gain_audio_cue.h"
+#include "rstctrl.h"
+#include "runtime_liveness.h"
 #include "sense_switches.h"
 #include "shared_state.h"
 #include "signal_score.h"
@@ -305,8 +308,48 @@ volatile bool g_audio_test = false;
 static AudioPathProcessor g_audio_path;
 static volatile int16_t g_pending_audio_sample = 0;
 static volatile bool g_audio_frame_ready = false;
-/* Debugger-visible deadline evidence: nonzero means 12 kHz DSP lost a frame. */
+/* Debugger-visible liveness evidence. The ADC owns dropped frames and backlog;
+ * each service owns its byte-sized heartbeat. */
 static volatile uint16_t g_audio_dropped_frames = 0;
+static volatile uint8_t g_audio_consecutive_drops = 0;
+static volatile bool g_audio_lockout = false;
+static volatile uint8_t g_adc_capture_heartbeat = 0;
+static volatile uint8_t g_audio_dsp_heartbeat = 0;
+static volatile uint8_t g_switch_service_heartbeat = 0;
+
+struct AudioLockoutEvidence
+{
+	uint8_t marker;
+	uint8_t inverseMarker;
+	uint16_t droppedFrames;
+};
+
+/* .noinit survives watchdog reset without wearing EEPROM. The marker pair is
+ * published last and validated only together with the hardware WDRF flag. */
+static AudioLockoutEvidence g_audio_lockout_evidence
+	__attribute__((section(".noinit")));
+static bool g_startup_watchdog_reset = false;
+static bool g_previous_audio_lockout = false;
+static uint16_t g_previous_audio_drops = 0;
+static RuntimeLivenessGate g_runtime_liveness_gate;
+
+#define AUDIO_LOCKOUT_MARKER UINT8_C(0xA5)
+#define AUDIO_LOCKOUT_INVERSE_MARKER UINT8_C(0x5A)
+
+struct AudioControlFrame
+{
+	int16_t injectedSample;
+	uint8_t gain;
+	bool feedthrough;
+};
+
+/* TCA1 writes the inactive slot completely, then publishes it with one atomic
+ * byte store. The higher-priority ADC ISR therefore never sees a torn frame. */
+static volatile AudioControlFrame g_audio_control_frames[2] = {
+	{0, AUDIO_NEUTRAL_GAIN, true},
+	{0, AUDIO_NEUTRAL_GAIN, true}
+};
+static volatile uint8_t g_audio_control_active = 0;
 
 /* VREF start-up time */
 #define VREF_STARTUP_TIME       (50)
@@ -327,6 +370,11 @@ static bool tuneActiveMemoryStep(int8_t direction, uint32_t stepHz);
 static void configureCwDetector(void);
 static bool applyCwOffsetSetting(uint8_t setting);
 static uint16_t selectedTuningStepHz(void);
+static AudioControlFrame nextAudioControlFrame(void);
+static void publishAudioControlFrame(const AudioControlFrame& frame);
+static RuntimeLivenessSnapshot captureRuntimeLiveness(void);
+static void armRuntimeWatchdog(void);
+static void serviceRuntimeWatchdog(bool audioExpected);
 
 /* Buffer to store the sine wave samples */
 int16_t sineWave[MAX_SINE_PERIOD_STEPS];
@@ -346,13 +394,74 @@ static volatile uint8_t g_tick = 0;
 static volatile uint8_t g_requested_rf_gain_cue = RF_GAIN_CUE_NO_REQUEST;
 static RfGainAudioCue g_rf_gain_audio_cue;
 
+static AudioControlFrame nextAudioControlFrame(void)
+{
+	static uint8_t sineIndex = 0;
+	static uint8_t gainCueSineIndex = 0;
+	AudioControlFrame frame = {
+		0,
+		(uint8_t)(g_audio_test ? AUDIO_NEUTRAL_GAIN : g_audio_gain),
+		g_enable_audio_feedthrough && !g_audio_test
+	};
+	const uint8_t requestedRfGainCue = g_requested_rf_gain_cue;
+	if (!g_gain_indicator_audio_feedback_enabled)
+	{
+		g_requested_rf_gain_cue = RF_GAIN_CUE_NO_REQUEST;
+		g_rf_gain_audio_cue.Cancel();
+	}
+	else if (requestedRfGainCue != RF_GAIN_CUE_NO_REQUEST)
+	{
+		g_requested_rf_gain_cue = RF_GAIN_CUE_NO_REQUEST;
+		g_rf_gain_audio_cue.Schedule(requestedRfGainCue);
+	}
+
+	if (g_beep && g_sine_period_steps)
+	{
+		frame.injectedSample = sineWave[sineIndex++];
+		if(sineIndex >= g_sine_period_steps) sineIndex = 0;
+		g_beep--;
+		return frame;
+	}
+
+	bool gainCueToneStarted = false;
+	if (g_rf_gain_audio_cue.NextFrame(&gainCueToneStarted))
+	{
+		if (gainCueToneStarted)
+		{
+			gainCueSineIndex = 0;
+		}
+		frame.injectedSample = g_rf_gain_cue_sine_wave[gainCueSineIndex++];
+		if(gainCueSineIndex >= RF_GAIN_CUE_TONE_PERIOD_FRAMES)
+		{
+			gainCueSineIndex = 0;
+		}
+	}
+	else if (g_tick)
+	{
+		g_tick--;
+		frame.feedthrough = false;
+	}
+	return frame;
+}
+
+static void publishAudioControlFrame(const AudioControlFrame& frame)
+{
+	const uint8_t inactive = g_audio_control_active ^ 1U;
+	g_audio_control_frames[inactive].injectedSample = frame.injectedSample;
+	g_audio_control_frames[inactive].gain = frame.gain;
+	g_audio_control_frames[inactive].feedthrough = frame.feedthrough;
+	/* Publish last; the ADC cannot preempt this byte store and then observe a
+	 * partially written inactive slot. */
+	g_audio_control_active = inactive;
+}
+
 /* User-interface sounds have independent settings; safety alerts remain
  * audible because they use separate feedback paths. */
 static void schedulePushbuttonAudioFeedback(void)
 {
 	if (g_pushbutton_audio_feedback_enabled)
 	{
-		g_beep = 1000;
+		atomicWriteU16(&g_beep, 1000);
 	}
 }
 
@@ -458,12 +567,48 @@ ADC Result Ready Interrupt
 ISR(ADC0_RESRDY_vect)
 {
 	const uint16_t sample = ADC0.RES; /* Reading RES clears RESRDY. */
+	g_adc_capture_heartbeat++;
+	const uint8_t controlIndex = g_audio_control_active;
+	const int16_t injectedSample =
+		g_audio_control_frames[controlIndex].injectedSample;
+	const uint8_t gain = g_audio_control_frames[controlIndex].gain;
+	const bool feedthrough = g_audio_control_frames[controlIndex].feedthrough;
+	/* OFF is the direct-listening experiment: preserve the 48 kHz sample stream
+	 * while using the corrected signed gain and DAC conversion. The decimated
+	 * stream below continues to feed signal analysis and filtered A/B modes. */
+	if (g_audio_filter_mode == AUDIO_FILTER_OFF)
+	{
+		DAC0_setVal(audioDirectDacValue(sample, gain, feedthrough,
+			injectedSample));
+	}
+
 	int16_t decimatedSample = 0;
 	if (g_audio_path.CaptureAdcSample(sample, &decimatedSample))
 	{
 		if (g_audio_frame_ready)
 		{
-			g_audio_dropped_frames++;
+			if (g_audio_dropped_frames != UINT16_MAX)
+			{
+				g_audio_dropped_frames++;
+			}
+			g_audio_consecutive_drops = audioBacklogAfterFrame(
+				g_audio_consecutive_drops, true);
+			if (audioBacklogMustTrip(g_audio_consecutive_drops) &&
+				!g_audio_lockout)
+			{
+				/* Stop the interrupt source immediately. If lower-priority work is
+				 * starved, the foreground will no longer feed the watchdog and the
+				 * receiver will restart within two seconds. */
+				g_audio_lockout = true;
+				g_audio_lockout_evidence.marker = 0;
+				g_audio_lockout_evidence.droppedFrames =
+					g_audio_dropped_frames;
+				g_audio_lockout_evidence.inverseMarker =
+					AUDIO_LOCKOUT_INVERSE_MARKER;
+				g_audio_lockout_evidence.marker = AUDIO_LOCKOUT_MARKER;
+				DAC0_setVal(AUDIO_DAC_CENTER);
+				ADC0_emergencyStopAudio();
+			}
 		}
 		else
 		{
@@ -478,8 +623,6 @@ ISR(ADC0_RESRDY_vect)
  * enabling same-level UI interrupts, which would add DAC timing jitter. */
 ISR(TCA1_CMP0_vect)
 {
-	static uint8_t sineIndex = 0;
-	static uint8_t gainCueSineIndex = 0;
 	ADC0_audioFrameHandled();
 	if (!g_audio_frame_ready)
 	{
@@ -488,63 +631,24 @@ ISR(TCA1_CMP0_vect)
 
 	const int16_t decimatedSample = g_pending_audio_sample;
 	g_audio_frame_ready = false;
-	int16_t injectedSample = 0;
-	bool feedthrough = g_enable_audio_feedthrough && !g_audio_test;
-	const uint8_t gain = g_audio_test ? AUDIO_NEUTRAL_GAIN : g_audio_gain;
-	const uint8_t requestedRfGainCue = g_requested_rf_gain_cue;
-	if (!g_gain_indicator_audio_feedback_enabled)
-	{
-		/* Cancel in the owning ISR so foreground menu edits never race the cue
-		 * sequencer's multi-byte frame counters. */
-		g_requested_rf_gain_cue = RF_GAIN_CUE_NO_REQUEST;
-		g_rf_gain_audio_cue.Cancel();
-	}
-	else if (requestedRfGainCue != RF_GAIN_CUE_NO_REQUEST)
-	{
-		g_requested_rf_gain_cue = RF_GAIN_CUE_NO_REQUEST;
-		g_rf_gain_audio_cue.Schedule(requestedRfGainCue);
-	}
-
-	/* Tone/tick durations are counted at the 12 ksample/s output rate. */
-	if (g_beep && g_sine_period_steps)
-	{
-		injectedSample = sineWave[sineIndex++];
-		if(sineIndex >= g_sine_period_steps) sineIndex = 0;
-		g_beep--;
-	}
-	else
-	{
-		bool gainCueToneStarted = false;
-		if (g_rf_gain_audio_cue.NextFrame(&gainCueToneStarted))
-		{
-			/* Every element spans complete 250 Hz cycles. Restarting at phase zero
-			 * keeps each independently gated element free of waveform steps. */
-			if (gainCueToneStarted)
-			{
-				gainCueSineIndex = 0;
-			}
-			injectedSample = g_rf_gain_cue_sine_wave[gainCueSineIndex++];
-			if(gainCueSineIndex >= RF_GAIN_CUE_TONE_PERIOD_FRAMES)
-			{
-				gainCueSineIndex = 0;
-			}
-		}
-		else if (g_tick)
-		{
-			g_tick--;
-			feedthrough = false;
-		}
-	}
+	g_audio_consecutive_drops = 0;
+	const AudioControlFrame control = nextAudioControlFrame();
+	publishAudioControlFrame(control);
 
 	AudioFrame frame;
 	const uint8_t cwOffsetSetting = g_cw_offset_setting;
-	g_audio_path.ProcessFrame(decimatedSample, gain, feedthrough,
-		injectedSample, g_audio_filter_mode, cwOffsetSetting, &frame);
-	DAC0_setVal(frame.dacValue);
+	g_audio_path.ProcessFrame(decimatedSample, control.gain,
+		control.feedthrough, control.injectedSample, g_audio_filter_mode,
+		cwOffsetSetting, &frame);
+	if (g_audio_filter_mode != AUDIO_FILTER_OFF)
+	{
+		DAC0_setVal(frame.dacValue);
+	}
 	if (cwOffsetSetting != CW_OFFSET_ZERO_SETTING)
 	{
 		g_goertzel.DataPoint(frame.analysisSample);
 	}
+	g_audio_dsp_heartbeat++;
 }
 
 
@@ -991,7 +1095,8 @@ ISR(TCB0_INT_vect)
 		}
     }
 
-    TCB0.INTFLAGS = (TCB_CAPT_bm | TCB_OVF_bm); /* clear all interrupt flags */
+	g_switch_service_heartbeat++;
+	TCB0.INTFLAGS = (TCB_CAPT_bm | TCB_OVF_bm); /* clear all interrupt flags */
 }
 
 /**
@@ -1172,12 +1277,51 @@ static void startAudioFlow(void)
 {
 	g_audio_frame_ready = false;
 	g_audio_dropped_frames = 0;
+	g_audio_consecutive_drops = 0;
+	g_audio_lockout = false;
 	g_requested_rf_gain_cue = RF_GAIN_CUE_NO_REQUEST;
 	g_rf_gain_audio_cue.Cancel();
+	const AudioControlFrame initialControl = {
+		0,
+		(uint8_t)(g_audio_test ? AUDIO_NEUTRAL_GAIN : g_audio_gain),
+		g_enable_audio_feedthrough && !g_audio_test
+	};
+	g_audio_control_active = 0;
+	for (uint8_t index = 0; index < 2; ++index)
+	{
+		g_audio_control_frames[index].injectedSample = initialControl.injectedSample;
+		g_audio_control_frames[index].gain = initialControl.gain;
+		g_audio_control_frames[index].feedthrough = initialControl.feedthrough;
+	}
 	g_audio_path.Reset(g_audio_filter_mode, g_cw_offset_setting);
 	g_goertzel.Flush();
 	ADC0.MUXPOS = ADC_I_AMPED;
 	ADC0_SYSTEM_init(ADC12BIT, true);
+}
+
+static RuntimeLivenessSnapshot captureRuntimeLiveness(void)
+{
+	const RuntimeLivenessSnapshot snapshot = {
+		g_switch_service_heartbeat,
+		g_adc_capture_heartbeat,
+		g_audio_dsp_heartbeat
+	};
+	return snapshot;
+}
+
+static void armRuntimeWatchdog(void)
+{
+	g_runtime_liveness_gate.Reset(captureRuntimeLiveness());
+	wdt_init(WD_HW_RESETS);
+}
+
+static void serviceRuntimeWatchdog(bool audioExpected)
+{
+	if (g_runtime_liveness_gate.ShouldFeed(captureRuntimeLiveness(),
+		audioExpected, g_audio_lockout))
+	{
+		wdt_reset();
+	}
 }
 
 static void acceptOperationalFrequencyUpdate(uint8_t* displayedMemory,
@@ -1363,6 +1507,28 @@ static void rollbackMenuEditsIfActive(void)
 
 int main(void)
 {
+	/* A watchdog reset can leave the watchdog running. Disable it before any
+	 * potentially slow hardware initialization, then preserve and clear the
+	 * reset evidence before drivers can alter peripheral state. */
+	wdt_reset();
+	wdt_disable();
+	while (WDT.STATUS & WDT_SYNCBUSY_bm)
+	{
+	}
+	const uint8_t startupResetCause = RSTCTRL_get_reset_cause();
+	g_startup_watchdog_reset =
+		(startupResetCause & RSTCTRL_WDRF_bm) != 0;
+	g_previous_audio_lockout = g_startup_watchdog_reset &&
+		g_audio_lockout_evidence.marker == AUDIO_LOCKOUT_MARKER &&
+		g_audio_lockout_evidence.inverseMarker ==
+			AUDIO_LOCKOUT_INVERSE_MARKER;
+	g_previous_audio_drops = g_previous_audio_lockout
+		? g_audio_lockout_evidence.droppedFrames : 0;
+	g_audio_lockout_evidence.marker = 0;
+	g_audio_lockout_evidence.inverseMarker = 0;
+	g_audio_lockout_evidence.droppedFrames = 0;
+	RSTCTRL_clear_reset_cause();
+
 	sineWaveInit(25);
 	fillSineWave(g_rf_gain_cue_sine_wave, RF_GAIN_CUE_TONE_PERIOD_FRAMES);
 	
@@ -1517,6 +1683,7 @@ int main(void)
 	
 	/* Start the timer/event-driven audio flow. */
 	startAudioFlow();
+	armRuntimeWatchdog();
 
 	while (1) 
 	{
@@ -2005,9 +2172,22 @@ int main(void)
 					if(hold_menuRow != menuRow)
 					{
 						hold_menuRow = menuRow;
+						/* About is entered from the three-line Main Menu. Restore all
+						 * four physical rows before writing the diagnostic row. */
+						display.display(LINES_4);
 						g_text_buff.putString("00Signal");
 						g_text_buff.putString("12Snagger!");
-						sprintf(g_tempStr, "20Ver:%s", SW_REVISION);
+						/* The display row has ten visible columns. Keep suffixed test
+						 * versions visible instead of truncating the final character. */
+						snprintf(g_tempStr, sizeof(g_tempStr), "20V:%s", SW_REVISION);
+						g_text_buff.putString(g_tempStr);
+						const uint16_t droppedFrames = MIN(
+							g_previous_audio_lockout ? g_previous_audio_drops :
+								atomicReadU16(&g_audio_dropped_frames), 999U);
+						snprintf(g_tempStr, sizeof(g_tempStr), "30D%u W%uL%u",
+							(unsigned int)droppedFrames,
+							g_startup_watchdog_reset ? 1U : 0U,
+							g_previous_audio_lockout ? 1U : 0U);
 						g_text_buff.putString(g_tempStr);
 					}
 				}
@@ -3163,11 +3343,17 @@ int main(void)
 		
 //======================================================= 
 				
+		const MenuState_t watchdogMenu = setMenu(MenuGetCurrent);
+		const bool audioExpected = watchdogMenu != MenuBattery &&
+			watchdogMenu != MenuSetmAh && watchdogMenu != MenuSetBatThresh;
+		serviceRuntimeWatchdog(audioExpected);
+
 		/********************************
 		 * Handle sleep
 		 ******************************/
 		if(g_go_to_sleep_now)
 		{
+			wdt_init(WD_DISABLE);
 			LEDS.deactivate();
 			shutdown_receiver();
 			PORTA_set_pin_level(PWR_5V_ENABLE, LOW);	
@@ -3196,6 +3382,8 @@ int main(void)
 			atmel_start_init();
 			PORTA_set_pin_level(PWR_5V_ENABLE, HIGH);  /* Enable 5V power regulator */
 			init_receiver();
+			startAudioFlow();
+			armRuntimeWatchdog();
 			
 			if(g_awakenedBy == AWAKENED_BY_BUTTONPRESS)
 			{	
@@ -3213,8 +3401,25 @@ int main(void)
 
 void wdt_init(WDReset resetType)
 {
-	/* Watchdog control is not implemented in the released 0.38 firmware. */
-	(void)resetType;
+	wdt_reset();
+	while (WDT.STATUS & WDT_SYNCBUSY_bm)
+	{
+	}
+
+	uint8_t period = WDT_PERIOD_2KCLK_gc;
+	if (resetType == WD_DISABLE)
+	{
+		period = WDT_PERIOD_OFF_gc;
+	}
+	else if (resetType == WD_FORCE_RESET)
+	{
+		period = WDT_PERIOD_8CLK_gc;
+	}
+
+	ccp_write_io((void*)&WDT.CTRLA, period);
+	while (WDT.STATUS & WDT_SYNCBUSY_bm)
+	{
+	}
 }
 
 EC hw_init()
