@@ -8,8 +8,9 @@ atomic. The firmware uses these ownership rules:
 | ISR | Shared state | Foreground rule |
 | --- | --- | --- |
 | `RTC_CNT_vect` | `g_powerdown_seconds` | Use `atomicReadU16` and `atomicWriteU16`. |
-| `ADC0_RESRDY_vect` | `g_beep`, Goertzel sample state | Use `atomicWriteU16` for foreground beep updates. Goertzel owns its double-buffer handoff. |
-| `TCB0_INT_vect` | button events, `g_rotary_count`, `g_rssi_countdown`, headphone state | Exchange multi-byte events atomically; byte-sized flags may be read directly. |
+| `ADC0_RESRDY_vect` | direct DAC output, pending 12 kHz sample, dropped-frame/backlog counters, ADC heartbeat | Publish the pending sample before setting `g_audio_frame_ready`. Saturate the dropped-frame counter. After 64 consecutive drops, center the DAC and stop the ADC event/interrupt source before returning. |
+| `TCA1_CMP0_vect` | `g_beep`, audio-cue state, audio-control slots, Goertzel sample state, DSP heartbeat | Copy the pending sample before clearing `g_audio_frame_ready`. Clear consecutive backlog only when consuming a frame. Write the inactive control slot completely before publishing its byte-sized index. Use `atomicWriteU16` for non-owner beep updates. Goertzel owns its double-buffer handoff. |
+| `TCB0_INT_vect` | button events, `g_rotary_count`, `g_rssi_countdown`, headphone state, switch-service heartbeat | Exchange multi-byte events atomically; byte-sized flags may be read directly. Publish the heartbeat only after completing the ISR body. |
 | `PORTF_PORT_vect` | `g_rotary_edges` | Consumed only by `TCB0_INT_vect`; same-level AVR ISRs do not nest. |
 | `TCB1_INT_vect` | utility millisecond counter | Access only through the atomic helper in `tcb.cpp`. |
 | `TCB2_INT_vect` | I2C timeout ticks | The ticks are byte-sized and therefore atomic on AVR. |
@@ -18,6 +19,27 @@ atomic. The firmware uses these ownership rules:
 Foreground-only receiver frequencies and configuration values must not be
 declared `volatile`. If a future ISR begins accessing one, add an explicit
 atomic accessor or transfer event rather than relying on `volatile`.
+
+## Runtime lockup containment
+
+The hardware watchdog uses a two-second period. Foreground code may execute
+`wdr` only after the 300 Hz switch service has advanced and, whenever audio is
+expected, both ADC capture and 12 kHz DSP have advanced since the previous
+feed. A foreground stall, UI/switch stall, ADC stall, or DSP stall therefore
+leaves the watchdog unfed.
+
+Sustained audio backlog has a faster circuit breaker. Sixty-four consecutive
+unconsumed DSP frames center the DAC and stop the level-1 ADC source. The
+resulting missing audio heartbeat deliberately causes a complete watchdog
+reset rather than attempting partial recovery from interrupt context.
+
+The lockout marker and dropped-frame count use a validated `.noinit` record so
+they survive a watchdog reset without EEPROM wear. About diagnostics show
+`D<drops> W<watchdog-reset>L<audio-lockout>`. The hardware reset flag must
+accompany a valid marker pair before the lockout evidence is trusted.
+
+Disable the watchdog only during startup initialization and intentional
+standby. Re-arm it immediately after normal audio flow starts or resumes.
 
 ## Bounded hardware waits
 
