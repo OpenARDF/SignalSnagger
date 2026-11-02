@@ -1,0 +1,37 @@
+{
+  "format": "signalsnagger-release-evidence-v1",
+  "version": "0.38.5",
+  "tag": "v0.38.5",
+  "tagCommit": "c757ac0fdaa3d20de504f746704f9706960dec0a",
+  "releaseUrl": "https://github.com/OpenARDF/SignalSnagger/releases/tag/v0.38.5",
+  "publishedUtc": "2026-11-02T23:04:17Z",
+  "verifiedUtc": "2026-11-02T23:04:38Z",
+  "releaseNotes": {
+    "fileName": "release-notes/v0.38.5.md",
+    "sha256": "a52d108ebbc07d0e4fdf21fe57d26110f780aea8ccad380aacc4dabbd803552a",
+    "matchesGitHubBody": true
+  },
+  "assets": [
+    {
+      "fileName": "SignalSnagger-v0.38.5.hex",
+      "sizeBytes": 144942,
+      "sha256": "507a5b7c3e37ccf79dbde7af1a7487076fefb0801e4b70d975616eddb3863a74"
+    },
+    {
+      "fileName": "SignalSnagger-v0.38.5-Release-Files.zip",
+      "sizeBytes": 54053,
+      "sha256": "48bef7ca71ed633c6ef8b497a6b6f56222f4f694c1b205d243e667afd740bff6"
+    }
+  ],
+  "verification": {
+    "annotatedTag": true,
+    "tagTargetMatchesPackageCommit": true,
+    "packageBuiltFromCleanTree": true,
+    "freshDownloadHasExactAssetSet": true,
+    "freshDownloadChecksumsMatch": true,
+    "zipContentsAndBytesMatch": true,
+    "embeddedVersionMatchesTag": true,
+    "exactReleaseImageProgrammedOnHardware": false,
+    "hardwareEvidence": "Inherited from the immediately preceding 0.38.4e candidate under the documented pre-1.0 version-only promotion rule. That exact candidate was programmed through Atmel-ICE J41800053674 on the representative AVR128DA48 receiver, independently read back byte-for-byte, and confirmed to preserve EEPROM, fuses, lock bits, and user row. Operator testing confirmed responsive UI and D999 W0L0 while near-threshold listening; no additional hardware testing was performed at the release owner's direction. Only SW_REVISION changed for 0.38.5, and the exact unsuffixed image was not programmed. See release-notes/v0.38.5.md."
+  }
+}
