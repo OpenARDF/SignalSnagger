@@ -51,6 +51,10 @@ struct AudioFrame
 int16_t audioScaleAndSaturate(int16_t centeredSample, uint8_t gain,
 	int16_t injectedSample);
 uint16_t audioCenteredToDac(int16_t centeredSample);
+/* Preserve every ADC sample for unfiltered listening while retaining the
+ * signed, centered gain and bounded DAC conversion used by the DSP path. */
+uint16_t audioDirectDacValue(uint16_t adcSample, uint8_t gain,
+	bool feedthrough, int16_t injectedSample);
 
 class AudioPathProcessor
 {
