@@ -35,6 +35,7 @@ SignalSlinger, adapted for SignalSnagger's single AVR128DA48 target:
 - [Codex workflow](CODEX_WORKFLOW.md)
 - [Build environment](BUILD_ENVIRONMENT.md)
 - [Firmware safety invariants](FIRMWARE_SAFETY.md)
+- [Feature roadmap](Docs/feature-roadmap.md)
 - [Release workflow](RELEASE_WORKFLOW.md)
 
 Start repository work with `just --list`. Use `just check` for the complete
