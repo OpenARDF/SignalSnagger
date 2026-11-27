@@ -112,3 +112,7 @@ stage-non-kicad:
 commit-push message: stage-non-kicad
     git commit -m {{quote(message)}}
     git push
+
+# Rebuild the Rev 0.4 mechanical models, offline viewer and illustrated briefs.
+enclosure-study:
+    python3 Docs/enclosure-study/source/rebuild.py

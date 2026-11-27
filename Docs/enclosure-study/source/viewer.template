@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SignalSnagger rev 0.4 | Enclosure models</title>
+<style>
+* {
+  box-sizing:border-box
+}
+body {
+  margin:0;
+  background:#f5f8f7;
+  color:#152f36;
+  font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif
+}
+main {
+  max-width:1320px;
+  margin:auto;
+  padding:24px
+}
+h1 {
+  font-size:clamp(23px,3vw,36px);
+  margin:0 0 18px;
+  letter-spacing:-.035em
+}
+.layout {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 280px;
+  gap:18px
+}
+.stage,aside {
+  background:white;
+  border:1px solid #cddbd8;
+  border-radius:13px
+}
+.stage {
+  position:relative;
+  min-height:400px;
+  height:min(75vh,790px);
+  overflow:hidden
+}
+canvas,.fallback {
+  width:100%;
+  height:100%;
+  display:block;
+  touch-action:none
+}
+.fallback {
+  object-fit:contain
+}
+.stage small {
+  position:absolute;
+  bottom:10px;
+  left:12px;
+  color:#436069;
+  background:#ffffffdd;
+  padding:2px 5px;
+  border-radius:4px;
+  pointer-events:none
+}
+aside {
+  padding:18px;
+  align-self:start
+}
+label {
+  display:block;
+  font-weight:650;
+  font-size:14px;
+  margin-bottom:4px
+}
+select,button {
+  font:inherit;
+  color:inherit;
+  border:1px solid #a8bdb9;
+  border-radius:6px;
+  background:white;
+  padding:8px
+}
+select {
+  width:100%;
+  font-size:14px;
+  margin-bottom:15px
+}
+button {
+  cursor:pointer;
+  font-size:13px;
+  padding:6px 10px
+}
+button:focus-visible,select:focus-visible,input:focus-visible,canvas:focus-visible {
+  outline:3px solid #008782
+}
+input[type=range] {
+  width:100%;
+  accent-color:#087b73;
+  margin:6px 0 12px
+}
+button:hover {
+  background:#eaf2ef
+}
+.group {
+  display:flex;
+  gap:5px;
+  flex-wrap:wrap
+}
+hr {
+  border:0;
+  border-top:1px solid #dce5e2;
+  margin:18px 0
+}
+p {
+  font-size:14px;
+  margin:0 0 10px
+}
+ul {
+  padding:0;
+  margin:8px 0 0;
+  list-style:none
+}
+li {
+  font-size:13px;
+  margin-top:5px
+}
+i {
+  display:inline-block;
+  width:12px;
+  height:12px;
+  border-radius:3px;
+  margin-right:8px;
+  vertical-align:-1px;
+  border:1px solid #0002
+}
+#fallback {
+  display:none
+}
+#fail {
+  color:#8d4f24
+}
+a {
+  color:#006e65
+}
+a:visited {
+  color:#365d68
+}
+@media(max-width:760px) {
+  main {
+    padding:12px
+  }
+  .layout {
+    grid-template-columns:1fr
+  }
+  .stage {
+    height:55vh;
+    min-height:290px
+  }
+  aside {
+    padding:14px
+  }
+}
+</style>
+</head>
+<body>
+<main>
+<h1>SignalSnagger rev 0.4 enclosure models</h1>
+<div class="layout">
+<div class="stage">
+<canvas id="canvas" tabindex="0" aria-label="Rotatable 3D assembly. Use arrow keys to rotate and plus or minus to zoom.">
+</canvas>
+<img id="fallback" class="fallback" alt="Front view of selected enclosure">
+<small id="hint">Drag to rotate · Scroll to zoom</small>
+</div>
+<aside>
+<label for="design">Design</label>
+<select id="design">
+<option value="three-piece">Three-piece printed receiver</option>
+<option value="polycase-hybrid">Machined Polycase with saddle</option>
+<option value="detachable-loop">Four-piece detachable loop</option>
+</select>
+<label for="isolate">Show</label>
+<select id="isolate">
+</select>
+<label for="explode">Separate parts</label>
+<input id="explode" type="range" min="0" max="100" value="0">
+<div class="group">
+<button type="button" id="frontView">Front</button>
+<button type="button" id="rearView">Rear</button>
+<button type="button" id="reset">Reset</button>
+</div>
+<hr>
+<p id="note">
+</p>
+<ul id="legend">
+</ul>
+<hr>
+<p>
+<a id="study">Illustrated study (PDF)</a>
+<br>
+<a id="model">CAD assembly (STEP)</a>
+<br>
+<a href="thumbwheel-44mm.step">Thumbwheel (STEP)</a>
+</p>
+<p id="fail" role="status">
+</p>
+</aside>
+</div>
+</main>
+<script>
+
+const data = DATA_PLACEHOLDER;
+const names = {
+  'knob': 'Custom printed thumbwheel',
+  'collar': 'Bonded splash collar',
+  'one': 'Rear with integral loop and bay',
+  'front': 'Printed front cover',
+  'lid': 'Battery lid',
+  'saddle': 'Printed saddle, loop and bay',
+  'stockrear': 'Machined KT-70 base',
+  'stockfront': 'Machined KT-70 front',
+  'smallrear': 'Rear with keyed socket and bay',
+  'loop': 'Removable loop'
+};
+const docs = {
+  'three-piece': 'signalsnagger-enclosure-feasibility',
+  'polycase-hybrid': 'signalsnagger-polycase-hybrid',
+  'detachable-loop': 'signalsnagger-detachable-loop'
+};
+const notes = {
+  'three-piece':
+      'Three printed enclosure parts plus the thumbwheel. The recessed front includes two exterior drains.',
+  'polycase-hybrid':
+      'The two molded halves carry a bonded loop saddle and a battery lid. A printed splash collar surrounds the encoder beneath the thumbwheel.',
+  'detachable-loop':
+      'Four printed enclosure parts plus the thumbwheel. Two screws retain the keyed loop. The recessed front includes two exterior drains.'
+};
+const q = id => document.getElementById(id), canvas = q('canvas'),
+      gl = canvas.getContext('webgl2', {antialias: true, alpha: false}),
+      D = q('design'), I = q('isolate'), E = q('explode');
+let yaw = .54, pitch = -.30, zoom = 1, program, attrib, loc = {}, meshes = {};
+const zero = [0, 0, 0];
+const normalize =
+          a => {
+            const n = Math.hypot(...a);
+            return a.map(v => v / n)
+          },
+      cross = (a, b) =>
+          [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
+           a[0] * b[1] - a[1] * b[0]],
+      dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
+function bytes(s) {
+  return Uint8Array.from(atob(s), c => c.charCodeAt(0))
+}
+function shader(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+    throw Error(gl.getShaderInfoLog(s));
+  return s
+}
+function init() {
+  const vs = shader(gl.VERTEX_SHADER, `#version 300 es
+ in vec3 vert;uniform vec3 rightV,upV,eye,off,ctr;uniform vec2 scale;out vec3 world;void main(){world=vert/100.+off;vec3 p=world-ctr;gl_Position=vec4(dot(p,rightV)*scale.x,dot(p,upV)*scale.y,-dot(p,eye)/900.,1.);}`);
+  const fs = shader(gl.FRAGMENT_SHADER, `#version 300 es
+ precision highp float;in vec3 world;uniform vec3 eye,rightV,upV,tint;out vec4 o;void main(){vec3 n=normalize(cross(dFdx(world),dFdy(world)));if(dot(n,eye)<0.)n=-n;vec3 light=normalize(.8*eye-.45*rightV+.7*upV);float f=.52+.56*max(0.,dot(n,light))+.1*max(0.,dot(n,normalize(rightV+.25*upV)));o=vec4(tint*f,1.);}`);
+  program = gl.createProgram();
+  gl.attachShader(program, vs);
+  gl.attachShader(program, fs);
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS))
+    throw Error('Model renderer failed to link');
+  gl.useProgram(program);
+  attrib = gl.getAttribLocation(program, 'vert');
+  ['rightV', 'upV', 'eye', 'off', 'ctr', 'scale', 'tint'].forEach(
+      n => loc[n] = gl.getUniformLocation(program, n));
+  for (const [k, v] of Object.entries(data.mesh)) {
+    let vb = gl.createBuffer(), ib = gl.createBuffer(),
+        idx = new Uint32Array(bytes(v.i).buffer);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+    gl.bufferData(
+        gl.ARRAY_BUFFER, new Int16Array(bytes(v.v).buffer), gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
+    meshes[k] = {
+      vb,
+      ib,
+      n: idx.length,
+      b: v.b,
+      c: v.c.match(/../g).map(s => parseInt(s, 16) / 255)
+    }
+  }
+  gl.enable(gl.DEPTH_TEST);
+  gl.clearColor(.975, .983, .98, 1);
+}
+function offset(k, design) {
+  const base = {
+    front: [-14, -22, 90],
+    stockfront: [-18, -44, 141],
+    stockrear: [-5, -25, 44],
+    lid: [8, 0, -70],
+    pack: [0, 0, -33],
+    pcb: [-5, -10, 44],
+    loop: [0, 48, 15],
+    saddle: zero,
+    smallrear: zero,
+    one: zero
+  };
+  if (design === 'polycase-hybrid') base.pcb = [-12, -36, 91];
+  if (k === 'rod') k = design === 'detachable-loop' ? 'loop' : 'one';
+  if (k === 'lidScrew') return [8, 0, -86];
+  if (k === 'loopScrews') return [0, 48, 37];
+  if (k === 'caseScrews')
+    return design === 'polycase-hybrid' ? [-5, -25, 15] : [0, 0, -25];
+  if (k === 'knob')
+    return design === 'polycase-hybrid' ? [-18, -44, 201] : [-14, -22, 155];
+  if (k === 'collar') return [-18, -44, 167];
+  if (k === 'body' || k === 'shaft') k = 'pcb';
+  if (['boots', 'lens', 'pipes'].includes(k))
+    k = design === 'polycase-hybrid' ? 'stockfront' : 'front';
+  if (k === 'lcd') k = 'pcb';
+  return base[k] || zero;
+}
+function refresh() {
+  const d = D.value, parts = data.designs[d];
+  q('note').textContent = notes[d];
+  q('study').href = '../pdf/' + docs[d] + '.pdf';
+  q('model').href = d + '.step';
+  I.replaceChildren(
+      new Option('Complete receiver', 'all'),
+      new Option('Shell and printed parts', 'shell'),
+      ...parts.map(k => new Option(names[k], k)));
+  q('legend').replaceChildren(...parts.map(k => {
+    let li = document.createElement('li'), mk = document.createElement('i');
+    mk.style.background = '#' + data.mesh[k].c;
+    li.append(mk, names[k]);
+    return li
+  }));
+  if (!gl) q('fallback').src = data.poster[d];
+  E.value = 0;
+  zoom = 1;
+  draw();
+}
+function draw() {
+  if (!gl || !program) return;
+  const d = D.value, group = I.value, parts = data.designs[d],
+        single = group !== 'all' && group !== 'shell';
+  const keys = single ?
+      [group] :
+      group === 'shell' ?
+      parts :
+      [
+        ...parts,
+        ...data.refs.filter(k => k !== 'loopScrews' || d === 'detachable-loop')
+      ];
+  const t = single ? 0 : E.value / 100;
+  E.disabled = single;
+  let w = Math.round(canvas.clientWidth * Math.min(devicePixelRatio, 2)),
+      h = Math.round(canvas.clientHeight * Math.min(devicePixelRatio, 2));
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h
+  }
+  gl.viewport(0, 0, w, h);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  let eye =
+          [
+            Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch),
+            Math.cos(yaw) * Math.cos(pitch)
+          ],
+      right = normalize(cross([0, 1, 0], eye)), up = cross(eye, right),
+      lo = [Infinity, Infinity, Infinity], hi = lo.map(x => -x), list = [];
+  for (const k of keys) {
+    const m = meshes[k], off = offset(k, d).map(x => x * t);
+    list.push([m, off]);
+    for (const i of [0, 3])
+      for (const j of [1, 4])
+        for (const l of [2, 5]) {
+          const p = [m.b[i] + off[0], m.b[j] + off[1], m.b[l] + off[2]];
+          [right, up, eye].forEach((v, n) => {
+            let s = dot(v, p);
+            lo[n] = Math.min(lo[n], s);
+            hi[n] = Math.max(hi[n], s)
+          })
+        }
+  }
+  const center = eye.map(
+      (_, i) => [right, up, eye].reduce(
+          (s, v, j) => s + v[i] * (hi[j] + lo[j]) / 2, 0));
+  const f = zoom * .90 *
+      Math.min(w / Math.max(hi[0] - lo[0], 1), h / Math.max(hi[1] - lo[1], 1));
+  for (const [n, v] of Object.entries(
+           {rightV: right, upV: up, eye, ctr: center}))
+    gl.uniform3fv(loc[n], v);
+  gl.uniform2f(loc.scale, 2 * f / w, 2 * f / h);
+  for (const [m, off] of list) {
+    gl.uniform3fv(loc.off, off);
+    gl.uniform3fv(loc.tint, m.c);
+    gl.bindBuffer(gl.ARRAY_BUFFER, m.vb);
+    gl.enableVertexAttribArray(attrib);
+    gl.vertexAttribPointer(attrib, 3, gl.SHORT, false, 0, 0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.ib);
+    gl.drawElements(gl.TRIANGLES, m.n, gl.UNSIGNED_INT, 0)
+  }
+}
+function home(rear = false) {
+  yaw = rear ? Math.PI + .49 : .54;
+  pitch = -.30;
+  zoom = 1;
+  draw()
+}
+if (gl)
+  init();
+else {
+  q('fallback').style.display = 'block';
+  canvas.style.display = 'none';
+  q('fail').textContent =
+      '3D rotation requires WebGL 2. The PDF includes exploded and individual part views.';
+  q('hint').hidden = true;
+  [I, E, q('frontView'), q('rearView'), q('reset')].forEach(
+      e => e.disabled = true)
+}
+D.onchange = () => {
+  refresh();
+  home()
+};
+I.onchange = () => {
+  zoom = 1;
+  draw()
+};
+E.oninput = draw;
+q('frontView').onclick = () => home(false);
+q('rearView').onclick = () => home(true);
+q('reset').onclick = () => {
+  I.value = 'all';
+  E.value = 0;
+  home()
+};
+let pointer = null;
+canvas.onpointerdown = e => {
+  pointer = [e.pointerId, e.clientX, e.clientY];
+  canvas.setPointerCapture(e.pointerId)
+};
+canvas.onpointermove = e => {
+  if (!pointer || pointer[0] !== e.pointerId) return;
+  yaw -= (e.clientX - pointer[1]) * .008;
+  pitch =
+      Math.max(-1.48, Math.min(1.48, pitch + (e.clientY - pointer[2]) * .008));
+  pointer = [e.pointerId, e.clientX, e.clientY];
+  draw()
+};
+canvas.onpointerup = canvas.onpointercancel = () => pointer = null;
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  zoom = Math.max(.4, Math.min(5, zoom * Math.exp(-e.deltaY * .0014)));
+  draw()
+}, {passive: false});
+canvas.onkeydown = e => {
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-']
+           .includes(e.key))
+    return;
+  e.preventDefault();
+  if (e.key === 'ArrowLeft') yaw -= .12;
+  if (e.key === 'ArrowRight') yaw += .12;
+  if (e.key === 'ArrowUp' || e.key === 'ArrowDown')
+    pitch = Math.max(
+        -1.48, Math.min(1.48, pitch + (e.key === 'ArrowUp' ? .12 : -.12)));
+  if ('+=-'.includes(e.key))
+    zoom = Math.max(.4, Math.min(5, zoom * (e.key === '-' ? .88 : 1.14)));
+  draw()
+};
+if (Object.hasOwn(data.designs, location.hash.slice(1)))
+  D.value = location.hash.slice(1);
+new ResizeObserver(draw).observe(canvas);
+refresh();
+
+</script>
+</body>
+</html>
