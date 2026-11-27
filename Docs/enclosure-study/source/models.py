@@ -23,6 +23,8 @@ from common import (
     vol,
 )
 from encoder import Y, front_details, reference, stock_collar, thumbwheel
+from exporter import export_assembly
+from lcd_window import fitted_window, verify_window
 from OCC.Core.BRep import BRep_Builder, BRep_Tool
 from OCC.Core.BRepCheck import BRepCheck_Analyzer
 from OCC.Core.BRepExtrema import BRepExtrema_DistShapeShape
@@ -50,19 +52,35 @@ ly = -36.29
 ss = [cyl(3.175, (-33, 36.94, 1.05), (1, 0, 0), 66), cyl(3.45, (0, -72, 2.20), (0, 1, 0), 9)]
 anten = box(-9, 65, -4, 18, 27, 18)
 bport = cylz(5, 51, -23, 3.15, 24)
-front = cut(
+cover_blank = cut(
     front0,
     *ss,
     anten,
+    *[cylz(x, y, 4, 1.65, 12) for x, y in [(-18.196, -47.69), (18.2415, -47.71)]],
+)
+front = cut(
+    cover_blank,
     cylz(0, 36.94, 5, 3.7, 12),
     rr(lx - 7, ly - 17.4, 5, 14, 34.8, 10, 0.9),
     rr(lx - 9, ly - 19.3, 10.4, 18, 38.6, 5, 1.4),
-    *[cylz(x, y, 4, 1.65, 12) for x, y in [(-18.196, -47.69), (18.2415, -47.71)]],
 )
-stockfront = cut(front, cylz(0, Y, 4, 5.15, 12))
+stockfront, stocklens, lens_tape = fitted_window(cut(cover_blank, cylz(0, 36.94, 4, 5.15, 12)), lx, ly)
 front = front_details(front)
 collar = stock_collar()
 back = cut(back0, *ss, anten, bport)
+quoted_shells = [
+    (back, "KT-70XXT0 machined base", "45494C"),
+    (stockfront, "Rev B cover - inside seat and beveled LCD viewing opening", "686F72"),
+]
+shell_step = out / "signalsnagger-rev04-kt70-wide-window-rfq.step"
+export_assembly(shell_step, "Rev B - KT-70XXT0 machined shells", quoted_shells)
+_, quoted_cover = elems(readstep(shell_step), TopAbs_SOLID)
+verify_window(quoted_cover)
+export_assembly(
+    out / "signalsnagger-lcd-window-installed-rev-b.step",
+    "Rev B - interior lens fitted to front cover",
+    [quoted_shells[1], (stocklens, "Clear polycarbonate lens", "A5DFE7"), (lens_tape, "4 mm adhesive on lens viewing face", "CC975B")],
+)
 loop_ref = transform(archive("PartShape54"), -1, 0, 0, 80, 0, 1, 0, 80.3, 0, 0, -1, 12.4)
 # Root cheeks replace the separate assembly clamp and leave the cable entry open.
 root = rr(-25.3, 70.2, -9.30, 50.6, 26.2, 18.0, 3.0)
@@ -145,6 +163,8 @@ refs = {
     "pack": pack,
     "rod": rod,
     "lens": lens,
+    "stocklens": stocklens,
+    "lensTape": lens_tape,
     "body": body,
     "shaft": shaft,
     "lcd": lcd,
@@ -176,6 +196,8 @@ colors = {
     "rod": "BF9950",
     "knob": "333E46",
     "lens": "69858A",
+    "stocklens": "69858A",
+    "lensTape": "CC975B",
     "lcd": "526B61",
     "pipes": "BCA97D",
     "boots": "525E65",
@@ -200,7 +222,7 @@ labels = {
     "front": "02 Printed front cover",
     "lid": "Battery lid - two tongues and one screw",
     "stockrear": "01 Machined KT-70 base",
-    "stockfront": "02 Machined KT-70 front cover",
+    "stockfront": "02 Machined KT-70 front cover - Rev B beveled LCD aperture",
     "saddle": "03 Bonded printed loop and battery saddle",
     "smallrear": "01 Printed rear - battery bay and keyed socket",
     "loop": "02 Detachable printed loop",
@@ -213,6 +235,8 @@ labels = {
     "collar": "Printed splash collar - bonded to molded front",
     "lcd": "Reference - LCD viewing area",
     "lens": "Reference - window lens",
+    "stocklens": "Rev B polycarbonate lens - inside cover",
+    "lensTape": "4 mm adhesive frame - viewing face of lens",
     "pipes": "Reference - two light pipes",
     "boots": "Reference - switch actuators",
     "lidScrew": "Reference - battery screw head",
@@ -222,11 +246,15 @@ designs = {
     "polycase-hybrid": ["saddle", "stockrear", "stockfront", "lid", "collar", "knob"],
     "detachable-loop": ["smallrear", "loop", "front", "lid", "knob"],
 }
+common_refs = [k for k in refs if k not in {"lens", "stocklens", "lensTape", "loopScrews"}]
+design_refs = {
+    "three-piece": common_refs + ["lens"],
+    "polycase-hybrid": common_refs + ["stocklens", "lensTape"],
+    "detachable-loop": common_refs + ["lens", "loopScrews"],
+}
 
 
 def export(file, keys):
-    from exporter import export_assembly
-
     export_assembly(
         out / (file + ".step"),
         "SignalSnagger rev 0.4 - " + file,
@@ -268,9 +296,7 @@ for file, keys in designs.items():
     # A translation of 0.8 mm cannot close a larger rest gap anywhere along the stroke.
     # The shaft moves with the wheel, so its socket fit is checked separately.
     fixed_parts = [pieces[k] for k in keys if k != "knob"] + [
-        shape
-        for name, shape in refs.items()
-        if name != "shaft" and (name != "loopScrews" or file == "detachable-loop")
+        refs[name] for name in design_refs[file] if name != "shaft"
     ]
     rest_gap = min(BRepExtrema_DistShapeShape(knob, fixed).Value() for fixed in fixed_parts)
     assert rest_gap > 0.8, (file, "wheel travel", rest_gap)
@@ -278,7 +304,7 @@ for file, keys in designs.items():
     assert vol(both(knob, shaft)) < 0.015, (file, "wheel socket")
     for k in keys:
         assert vol(both(pieces[k], body)) < 0.015, (file, k, "encoder body")
-    export(file, keys + [k for k in refs if k != "loopScrews" or file == "detachable-loop"])
+    export(file, keys + design_refs[file])
 from OCC.Core.STEPControl import STEPControl_Writer
 
 knobfile = out / "thumbwheel-44mm.step"
@@ -314,7 +340,9 @@ for key, s in {**pieces, **refs}.items():
     np.save(W / (key + ".npy"), mesh(s))
 contact = move(both(back, move(saddle, 0, 0, 0.12)), 0, 0, -0.15)
 np.save(W / "contact.npy", mesh(contact))
-(W / "scene.json").write_text(json.dumps({"colors": colors, "labels": labels, "designs": designs}))
+(W / "scene.json").write_text(
+    json.dumps({"colors": colors, "labels": labels, "designs": designs, "refs": design_refs})
+)
 
 # Leave the antenna-end screw towers on the coupon so the existing rear establishes the
 # board-to-front height. The transverse cut also provides a flat face for the print bed.

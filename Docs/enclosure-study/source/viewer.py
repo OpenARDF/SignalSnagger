@@ -16,11 +16,7 @@ def b64(s):
 
 data = {
     "designs": sc["designs"],
-    "refs": [
-        k
-        for k in sc["labels"]
-        if k not in {part for group in sc["designs"].values() for part in group}
-    ],
+    "refs": sc["refs"],
     "mesh": {},
     "poster": {},
 }

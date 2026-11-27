@@ -216,6 +216,8 @@ const names = {
   'saddle': 'Printed saddle, loop and bay',
   'stockrear': 'Machined KT-70 base',
   'stockfront': 'Machined KT-70 front',
+  'stocklens': 'Polycarbonate lens',
+  'lensTape': '4 mm adhesive frame',
   'smallrear': 'Rear with keyed socket and bay',
   'loop': 'Removable loop'
 };
@@ -228,7 +230,7 @@ const notes = {
   'three-piece':
       'Three printed enclosure parts plus the thumbwheel. The recessed front includes two exterior drains.',
   'polycase-hybrid':
-      'The two molded halves carry a bonded loop saddle and a battery lid. A printed splash collar surrounds the encoder beneath the thumbwheel.',
+      'The custom KT-70 cover requires a 45° exterior LCD bevel and a 0.60 mm-deep inside recess. A 4 mm adhesive border bonds the lens to the flat seat.',
   'detachable-loop':
       'Four printed enclosure parts plus the thumbwheel. Two screws retain the keyed loop. The recessed front includes two exterior drains.'
 };
@@ -237,6 +239,12 @@ const q = id => document.getElementById(id), canvas = q('canvas'),
       D = q('design'), I = q('isolate'), E = q('explode');
 let yaw = .54, pitch = -.30, zoom = 1, program, attrib, loc = {}, meshes = {};
 const zero = [0, 0, 0];
+const chassisModels = {
+  chassis: {label: 'Machined chassis', parts: ['stockrear', 'stockfront'],
+            file: 'signalsnagger-rev04-kt70-wide-window-rfq.step'},
+  window: {label: 'Cover with installed LCD lens', parts: ['stockfront', 'stocklens', 'lensTape'],
+           file: 'signalsnagger-lcd-window-installed-rev-b.step'}
+};
 const normalize =
           a => {
             const n = Math.hypot(...a);
@@ -314,7 +322,7 @@ function offset(k, design) {
     return design === 'polycase-hybrid' ? [-18, -44, 201] : [-14, -22, 155];
   if (k === 'collar') return [-18, -44, 167];
   if (k === 'body' || k === 'shaft') k = 'pcb';
-  if (['boots', 'lens', 'pipes'].includes(k))
+  if (['boots', 'lens', 'stocklens', 'lensTape', 'pipes'].includes(k))
     k = design === 'polycase-hybrid' ? 'stockfront' : 'front';
   if (k === 'lcd') k = 'pcb';
   return base[k] || zero;
@@ -323,34 +331,38 @@ function refresh() {
   const d = D.value, parts = data.designs[d];
   q('note').textContent = notes[d];
   q('study').href = '../pdf/' + docs[d] + '.pdf';
-  q('model').href = d + '.step';
+  const models = d === 'polycase-hybrid' ? Object.entries(chassisModels) : [];
   I.replaceChildren(
       new Option('Complete receiver', 'all'),
+      ...models.map(([key, model]) => new Option(model.label, key)),
       new Option('Shell and printed parts', 'shell'),
       ...parts.map(k => new Option(names[k], k)));
+  updateSelection();
+  if (!gl) q('fallback').src = data.poster[d];
+  E.value = 0;
+  zoom = 1;
+  draw();
+}
+function updateSelection() {
+  const model = chassisModels[I.value];
+  const parts = model ? model.parts : data.designs[D.value];
+  q('model').href = model ? model.file : D.value + '.step';
   q('legend').replaceChildren(...parts.map(k => {
     let li = document.createElement('li'), mk = document.createElement('i');
     mk.style.background = '#' + data.mesh[k].c;
     li.append(mk, names[k]);
     return li
   }));
-  if (!gl) q('fallback').src = data.poster[d];
-  E.value = 0;
-  zoom = 1;
-  draw();
 }
 function draw() {
   if (!gl || !program) return;
   const d = D.value, group = I.value, parts = data.designs[d],
-        single = group !== 'all' && group !== 'shell';
-  const keys = single ?
+        model = chassisModels[group], single = !model && group !== 'all' && group !== 'shell';
+  const keys = model ? model.parts : single ?
       [group] :
       group === 'shell' ?
       parts :
-      [
-        ...parts,
-        ...data.refs.filter(k => k !== 'loopScrews' || d === 'detachable-loop')
-      ];
+      [...parts, ...data.refs[d]];
   const t = single ? 0 : E.value / 100;
   E.disabled = single;
   let w = Math.round(canvas.clientWidth * Math.min(devicePixelRatio, 2)),
@@ -369,7 +381,10 @@ function draw() {
       right = normalize(cross([0, 1, 0], eye)), up = cross(eye, right),
       lo = [Infinity, Infinity, Infinity], hi = lo.map(x => -x), list = [];
   for (const k of keys) {
-    const m = meshes[k], off = offset(k, d).map(x => x * t);
+    const m = meshes[k];
+    // The lens and tape lift out toward the inside of the stationary cover.
+    const travel = group === 'window' ? [0, 0, {stockfront: 0, stocklens: -20, lensTape: -10}[k]] : offset(k, d);
+    const off = travel.map(x => x * t);
     list.push([m, off]);
     for (const i of [0, 3])
       for (const j of [1, 4])
@@ -423,6 +438,7 @@ D.onchange = () => {
   home()
 };
 I.onchange = () => {
+  updateSelection();
   zoom = 1;
   draw()
 };
@@ -431,6 +447,7 @@ q('frontView').onclick = () => home(false);
 q('rearView').onclick = () => home(true);
 q('reset').onclick = () => {
   I.value = 'all';
+  updateSelection();
   E.value = 0;
   home()
 };

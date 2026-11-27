@@ -10,6 +10,24 @@ This study uses the tested Polycase KT-70XXT0 grip and the Rev 0.4 PCB as its me
 | Molded KT-70 with bonded saddle | Keeps the tested molded grip and board capture. The saddle fits a 220 mm square bed. | Requires a machined case and two qualified bonds, one for the saddle and one for the encoder splash collar. | [Brief](../../output/pdf/signalsnagger-polycase-hybrid.pdf) · [Assembly STEP](../../output/models/polycase-hybrid.step) |
 | Printed receiver with detachable loop | Every print fits a 220 mm square bed and the loop can be replaced on its own. | The keyed joint needs two M3 screws, a wire disconnect and repeated-use testing. | [Brief](../../output/pdf/signalsnagger-detachable-loop.pdf) · [Assembly STEP](../../output/models/detachable-loop.step) |
 
+Polycase estimates **$1,024 for 100 machined KT-70XXT0 base-and-cover sets**, or **$10.24 per set including setup**, before shipping and tax. The November 27, 2026 revision covers seven machined surfaces and eleven features (nine openings, the exterior bevel and the inside lens pocket). The portal lists $9.24 per set and $100 setup. Polycase may revise pricing after reviewing the drawings. The lens, printed parts, fasteners and adhesive are separate costs.
+
+## Required LCD window for the custom Polycase KT-70
+
+Every revision of the custom KT-70 cover must include both the exterior viewing bevel and the interior lens recess. The current dimensions are SSG-LCD-04 Rev B. Center the two features together at X +0.40, Y −36.29 mm in the assembled-case coordinates.
+
+| Feature | Design requirement |
+| --- | --- |
+| Exterior viewing opening | Machine a continuous 45° bevel around all four sides and corners, down to the flat lens-seat plane. The clear opening at that plane must be 34.80 × 14.00 mm, R0.90. Keep the lip crisp and burr-free, with a maximum edge break of 0.10 mm. |
+| Interior lens recess | Machine a 44.60 × 23.80 mm pocket, R5.20, 0.60 mm deep from the molded inside face. Its flat seat locates the 44.20 × 23.40 mm lens with 0.20 mm nominal clearance per side. |
+| Lens attachment | Install the lens from inside the cover. The continuous 4 mm adhesive border on the outward-facing side of the lens must bond to the flat seat and clear the viewing opening. |
+
+Show both cuts in the chassis STEP and in a dimensioned section on every subsequent machining drawing and RFQ. For first-article inspection, measure the throat at the seat and the pocket depth from the inside face. Inspect all four bevel corners and dry-fit the lens to check registration before bonding. [Machining drawing, sheet 2](../../output/pdf/signalsnagger-rev04-kt70-wide-window-rfq.pdf) · [Machined shells STEP](../../output/models/signalsnagger-rev04-kt70-wide-window-rfq.step) · [Installed lens STEP](../../output/models/signalsnagger-lcd-window-installed-rev-b.step) · [Interactive receiver assembly](../../output/models/enclosure-viewer.html#polycase-hybrid)
+
+The lens RFQ requests five prototypes and a separate run of 100. [Lens and adhesive drawing](../../output/pdf/signalsnagger-lcd-window-drawing-rev-b.pdf) · [Full-size cutting profiles](../../output/models/signalsnagger-lcd-window-rev-b.dxf)
+
+JN White offers production-material prototypes and has made hard-coated polycarbonate display lenses. For comparison quotes, Nameplate & Panel Technology advertises no minimum order for clear polycarbonate display overlays, and Hallmark Nameplate accepts single prototypes through production. Each supplier would need to confirm the specified 0.95 mm lens, outward-facing adhesive frame and lot prices. [JN White prototyping](https://jnwhiteusa.com/services/rapid-prototyping/) · [JN White display lens](https://jnwhiteusa.com/case-studies/cnc-machined-optically-clear-polycarbonate/) · [Nameplate & Panel Technology](https://nptec.com/custom-graphic-overlays/) · [Hallmark Nameplate](https://www.hallmarknameplate.com/services-products/graphic-overlays/)
+
 Each brief opens with an executive summary and names its CAD files. Page 2 shows the main enclosure parts, page 3 the architecture-specific joints and wiring, and page 4 the rotary control in section. The custom knob is an additional print in every concept. The hybrid uses four prints in addition to the two molded halves. They are the saddle, battery lid, splash collar and thumbwheel.
 
 Open the viewer locally to rotate, explode or isolate the models. GitHub displays the source of the HTML file. The standalone wheel uses a local origin so it can be imported into CAD independently. [Offline 3D viewer](../../output/models/enclosure-viewer.html) · [44 mm thumbwheel STEP](../../output/models/thumbwheel-44mm.step)
@@ -51,7 +69,7 @@ In the enclosure coordinate system, X runs across the grip, +Y points toward the
 | SW201 and SW202 | 107.000, 78.312 and 107.000, 114.070 | Opposed side buttons at the encoder station. Fit the actuator to the short switch stroke and check return with the case tightened. |
 | SW203 | 107.000, 96.186 | Thumbwheel on the grip centerline, enclosure Y = 36.94 mm. |
 | D203 and D204 | 191.630, 77.990 and 191.650, 114.4275 | Two separate light pipes. Size the final bores to the selected optics and check daylight visibility. |
-| LCD | See module drawing | The DOGS104 viewing area is 33.0 × 12.1 mm and is offset on the module. Provide a stepped seat for a nominal 1 mm clear lens. Confirm the socketed height. |
+| LCD | See module drawing | The DOGS104 viewing area is 33.0 × 12.1 mm and is offset on the module. The custom KT-70 must meet the [LCD window requirements](#required-lcd-window-for-the-custom-polycase-kt-70). Confirm the socketed height. |
 | J301 | 210.500, 96.186 | Provide barrel and plug-shoulder clearance at the bottom seam. Install the PCB jack end first. |
 | Antenna J102 and J104 | 81.150, 85.695 and 81.150, 104.075 | Route the coax and ribbon through the top-edge opening. Allow for terminated connectors, bend radius and strain relief. |
 | Battery BT201 | 122.415, 82.475 | Route the pack leads through the separate rear-floor channel. Preserve access to the main and balance connectors. |
@@ -85,7 +103,7 @@ The integrated rear is 160 × 310.2 × 43.9 mm. Its flat diagonal footprint is a
 
 | Established by this study | Still needs a specimen |
 | --- | --- |
-| All printed/machined primary parts are single valid CAD solids. The assemblies reopen with 20, 22 and 23 solids respectively, including reference hardware. Solid counts, positions and volumes are checked on reimport. | Measure a populated Rev 0.4 and the tested case. Build a two-corner tower coupon and a section containing the actual encoder, LCD, side buttons or jack as appropriate. Check closing force, tool access and support removal. |
+| All printed/machined primary parts are single valid CAD solids. The integrated, Polycase and detachable-loop assemblies reopen with 20, 23 and 23 solids respectively, including reference hardware. The Polycase assembly includes the lens and adhesive as separate solids. | Measure a populated Rev 0.4 and the tested case. Build a two-corner tower coupon and a section containing the actual encoder, LCD, side buttons or jack as appropriate. Check closing force, tool access and support removal. |
 | Nominal positions clear the modeled board, pack and structural parts. The wheel clears the modeled fixed hardware through 0.8 mm push travel. The PCB model is a bare body and controls are simplified envelopes. | Check full rotation, retention, rocking, repeated push, moisture paths and actual control heights. Take measurements with the cover secured. Record material, printer, orientation and dimensional changes. |
 | CAD gives bed footprints and separate battery and antenna feed-throughs. Both the assembled and exploded views derive from those models. | Slice full-size parts. Route terminated wiring, cycle the battery lid, load the loop joint, and try a representative drop with a dummy pack. Compare mass and balance in the hand. |
 | The molded receiver is the control for a radio comparison. The archived frame describes conductor routing and the sense element. | With final pack, wiring and screws, compare tuning over 3.5–3.7 MHz, null depth and direction, front/back sense, and compass bearing through a full turn. Earlier trials reported compass deflection with steel-cased cells. |
@@ -98,4 +116,4 @@ The checked-in PDFs, STEP files and HTML viewer open independently. To regenerat
 
 The builder uses a C compiler, Python with pythonocc-core 7.8, NumPy and Pillow, and Python with ReportLab and Pillow. The CAD and PDF tools can share an interpreter. Set `CAD_PYTHON` or `PDF_PYTHON` to use separate interpreters, and `CC` to select the C compiler. The study was rebuilt on macOS with pythonocc-core 7.8.1.1. A C compiler and the CAD tools are needed only to rebuild the artifacts.
 
-Start with [the assembly geometry](source/models.py) for the shells, openings, leads and fasteners, [the encoder geometry](source/encoder.py) for the removable wheel and its mating features, and [the brief source](source/briefs.py) for the illustrated report text. The shared [build entry point](source/rebuild.py) also regenerates the browser viewer from the same meshes.
+The [window geometry](source/lcd_window.py) defines the inside pocket, exterior bevel, lens and adhesive. The [assembly builder](source/models.py) uses these solids for the shell-only quotation STEP, the installed-window STEP and the full receiver. The [encoder geometry](source/encoder.py) defines the removable wheel and its mating features. The shared [build entry point](source/rebuild.py) also regenerates the offline viewer and [illustrated briefs](source/briefs.py).
