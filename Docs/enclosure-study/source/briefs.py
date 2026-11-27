@@ -220,7 +220,7 @@ docs = {
             (
                 "stockfront",
                 "Machined KT-70 front",
-                "The flat front has a round encoder opening, a display window and light-pipe holes. Pull the wheel off to lift the cover.",
+                "The cover requires a 45° exterior LCD bevel and an inside lens recess. A 4 mm adhesive border bonds the lens to the seat.",
             ),
             (
                 "lid",
@@ -234,8 +234,8 @@ docs = {
             ((-18, -89, 161), (-14, -2)),
             ((21, 94, -108), (18, 8)),
         ],
-        "detail": "Where the saddle bonds",
-        "intro": "The permanent joint belongs on the rear half. The clearances around the cover screws preserve normal chassis service.",
+        "detail": "Saddle bond and LCD window",
+        "intro": "The saddle bonds to the rear half. Every custom KT-70 front cover requires the exterior LCD bevel and the inside lens recess shown below.",
         "cards": [
             (
                 "contact-map",
@@ -248,9 +248,9 @@ docs = {
                 "The saddle bears against the upper end and wraps the rear corners. Dry-fit both halves and check the seam. Machine the antenna passage through the upper end and the separate battery passage through the rear.",
             ),
             (
-                "open-bay",
-                "Battery access after bonding",
-                "The purple block represents a 56 × 31 × 11 mm pack. Its lid closes with two tabs and one M2.5 screw. Verify the main and balance plugs can be withdrawn with the saddle attached.",
+                "hybrid-window",
+                "Required LCD bevel and recess",
+                "Carry the 45° bevel through all four corners to the 34.80 × 14.00 mm throat. Machine the 44.60 × 23.80 mm recess 0.60 mm deep from inside. Bond the lens to its flat seat with the continuous 4 mm border. See machining drawing sheet 2.",
             ),
         ],
         "next": "Start with a short saddle sample and a spare molded base. For a solvent-weld trial, use ABS filament and an ABS-to-ABS cement. Test adhesion to the molded surface and apply a sideways load to the cured sample before bonding a complete loop.",
@@ -320,7 +320,7 @@ summary = {
     "polycase-hybrid": (
         "Machine the tested KT-70XXT0 and bond a printed antenna-and-battery saddle to its rear. Print the battery lid, a small splash collar for the flat front, and the thumbwheel.",
         "The molded case preserves the proven grip and board seats. The largest print fits a 220 mm square bed. The flat front needs a round encoder opening, and the battery lid takes one screw.",
-        "Case purchase and machining add cost. The saddle needs alignment, surface preparation and a proven bond. The separate splash collar adds a second bonded joint to assemble and inspect.",
+        "Quote #154911 estimates <b>$1,024 for 100 machined shell sets</b> with the Rev B bevel and inside pocket ($9.24 per set plus $100 setup). Subject to drawing review. Lens, printing, hardware, shipping and tax are extra.",
     ),
     "detachable-loop": (
         "Print the receiver rear with a battery bay and keyed socket. Attach the separately printed loop with two M3 screws. A recessed front and battery lid bring the enclosure to four parts, plus the thumbwheel.",
@@ -495,7 +495,12 @@ for design, d in docs.items():
     for (img, title, body), x in zip(d["cards"], xs):
         if design == "detachable-loop" and img == "wire-port":
             img = "wire-port-small"
-        photo = image(img, x + 1, 329, 226, 145)
+        if img == "hybrid-window":
+            for offset, view, label in [(0, img, "Outside · lens fitted"), (116, "hybrid-window-pocket", "Inside · empty pocket")]:
+                image(view, x + offset, 348, 110, 129)
+                mid(x + offset + 55, 332, label, 8.4, "B")
+        else:
+            photo = image(img, x + 1, 329, 226, 145)
         if img in ("wire-port", "wire-port-small"):
             tag(img, photo, (5, 51, -6.6), x + 133, 340, "Battery port")
             tag(img, photo, (2, 68, -3.9), x + 2, 457, "Antenna slot")

@@ -93,20 +93,8 @@ def closeview(name, keys, center, span, eye, offs=None):
     )
 
 
-allrefs = [
-    "pcb",
-    "pack",
-    "rod",
-    "body",
-    "shaft",
-    "lens",
-    "pipes",
-    "boots",
-    "lidScrew",
-    "caseScrews",
-]
 for file, struct in sc["designs"].items():
-    keys = struct + allrefs + (["loopScrews"] if file == "detachable-loop" else [])
+    keys = struct + sc["refs"][file]
     render(file + "-front", keys, (0.88, -0.48, 1.36), sizes=(1200, 1450))
     render(file + "-rear", keys, (-0.83, -0.49, -1.45), sizes=(1150, 1450))
 for k in ["one", "front", "lid", "stockrear", "stockfront", "saddle", "smallrear", "loop"]:
@@ -154,6 +142,14 @@ render(
 )
 closeview("open-bay", ["one", "pack"], (0, 94, -23), (106, 72), (0.28, 0.30, -1.6))
 closeview("empty-bay", ["one"], (0, 94, -23), (106, 72), (0.28, 0.30, -1.6))
+closeview(
+    "hybrid-window", ["stockfront", "stocklens", "lensTape", "pipes"],
+    (0.4, -36.29, 10), (39, 53), (0.62, -0.38, 1.25),
+)
+closeview(
+    "hybrid-window-pocket", ["stockfront"],
+    (0.4, -36.29, 9.3), (39, 53), (-0.48, -0.26, -1.5),
+)
 closeview("tongues", ["lid"], (0, 96, -31), (93, 54), (0.5, 0.7, 1.45))
 closeview(
     "saddle-bond",
