@@ -16,18 +16,26 @@ Open the viewer locally to rotate, explode or isolate the models. GitHub display
 
 ## Print the encoder fit sample
 
-To print both parts together, open the [PrusaSlicer PETG fit-plate project](../../output/models/rev04-encoder-fit-plate-mk3s-petg.3mf) as a project. It contains both oriented parts and the fit-test settings for an Original Prusa i3 MK3S/MK3S+ with a 0.4 mm nozzle. PrusaSlicer 2.9.7 estimates 4 h 11 min and 30.6 g of PETG for the plate.
+For an **Original Prusa i3 MK3S with a 0.4 mm nozzle and PETG**, the [print-ready G-code](../../output/models/rev04-encoder-fit-plate-mk3s-petg.gcode) prints the recessed encoder section and 44 mm thumbwheel together. PrusaSlicer 2.9.7 estimates 4 h 11 min and 30.6 g of PETG for the plate. To inspect the layout or slice it for another printer, open the [PrusaSlicer fit-plate project](../../output/models/rev04-encoder-fit-plate-mk3s-petg.3mf) as a project. It includes both oriented parts and the tested MK3S/MK3S+ settings.
 
 | Print | Orientation supplied in the STL | What it reproduces |
 | --- | --- | --- |
 | [Recessed encoder section](../../output/models/rev04-recessed-encoder-section.stl) | Stand on the flat transverse cut. The antenna end is at the top of the print. | A 61.9 mm length of the printed front with the full 50.8 mm grip width, two antenna-end screw towers, side-button openings, encoder well and both drains. |
 | [44 mm thumbwheel](../../output/models/thumbwheel-44mm.stl) | Flat center of the crown down, blind D-socket up. | The study wheel for the 6 mm D-shaft of the unthreaded PEC12R-4225F-S0024. |
 
-Import in **millimeters at 100%** and keep the supplied orientations. Both files sliced as single manifold parts in PrusaSlicer 2.9.7 with an MK3S-size bed, a 0.4 mm nozzle, PETG, 0.15 mm layers, three perimeters, a 5 mm brim and build-plate-only supports. Remove the brim and supports. Check the mating seam, pilot holes, wheel skirt and socket for loose plastic.
+If slicing the STLs, import in **millimeters at 100%** and keep the supplied orientations. Both files sliced as single manifold parts in PrusaSlicer 2.9.7 with an MK3S-size bed, a 0.4 mm nozzle, PETG, 0.15 mm layers, three perimeters, a 5 mm brim and build-plate-only supports. After printing, remove the brim and supports. Check the mating seam, pilot holes, wheel skirt and socket for loose plastic.
 
-1. With the receiver off, remove its knob and front. Leave the Rev 0.4 board seated in the rear shell. Set the printed section over SW203 and the side buttons with the cut end toward the headphone jack. It should seat on the original seam before the screws are tightened. Start the two original antenna-end cover screws from the rear by hand and snug them gently.
-2. Align the shaft flat and slide the wheel on by hand. Stop if the shaft binds or the PCB flexes. A tight D-socket can change the result of the push test. If the fitted encoder has a threaded bushing, the substitute needs a different seat and has a shorter shaft.
-3. Turn the wheel through a full revolution, press and release it several times, then repeat while gripping the rear shell in either hand. Check for scraping, a missed return, or an accidental side-button press. The nominal rim sits 3.4 mm inside each side of the grip. CAD gives 0.85 mm minimum wheel-to-section clearance at rest and 0.55 mm with the wheel depressed 0.8 mm. Measure travel on the actual switch and compare it with the wheel removed.
+### Receiver fit checklist
+
+With the receiver off, remove its knob and front. Leave the Rev 0.4 board seated in the rear shell. The section is designed for the unthreaded SW203 encoder listed above. The threaded substitute has a shorter shaft and needs a different seat.
+
+Place the section over SW203 and the side buttons, cut end toward the headphone jack. Once it sits flush on the seam, gently snug the two original antenna-end screws from the rear by hand. Before fitting the wheel, measure the bare shaft’s travel from rest to full press relative to the fixed section.
+
+- [ ] **Encoder fit.** Align the D-flat and slide the wheel on by hand. Stop if the shaft binds or the PCB flexes. The wheel should turn one full revolution without rubbing, wobbling or slipping on the shaft.
+- [ ] **Push travel.** Measure the wheel’s travel from the same reference and compare it with the bare shaft’s travel. On repeated presses, the switch should click and return fully each time, with the skirt clear of the section throughout.
+- [ ] **Thumb reach.** With your normal grip, use your thumb to turn the rim both ways, then press and release. Try each hand. You should be able to turn without shifting your grip, clicking the encoder or pressing a side button.
+
+For comparison, the modeled rim sits 3.4 mm inside each grip edge. CAD gives 0.85 mm minimum wheel-to-section clearance at rest and 0.55 mm at 0.8 mm depression. Record the measured bare-shaft and wheel travel in millimeters and note where any rubbing or grip shift occurred.
 
 ## Mechanical references and datums
 
