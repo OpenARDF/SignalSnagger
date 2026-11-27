@@ -16,6 +16,8 @@ Open the viewer locally to rotate, explode or isolate the models. GitHub display
 
 ## Print the encoder fit sample
 
+To print both parts together, open the [PrusaSlicer PETG fit-plate project](../../output/models/rev04-encoder-fit-plate-mk3s-petg.3mf) as a project. It contains both oriented parts and the fit-test settings for an Original Prusa i3 MK3S/MK3S+ with a 0.4 mm nozzle. PrusaSlicer 2.9.7 estimates 4 h 11 min and 30.6 g of PETG for the plate.
+
 | Print | Orientation supplied in the STL | What it reproduces |
 | --- | --- | --- |
 | [Recessed encoder section](../../output/models/rev04-recessed-encoder-section.stl) | Stand on the flat transverse cut. The antenna end is at the top of the print. | A 61.9 mm length of the printed front with the full 50.8 mm grip width, two antenna-end screw towers, side-button openings, encoder well and both drains. |
