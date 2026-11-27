@@ -31,6 +31,7 @@ from OCC.Core.BRepGProp import brepgprop
 from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
 from OCC.Core.GProp import GProp_GProps
 from OCC.Core.STEPControl import STEPControl_AsIs
+from OCC.Core.StlAPI import StlAPI_Writer
 from OCC.Core.TopAbs import TopAbs_EDGE, TopAbs_FACE, TopAbs_REVERSED, TopAbs_SOLID
 from OCC.Core.TopLoc import TopLoc_Location
 from OCC.Core.TopoDS import TopoDS_Compound, topods
@@ -314,3 +315,27 @@ for key, s in {**pieces, **refs}.items():
 contact = move(both(back, move(saddle, 0, 0, 0.12)), 0, 0, -0.15)
 np.save(W / "contact.npy", mesh(contact))
 (W / "scene.json").write_text(json.dumps({"colors": colors, "labels": labels, "designs": designs}))
+
+# Leave the antenna-end screw towers on the coupon so the existing rear establishes the
+# board-to-front height. The transverse cut also provides a flat face for the print bed.
+cut_y = 8.0
+xmin, _, zmin, xmax, ymax, zmax = bbox(front)
+coupon = both(
+    front, box(xmin - 1, cut_y, zmin - 1, xmax - xmin + 2, ymax - cut_y + 1, zmax - zmin + 2)
+)
+coupon_on_cut = transform(coupon, 1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0)
+# Put the crown on the bed to leave the blind D-socket open from above.
+wheel_on_crown = transform(knob, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 0)
+for name, shape in [
+    ("rev04-recessed-encoder-section", coupon_on_cut),
+    ("thumbwheel-44mm", wheel_on_crown),
+]:
+    assert len(list(elems(shape, TopAbs_SOLID))) == 1 and BRepCheck_Analyzer(shape).IsValid(), name
+    xmin, ymin, zmin, *_ = bbox(shape)
+    printable = move(shape, -xmin, -ymin, -zmin)
+    BRepMesh_IncrementalMesh(printable, 0.02, False, 0.09, True)
+    stl = StlAPI_Writer()
+    stl.SetASCIIMode(False)
+    path = out / (name + ".stl")
+    if not stl.Write(printable, str(path)):
+        raise OSError(f"Could not write {path}")
