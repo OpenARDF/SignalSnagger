@@ -14,6 +14,19 @@ Each brief opens with an executive summary and names its CAD files. Page 2 shows
 
 Open the viewer locally to rotate, explode or isolate the models. GitHub displays the source of the HTML file. The standalone wheel uses a local origin so it can be imported into CAD independently. [Offline 3D viewer](../../output/models/enclosure-viewer.html) · [44 mm thumbwheel STEP](../../output/models/thumbwheel-44mm.step)
 
+## Print the encoder fit sample
+
+| Print | Orientation supplied in the STL | What it reproduces |
+| --- | --- | --- |
+| [Recessed encoder section](../../output/models/rev04-recessed-encoder-section.stl) | Stand on the flat transverse cut. The antenna end is at the top of the print. | A 61.9 mm length of the printed front with the full 50.8 mm grip width, two antenna-end screw towers, side-button openings, encoder well and both drains. |
+| [44 mm thumbwheel](../../output/models/thumbwheel-44mm.stl) | Flat center of the crown down, blind D-socket up. | The study wheel for the 6 mm D-shaft of the unthreaded PEC12R-4225F-S0024. |
+
+Import in **millimeters at 100%** and keep the supplied orientations. Both files sliced as single manifold parts in PrusaSlicer 2.9.7 with an MK3S-size bed, a 0.4 mm nozzle, PETG, 0.15 mm layers, three perimeters, a 5 mm brim and build-plate-only supports. Remove the brim and supports. Check the mating seam, pilot holes, wheel skirt and socket for loose plastic.
+
+1. With the receiver off, remove its knob and front. Leave the Rev 0.4 board seated in the rear shell. Set the printed section over SW203 and the side buttons with the cut end toward the headphone jack. It should seat on the original seam before the screws are tightened. Start the two original antenna-end cover screws from the rear by hand and snug them gently.
+2. Align the shaft flat and slide the wheel on by hand. Stop if the shaft binds or the PCB flexes. A tight D-socket can change the result of the push test. If the fitted encoder has a threaded bushing, the substitute needs a different seat and has a shorter shaft.
+3. Turn the wheel through a full revolution, press and release it several times, then repeat while gripping the rear shell in either hand. Check for scraping, a missed return, or an accidental side-button press. The nominal rim sits 3.4 mm inside each side of the grip. CAD gives 0.85 mm minimum wheel-to-section clearance at rest and 0.55 mm with the wheel depressed 0.8 mm. Measure travel on the actual switch and compare it with the wheel removed.
+
 ## Mechanical references and datums
 
 - **Case.** The flush, textured KT-70XXT0 is 139.80 × 50.80 × 20.78 mm. Its four assembly towers capture the board near the screw axes. The tested XX variant omits the optional extra MB mounting bosses. The STEP supplies the outer radii, seam, shoulders and cover screws used in the studies. [Case STEP](../../FreeCAD/KT-70XXT0%20ASS%27Y.STEP) · [Polycase product and drawings](https://www.polycase.com/kt-70)
